@@ -1,0 +1,106 @@
+name: CD
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/inha-capstone-25-2/backend
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ env.IMAGE_NAME }}
+      tag: ${{ github.sha }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          provenance: false
+          sbom: false
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE: ${{ needs.build-and-push.outputs.image }}
+      TAG: ${{ needs.build-and-push.outputs.tag }}
+      DIGEST: ${{ needs.build-and-push.outputs.digest }}
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.APP_SERVER_HOST }}
+          username: ${{ secrets.APP_SERVER_USER }}
+          key: ${{ secrets.APP_SERVER_SSH_KEY }}
+          # port: ${{ secrets.APP_SERVER_SSH_PORT }}
+          script: |
+            set -e
+            APP_DIR="/opt/inha-backend"
+            sudo mkdir -p "$APP_DIR/data"
+            sudo chown -R $USER "$APP_DIR"
+            cd "$APP_DIR"
+
+            # .env 생성
+            cat > .env << 'EOF'
+            MONGO_HOST=${{ secrets.MONGO_HOST }}
+            MONGO_PORT=${{ secrets.MONGO_PORT }}
+            MONGO_USER=${{ secrets.MONGO_USER }}
+            MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}
+            MONGO_AUTH_SOURCE=${{ secrets.MONGO_AUTH_SOURCE }}
+            MONGO_DB=${{ secrets.MONGO_DB }}
+            MONGO_COLLECTION=${{ secrets.MONGO_COLLECTION }}
+
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+
+            KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
+            KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}
+            EOF
+
+            # GHCR 로그인(원격 서버에서는 PAT 사용 권장)
+            if [ -n "$GHCR_USERNAME" ] && [ -n "$GHCR_PAT" ]; then
+              docker login ${{ env.REGISTRY }} -u "$GHCR_USERNAME" -p "$GHCR_PAT"
+            fi
+
+            # 정확한 빌드 산출물로 배포(immutable digest)
+            docker pull "${IMAGE}@${DIGEST}"
+            docker rm -f inha-backend || true
+            docker run -d --name inha-backend --restart unless-stopped \
+              -p 8000:8000 \
+              --env-file .env \
+              -v "$APP_DIR/data:/app/data" \
+              "${IMAGE}@${DIGEST}"
