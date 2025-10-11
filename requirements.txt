@@ -4,3 +4,5 @@ uvicorn[standard]
 mysql-connector-python
 # DynamoDB 연결용 AWS SDK
 boto3
+apscheduler
+kaggle
