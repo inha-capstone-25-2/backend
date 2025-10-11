@@ -3,11 +3,15 @@ version: '3.8'
 services:
   # FastAPI
   app:
-    build: .
+    image: python:3.9-slim
     container_name: fastapi_app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    working_dir: /app
+    command: >
+      bash -lc "pip install --no-cache-dir -r requirements.txt &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - .:/app
+      - ./data:/app/data
     ports:
       - "8000:8000"
     environment:
@@ -17,14 +21,20 @@ services:
       - DB_PASSWORD=password
       - DB_NAME=rsrs
 
-      # DynamoDB Local
-      - DYNAMODB_ENDPOINT_URL=http://dynamodb:8000
-      - AWS_ACCESS_KEY_ID=dummy
-      - AWS_SECRET_ACCESS_KEY=dummy
-      - AWS_REGION=ap-northeast-2
+      # MongoDB
+      - MONGO_HOST=mongo
+      - MONGO_PORT=27017
+      - MONGO_USER=root
+      - MONGO_PASSWORD=capstone02
+      - MONGO_AUTH_SOURCE=admin
+      - MONGO_DB=arxiv
+      - MONGO_COLLECTION=arxiv_papers
+
+      # Kaggle
+      - KAGGLE_CONFIG_DIR=/app/data
     depends_on:
       - db
-      - dynamodb
+      - mongo
 
   # MySQL
   db:
@@ -40,17 +50,18 @@ services:
     volumes:
       - db_data:/var/lib/mysql
 
-  # DynamoDB Local
-  dynamodb:
-    image: amazon/dynamodb-local:latest
-    container_name: dynamodb_local
-    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data" # 공유 DB 모드로 실행
-    working_dir: /home/dynamodblocal
+  # MongoDB
+  mongo:
+    image: mongo:6
+    container_name: mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=capstone02
     ports:
-      - "8001:8000"
+      - "27017:27017"
     volumes:
-      - dynamodb_data:/home/dynamodblocal/data
+      - mongo_data:/data/db
 
 volumes:
   db_data:
-  dynamodb_data:
+  mongo_data:

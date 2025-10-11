@@ -1,131 +1,128 @@
 import json
 import logging
 import os
-import subprocess
-import zipfile
-from ..db.connection import get_dynamodb_resource
+from pymongo import UpdateOne
+from pymongo.errors import PyMongoError, BulkWriteError
+from dotenv import load_dotenv
+from app.db.connection import get_mongo_collection
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TABLE_NAME = "arxiv_papers"
-DATA_DIR = "/app/data"
+# 경로 설정 및 .env 로드
+BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR = os.path.join(BACKEND_ROOT, "data")
 DATA_FILE_PATH = os.path.join(DATA_DIR, "arxiv-metadata-oai-snapshot.json")
-ZIP_FILE_PATH = os.path.join(DATA_DIR, "arxiv.zip")
+load_dotenv(os.path.join(BACKEND_ROOT, ".env"))
+
+# 배치 설정
+BATCH_SIZE = 1000
+PROGRESS_EVERY = 5000
 
 
-def download_and_unzip_dataset():
+def download_and_unzip_dataset() -> bool:
+    """Kaggle API로 데이터셋을 다운로드"""
     logger.info("Starting dataset download from Kaggle.")
-
-    # 다운받은 JSON 파일 경로
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # Kaggle API를 사용하여 데이터셋 다운로드
-    try:
-        subprocess.run(
-            [
-                "kaggle", "datasets", "download",
-                "Cornell-University/arxiv",
-                "-p", DATA_DIR,
-                "--unzip"
-            ],
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        logger.info("Dataset downloaded and unzipped successfully.")
-        
-        # 압축 해제 후 삭제
-        if os.path.exists(ZIP_FILE_PATH):
-            os.remove(ZIP_FILE_PATH)
-            logger.info(f"Removed zip file: {ZIP_FILE_PATH}")
-
+    if os.path.exists(DATA_FILE_PATH):
+        logger.info(f"Dataset already exists at {DATA_FILE_PATH}. Skipping download.")
         return True
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to download or unzip dataset: {e.stderr}")
-        return False
-    except FileNotFoundError:
-        logger.error("`kaggle` command not found. Is it installed in the Docker container?")
-        return False
 
-
-def create_arxiv_table(dynamodb):
     try:
-        existing_tables = [table.name for table in dynamodb.tables.all()]
-        if TABLE_NAME not in existing_tables:
-            logger.info(f"Creating table: {TABLE_NAME}")
-            table = dynamodb.create_table(
-                TableName=TABLE_NAME,
-                KeySchema=[
-                    {'AttributeName': 'id', 'KeyType': 'HASH'}
-                ],
-                AttributeDefinitions=[
-                    {'AttributeName': 'id', 'AttributeType': 'S'}
-                ],
-                ProvisionedThroughput={
-                    'ReadCapacityUnits': 10,
-                    'WriteCapacityUnits': 10
-                }
-            )
-            table.wait_until_exists()
-            logger.info(f"Table {TABLE_NAME} created successfully.")
-        else:
-            logger.info(f"Table {TABLE_NAME} already exists.")
-        return dynamodb.Table(TABLE_NAME)
+        os.environ.setdefault("KAGGLE_CONFIG_DIR", DATA_DIR)
+
+        from kaggle.api.kaggle_api_extended import KaggleApi
+
+        api = KaggleApi()
+        api.authenticate()
+        api.dataset_download_files(
+            "Cornell-University/arxiv",
+            path=DATA_DIR,
+            unzip=True,
+            quiet=True
+        )
+
+        # 남아 있는 zip 정리
+        for fname in os.listdir(DATA_DIR):
+            if fname.endswith(".zip"):
+                try:
+                    os.remove(os.path.join(DATA_DIR, fname))
+                except OSError:
+                    pass
+
+        logger.info("Dataset downloaded and unzipped successfully via Kaggle API.")
+        return True
     except Exception as e:
-        logger.error(f"Error creating table: {e}")
-        return None
+        logger.error(f"Failed to download dataset via Kaggle API: {e}")
+        return False
 
 
-def load_arxiv_data_to_dynamodb():
-    logger.info("Starting arXiv data load job.")
+def load_arxiv_data_to_mongodb():
+    """arXiv 메타데이터 JSON 라인 파일을 MongoDB에 upsert."""
+    logger.info("Starting arXiv data load job to MongoDB.")
 
-    # 데이터셋 다운로드 및 압축 해제
     if not download_and_unzip_dataset():
         logger.error("Aborting data load job due to download failure.")
         return
 
-    # DynamoDB에 데이터 로드
-    dynamodb = get_dynamodb_resource()
-    if not dynamodb:
-        logger.error("Failed to get DynamoDB resource. Aborting job.")
-        return
-
-    table = create_arxiv_table(dynamodb)
-    if not table:
-        logger.error("Failed to get DynamoDB table. Aborting job.")
+    client, collection = get_mongo_collection()
+    if collection is None:
+        logger.error("Failed to get MongoDB collection. Aborting job.")
+        if client:
+            client.close()
         return
 
     try:
-        with open(DATA_FILE_PATH, 'r') as f, table.batch_writer() as batch:
-            count = 0
+        ops = []
+        count = 0
+        with open(DATA_FILE_PATH, "r", encoding="utf-8") as f:
             for line in f:
                 try:
                     data = json.loads(line)
-                    # 필요한 데이터만 선택하여 저장
+
                     item = {
-                        'id': data.get('id'),
-                        'title': data.get('title'),
-                        'authors': data.get('authors'),
-                        'abstract': data.get('abstract'),
-                        'categories': data.get('categories'),
-                        'update_date': data.get('update_date')
+                        "id": data.get("id"),
+                        "title": data.get("title"),
+                        "authors": data.get("authors"),
+                        "abstract": data.get("abstract"),
+                        "categories": data.get("categories"),
+                        "update_date": data.get("update_date"),
                     }
-                    # None 값 필드 제거
                     item = {k: v for k, v in item.items() if v is not None}
 
-                    if item.get('id'):
-                        batch.put_item(Item=item)
+                    if item.get("id"):
+                        ops.append(
+                            UpdateOne({"id": item["id"]}, {"$set": item}, upsert=True)
+                        )
                         count += 1
-                        if count % 5000 == 0:
-                            logger.info(f"Loaded {count} items into DynamoDB.")
+
+                        if len(ops) >= BATCH_SIZE:
+                            collection.bulk_write(ops, ordered=False)
+                            ops.clear()
+
+                        if count % PROGRESS_EVERY == 0:
+                            logger.info(f"Processed {count} items for MongoDB upsert.")
                 except json.JSONDecodeError:
-                    logger.warning(f"Could not decode JSON for line: {line.strip()}")
+                    # 데이터 손상 시 스킵
                     continue
-        logger.info(f"Finished loading data. Total items loaded: {count}")
+
+        if ops:
+            collection.bulk_write(ops, ordered=False)
+
+        logger.info(f"Finished loading data into MongoDB. Total processed items: {count}")
+    except (PyMongoError, BulkWriteError) as e:
+        logger.error(f"An error occurred during MongoDB bulk write: {e}")
     except FileNotFoundError:
-        logger.error(
-            f"Data file not found at {DATA_FILE_PATH}. Please make sure the file exists and the volume is mounted correctly.")
+        logger.error(f"Data file not found at {DATA_FILE_PATH}.")
     except Exception as e:
         logger.error(f"An error occurred during data loading: {e}")
+    finally:
+        if client:
+            client.close()
+
+
+if __name__ == "__main__":
+    logger.info("Running scheduler as a standalone script.")
+    load_arxiv_data_to_mongodb()

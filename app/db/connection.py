@@ -1,6 +1,10 @@
 import os
 import mysql.connector
-import boto3
+import logging
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
+
+logger = logging.getLogger(__name__)
 
 # MySQL 연결 설정
 def get_mysql_connection():
@@ -16,13 +20,32 @@ def get_mysql_connection():
         print(f"Error: {err}")
         return None
 
-# DynamoDB 연결 설정
-def get_dynamodb_resource():
-    dynamodb = boto3.resource(
-        'dynamodb',
-        endpoint_url=os.getenv("DYNAMODB_ENDPOINT_URL"),
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION")
-    )
-    return dynamodb
+# MongoDB 연결 설정
+def get_mongo_collection():
+    host = os.getenv("MONGO_HOST")
+    port = int(os.getenv("MONGO_PORT", "27017"))
+    user = os.getenv("MONGO_USER")
+    password = os.getenv("MONGO_PASSWORD")
+    auth_source = os.getenv("MONGO_AUTH_SOURCE", "admin")
+    db_name = os.getenv("MONGO_DB", "arxiv")
+    collection_name = os.getenv("MONGO_COLLECTION", "arxiv_papers")
+
+    if not host:
+        logger.error("MONGO_HOST is not set.")
+        return None, None
+
+    if user and password:
+        mongo_uri = f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
+    else:
+        mongo_uri = f"mongodb://{host}:{port}/"
+
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        client.admin.command("ping")
+        db = client[db_name]
+        coll = db[collection_name]
+        coll.create_index("id", unique=True)
+        return client, coll
+    except PyMongoError as e:
+        logger.error(f"Error: {e}")
+        return None, None
