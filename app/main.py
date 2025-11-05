@@ -3,12 +3,22 @@ import logging
 from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import ConflictingIdError
-from .scheduler.scheduler import load_arxiv_data_to_mongodb  # 변경: 최신 함수 사용
+
+from app.core.env import load_env
+load_env()  # 앱 기동 시 .env 로드
+
+# 추가: 스케줄 작업으로 실행할 함수 연결
+from app.scheduler.scheduler import parse_and_load, NT_FILE_PATH
 
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
-JOB_ID = "arxiv_loader_daily_4am"
+JOB_ID = "dblp_loader_daily_4am"
+
+
+# 추가: 실제 실행 함수 정의
+def load_dblp_data_to_mongodb():
+    parse_and_load(NT_FILE_PATH)
 
 
 def _ensure_daily_job():
@@ -18,7 +28,7 @@ def _ensure_daily_job():
         return
     try:
         scheduler.add_job(
-            load_arxiv_data_to_mongodb,
+            load_dblp_data_to_mongodb,
             trigger="cron",
             id=JOB_ID,
             hour=4,
@@ -27,7 +37,7 @@ def _ensure_daily_job():
             misfire_grace_time=3600,
             max_instances=1,
         )
-        logger.info("Scheduled arxiv loader at 04:00 Asia/Seoul.")
+        logger.info("Scheduled dblp loader at 04:00 Asia/Seoul.")
     except ConflictingIdError:
         logger.info("Scheduler job conflict. Using existing job.")
 
@@ -47,4 +57,5 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def root():
-    return {"Hello World!"}
+    # set은 JSON 직렬화 불가 -> dict로 반환
+    return {"message": "Hello World!"}
