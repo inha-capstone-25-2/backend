@@ -7,9 +7,6 @@ from apscheduler.jobstores.base import ConflictingIdError
 # Settings를 초기화하여 .env 계층을 로드
 from app.core.settings import settings
 
-# 추가: 스케줄 작업으로 실행할 함수 연결
-from app.scheduler.scheduler import parse_and_load, NT_FILE_PATH
-
 # 추가: Auth 라우터 & DB 초기화
 from app.api.routes.auth import router as auth_router
 from app.db.mysql import init_db

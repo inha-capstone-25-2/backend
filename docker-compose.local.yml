@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # FastAPI
   app:
-    image: python:3.9-slim
+    image: python:3.11-slim
     container_name: fastapi_local
     working_dir: /app
     command: >
@@ -11,12 +11,13 @@ services:
       uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - .:/app
-      - ./data:/app/data
     ports:
       - "8000:8000"
     environment:
+      - PYTHONUNBUFFERED=1
       # MySQL
-      - DB_HOST=db
+      - DB_HOST=mysql
+      - DB_PORT=3306
       - DB_USER=root
       - DB_PASSWORD=capstone02
       - DB_NAME=rsrs
@@ -27,26 +28,38 @@ services:
       - MONGO_USER=root
       - MONGO_PASSWORD=capstone02
       - MONGO_AUTH_SOURCE=admin
-      - MONGO_DB=dblp
+      - MONGO_DB=rsrs
       - MONGO_COLLECTION=publications
 
+      # App settings
+      - APP_ENV=local
+      - SECRET_KEY=dev-secret
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+
     depends_on:
-      - db
-      - mongo
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
 
   # MySQL
-  db:
+  mysql:
     image: mysql:8.0
     container_name: mysql_local
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     environment:
       - MYSQL_ROOT_PASSWORD=capstone02
       - MYSQL_DATABASE=rsrs
-      - MYSQL_USER=root
-      - MYSQL_PASSWORD=capstone02
+      - MYSQL_ROOT_HOST=%   # root 원격 접속 허용
     ports:
       - "3306:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pcapstone02"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   # MongoDB
   mongo:
@@ -59,7 +72,12 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep mongod >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
 volumes:
-  db_data:
+  mysql_data:
   mongo_data:
