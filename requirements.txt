@@ -4,4 +4,7 @@ mysql-connector-python
 apscheduler
 pymongo
 python-dotenv
-rdflib
+sqlalchemy
+passlib[bcrypt]
+python-jose[cryptography]
+email-validator
