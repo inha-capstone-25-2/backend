@@ -4,7 +4,7 @@ services:
   # FastAPI
   app:
     image: python:3.9-slim
-    container_name: fastapi_app
+    container_name: fastapi_local
     working_dir: /app
     command: >
       bash -lc "pip install --no-cache-dir -r requirements.txt &&
@@ -17,8 +17,8 @@ services:
     environment:
       # MySQL
       - DB_HOST=db
-      - DB_USER=user
-      - DB_PASSWORD=password
+      - DB_USER=root
+      - DB_PASSWORD=capstone02
       - DB_NAME=rsrs
 
       # MongoDB
@@ -27,11 +27,9 @@ services:
       - MONGO_USER=root
       - MONGO_PASSWORD=capstone02
       - MONGO_AUTH_SOURCE=admin
-      - MONGO_DB=arxiv
-      - MONGO_COLLECTION=arxiv_papers
+      - MONGO_DB=dblp
+      - MONGO_COLLECTION=publications
 
-      # Kaggle
-      - KAGGLE_CONFIG_DIR=/app/data
     depends_on:
       - db
       - mongo
@@ -39,12 +37,12 @@ services:
   # MySQL
   db:
     image: mysql:8.0
-    container_name: mysql_db
+    container_name: mysql_local
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_ROOT_PASSWORD=capstone02
       - MYSQL_DATABASE=rsrs
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=capstone02
     ports:
       - "3306:3306"
     volumes:
@@ -53,7 +51,7 @@ services:
   # MongoDB
   mongo:
     image: mongo:6
-    container_name: mongodb
+    container_name: mongodb_local
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=capstone02

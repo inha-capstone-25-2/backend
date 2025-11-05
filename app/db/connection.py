@@ -1,5 +1,5 @@
 import os
-import mysql.connector
+# import mysql.connector
 import logging
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
@@ -7,18 +7,18 @@ from pymongo.errors import PyMongoError
 logger = logging.getLogger(__name__)
 
 # MySQL 연결 설정
-def get_mysql_connection():
-    try:
-        conn = mysql.connector.connect(
-            host=os.getenv("DB_HOST"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            database=os.getenv("DB_NAME")
-        )
-        return conn
-    except mysql.connector.Error as err:
-        print(f"Error: {err}")
-        return None
+# def get_mysql_connection():
+#     try:
+#         conn = mysql.connector.connect(
+#             host=os.getenv("DB_HOST"),
+#             user=os.getenv("DB_USER"),
+#             password=os.getenv("DB_PASSWORD"),
+#             database=os.getenv("DB_NAME")
+#         )
+#         return conn
+#     except mysql.connector.Error as err:
+#         print(f"Error: {err}")
+#         return None
 
 # MongoDB 연결 설정
 def get_mongo_collection():
@@ -44,7 +44,7 @@ def get_mongo_collection():
         client.admin.command("ping")
         db = client[db_name]
         coll = db[collection_name]
-        coll.create_index("id", unique=True)
+        # coll.create_index("id", unique=True) # 이 라인을 삭제 또는 주석 처리합니다. _id는 자동으로 고유 인덱스가 생성됩니다.
         return client, coll
     except PyMongoError as e:
         logger.error(f"Error: {e}")

@@ -1,8 +1,7 @@
 fastapi
 uvicorn[standard]
-# MySQL 연결용 라이브러리
 mysql-connector-python
-# DynamoDB 연결용 AWS SDK
-boto3
 apscheduler
-kaggle
+pymongo
+python-dotenv
+rdflib
