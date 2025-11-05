@@ -10,6 +10,10 @@ load_env()  # 앱 기동 시 .env 로드
 # 추가: 스케줄 작업으로 실행할 함수 연결
 from app.scheduler.scheduler import parse_and_load, NT_FILE_PATH
 
+# 추가: Auth 라우터 & DB 초기화
+from app.api.routes.auth import router as auth_router
+from app.db.mysql import init_db
+
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
@@ -44,6 +48,8 @@ def _ensure_daily_job():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # DB 테이블 준비
+    init_db()
     _ensure_daily_job()
     if not scheduler.running:
         scheduler.start()
@@ -53,6 +59,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Auth 라우터 등록
+app.include_router(auth_router)
 
 
 @app.get("/")
