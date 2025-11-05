@@ -1,34 +1,19 @@
-import os
-# import mysql.connector
 import logging
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
+from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# MySQL 연결 설정
-# def get_mysql_connection():
-#     try:
-#         conn = mysql.connector.connect(
-#             host=os.getenv("DB_HOST"),
-#             user=os.getenv("DB_USER"),
-#             password=os.getenv("DB_PASSWORD"),
-#             database=os.getenv("DB_NAME")
-#         )
-#         return conn
-#     except mysql.connector.Error as err:
-#         print(f"Error: {err}")
-#         return None
-
 # MongoDB 연결 설정
 def get_mongo_collection():
-    host = os.getenv("MONGO_HOST")
-    port = int(os.getenv("MONGO_PORT", "27017"))
-    user = os.getenv("MONGO_USER")
-    password = os.getenv("MONGO_PASSWORD")
-    auth_source = os.getenv("MONGO_AUTH_SOURCE", "admin")
-    db_name = os.getenv("MONGO_DB", "arxiv")
-    collection_name = os.getenv("MONGO_COLLECTION", "arxiv_papers")
+    host = settings.mongo_host
+    port = settings.mongo_port
+    user = settings.mongo_user
+    password = settings.mongo_password
+    auth_source = settings.mongo_auth_source
+    db_name = settings.mongo_db
+    collection_name = settings.mongo_collection
 
     if not host:
         logger.error("MONGO_HOST is not set.")
@@ -44,7 +29,6 @@ def get_mongo_collection():
         client.admin.command("ping")
         db = client[db_name]
         coll = db[collection_name]
-        # coll.create_index("id", unique=True) # 이 라인을 삭제 또는 주석 처리합니다. _id는 자동으로 고유 인덱스가 생성됩니다.
         return client, coll
     except PyMongoError as e:
         logger.error(f"Error: {e}")

@@ -4,8 +4,8 @@ from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import ConflictingIdError
 
-from app.core.env import load_env
-load_env()  # 앱 기동 시 .env 로드
+# Settings를 초기화하여 .env 계층을 로드
+from app.core.settings import settings
 
 # 추가: 스케줄 작업으로 실행할 함수 연결
 from app.scheduler.scheduler import parse_and_load, NT_FILE_PATH

@@ -1,7 +1,7 @@
 from __future__ import annotations
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from app.core.settings import settings
 
 Base = declarative_base()
 
@@ -9,11 +9,11 @@ _engine = None
 _SessionLocal = None
 
 def _mysql_url() -> str:
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "3306")
-    user = os.getenv("DB_USER", "root")
-    password = os.getenv("DB_PASSWORD", "")
-    db = os.getenv("DB_NAME", "app")
+    host = settings.db_host
+    port = settings.db_port
+    user = settings.db_user
+    password = settings.db_password
+    db = settings.db_name
     return f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{db}?charset=utf8mb4"
 
 def get_engine():

@@ -1,14 +1,14 @@
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any, Dict
 from passlib.context import CryptContext
 from jose import jwt
+from app.core.settings import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-prod")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+SECRET_KEY = settings.secret_key
+ALGORITHM = settings.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
