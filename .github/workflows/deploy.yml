@@ -11,22 +11,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (main repo only)
+      - name: Checkout with submodules (PAT)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false   # GITHUB_TOKEN 자격증명 비활성화
-
-      - name: Auth for private submodules (HTTPS + PAT)
-        run: |
-          git config --global url."https://${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          git submodule sync --recursive
-          git submodule update --init --recursive --depth 1
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_TOKEN }}  # PAT (repo read + SSO 승인)
 
       - name: Verify env submodule
-        run: |
-          ls -la env || true
-          ls -la env/prod || true
+        run: ls -la env/prod || (echo "env/prod missing" && exit 1)
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
