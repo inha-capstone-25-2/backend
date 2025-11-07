@@ -8,11 +8,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (include submodules)
+      - name: Checkout (include submodules with PAT)
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
           fetch-depth: 0
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+
+      - name: Verify env submodule
+        run: |
+          ls -la env || true
+          ls -la env/prod || true
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
