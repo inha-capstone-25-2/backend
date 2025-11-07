@@ -24,31 +24,22 @@ jobs:
 
       - name: Write EC2 SSH key
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/ec2_key
-          chmod 600 ~/.ssh/ec2_key
-          grep -q "PRIVATE KEY" ~/.ssh/ec2_key || (echo "Invalid EC2_KEY" && exit 1)
+          mkdir -p .ssh
+          echo "${{ secrets.EC2_KEY }}" > .ssh/ec2_key
+          chmod 600 .ssh/ec2_key
+          grep -q "PRIVATE KEY" .ssh/ec2_key || (echo "Invalid EC2_KEY" && exit 1)
 
       - name: Remote pre-check
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key_path: ~/.ssh/ec2_key
+          key_path: .ssh/ec2_key
           script: |
             set -e
             echo "[whoami]"; whoami
-            echo "[pwd]"; pwd
-            echo "[uname]"; uname -a
             TARGET="${{ secrets.EC2_PATH }}"
-            echo "[ls -ld target parent]"
             ls -ld "$(dirname "$TARGET")" || true
-            ls -ld "$TARGET" || true
-            echo "[disk usage]"
-            df -h
-            echo "[inode usage]"
-            df -i
-            echo "[touch test]"
             mkdir -p "$TARGET"
             touch "$TARGET/__write_probe" || (echo "Cannot write to $TARGET" && exit 1)
             rm -f "$TARGET/__write_probe"
@@ -59,31 +50,20 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key_path: ~/.ssh/ec2_key
+          key_path: .ssh/ec2_key
           source: "."
           target: ${{ secrets.EC2_PATH }}
           debug: true
           overwrite: true
-
-      - name: Remote post-check
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key_path: ~/.ssh/ec2_key
-          script: |
-            set -e
-            cd ${{ secrets.EC2_PATH }}
-            ls -la | head -50
-            grep -R "FastAPI" -n app/main.py || true
 
       - name: Build & Restart
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key_path: ~/.ssh/ec2_key
+          key_path: .ssh/ec2_key
           script: |
+            set -e
             cd ${{ secrets.EC2_PATH }}
             docker compose -f docker-compose.prod.yml up -d --build
             docker ps
