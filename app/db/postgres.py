@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from urllib.parse import quote_plus
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from app.core.settings import settings
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 def _postgres_url() -> str:
     host = settings.db_host
     port = settings.db_port
-    user = settings.db_user
-    password = settings.db_password
+    user = quote_plus(settings.db_user or "")
+    password = quote_plus(settings.db_password or "")
     db = settings.db_name
     return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
 
