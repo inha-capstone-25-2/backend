@@ -22,36 +22,15 @@ jobs:
       - name: Verify env submodule
         run: ls -la env/prod || (echo "env/prod missing" && exit 1)
 
-      - name: Remote pre-check
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            set -e
-            echo "[whoami]"; whoami
-            TARGET="${{ secrets.EC2_PATH }}"
-            ls -ld "$(dirname "$TARGET")" || true
-            mkdir -p "$TARGET"
-            touch "$TARGET/__write_probe" || (echo "Cannot write to $TARGET" && exit 1)
-            rm -f "$TARGET/__write_probe"
-            echo "Pre-check OK"
-
-      - name: Copy files to EC2 (only required files)
+      - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: |
-            app/**
-            requirements.txt
-            Dockerfile
-            docker-compose.prod.yml
-            env/prod/.env
+          # 멀티라인 대신 단일 라인(콤마 구분)로 지정 — CRLF로 인한 매칭 실패 방지
+          source: "app/**,requirements.txt,Dockerfile,docker-compose.prod.yml,env/prod/.env"
           target: ${{ secrets.EC2_PATH }}
-          debug: true
           overwrite: true
 
       - name: Build & Restart
@@ -66,4 +45,3 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --build
             docker ps
             docker logs fastapi_prod --tail=50 || true
-            docker image prune -f || true
