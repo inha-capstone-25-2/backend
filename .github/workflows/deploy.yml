@@ -11,12 +11,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout with submodules (PAT)
+      - name: Checkout with submodules (SSH Deploy Key)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_TOKEN }}  # PAT (repo read + SSO 승인)
+          persist-credentials: false
+          ssh-key: ${{ secrets.SUBMODULES_SSH_KEY }}
+          # 필요 시 엄격 검증 해제(호스트 키 문제 시만):
+          # ssh-strict: false
 
       - name: Verify env submodule
         run: ls -la env/prod || (echo "env/prod missing" && exit 1)
