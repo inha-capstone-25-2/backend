@@ -1,5 +1,5 @@
 [submodule "env"]
 	path = env
-	url = https://github.com/inha-capstone-25-2/backend-secret
+	url = git@github.com:inha-capstone-25-2/backend-secret.git
 	branch = main
 	ignore = all
