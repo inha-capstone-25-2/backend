@@ -13,30 +13,10 @@ services:
       - .:/app
     ports:
       - "8000:8000"
+    env_file:
+      - env/local/.env
     environment:
-      - PYTHONUNBUFFERED=1
-
-      # PostgreSQL (DB_*는 Settings에서 인식)
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=root
-      - DB_PASSWORD=1234
-      - DB_NAME=rsrs
-
-      # MongoDB
-      - MONGO_HOST=mongo
-      - MONGO_PORT=27017
-      - MONGO_USER=root
-      - MONGO_PASSWORD=1234
-      - MONGO_AUTH_SOURCE=admin
-      - MONGO_DB=rsrs
-      - MONGO_COLLECTION=publications
-
-      # App settings
-      - APP_ENV=local
-      - SECRET_KEY=dev-secret
-      - ACCESS_TOKEN_EXPIRE_MINUTES=60
-
+      - PYTHONUNBUFFERED=1   # 컨테이너 편의용 (필요 시 env로 이동 가능)
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,7 +36,8 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d rsrs"]
+      # 사용자명 root로 맞춤
+      test: ["CMD-SHELL", "pg_isready -U root -d rsrs"]
       interval: 5s
       timeout: 3s
       retries: 30
