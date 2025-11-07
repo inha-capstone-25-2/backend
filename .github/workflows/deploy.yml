@@ -4,16 +4,24 @@ on:
   push:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (include submodules with PAT)
+      - name: Checkout (main repo only)
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
-          token: ${{ secrets.SUBMODULES_TOKEN }}
+          persist-credentials: false   # GITHUB_TOKEN 자격증명 비활성화
+
+      - name: Auth for private submodules (HTTPS + PAT)
+        run: |
+          git config --global url."https://${{ secrets.SUBMODULES_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git submodule sync --recursive
+          git submodule update --init --recursive --depth 1
 
       - name: Verify env submodule
         run: |
