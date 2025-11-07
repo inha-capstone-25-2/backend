@@ -8,18 +8,18 @@ Base = declarative_base()
 _engine = None
 _SessionLocal = None
 
-def _mysql_url() -> str:
+def _postgres_url() -> str:
     host = settings.db_host
     port = settings.db_port
     user = settings.db_user
     password = settings.db_password
     db = settings.db_name
-    return f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{db}?charset=utf8mb4"
+    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
 
 def get_engine():
     global _engine
     if _engine is None:
-        _engine = create_engine(_mysql_url(), pool_pre_ping=True, future=True)
+        _engine = create_engine(_postgres_url(), pool_pre_ping=True, future=True)
     return _engine
 
 def _get_sessionmaker():
@@ -36,5 +36,4 @@ def get_db() -> Session:
         db.close()
 
 def init_db():
-    # 테이블 생성
     Base.metadata.create_all(bind=get_engine())

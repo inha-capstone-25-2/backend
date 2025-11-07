@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.api.deps import get_current_user
 
-from app.db.mysql import get_db
+from app.db.postgres import get_db
 from app.models.user import User
 from app.schemas.auth import UserCreate, UserOut, Token
 from app.core.security import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES

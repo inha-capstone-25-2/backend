@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-mysql-connector-python
+psycopg2-binary
 apscheduler
 pymongo
 python-dotenv

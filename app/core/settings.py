@@ -30,12 +30,27 @@ class Settings(BaseSettings):
     # 앱
     app_env: str = Field(default="local", validation_alias="APP_ENV")
 
-    # DB (MYSQL_*도 호환)
-    db_host: str = Field(default="localhost", validation_alias=AliasChoices("DB_HOST", "MYSQL_HOST"))
-    db_port: int = Field(default=3306, validation_alias=AliasChoices("DB_PORT", "MYSQL_PORT"))
-    db_user: str = Field(default="root", validation_alias=AliasChoices("DB_USER", "MYSQL_USER"))
-    db_password: str = Field(default="", validation_alias=AliasChoices("DB_PASSWORD", "MYSQL_PASSWORD"))
-    db_name: str = Field(default="app", validation_alias=AliasChoices("DB_NAME", "MYSQL_DB"))
+    # DB (PostgreSQL 전용)
+    db_host: str = Field(
+        default="localhost",
+        validation_alias=AliasChoices("DB_HOST", "POSTGRES_HOST", "POSTGRESQL_HOST"),
+    )
+    db_port: int = Field(
+        default=5432,
+        validation_alias=AliasChoices("DB_PORT", "POSTGRES_PORT", "POSTGRESQL_PORT"),
+    )
+    db_user: str = Field(
+        default="postgres",
+        validation_alias=AliasChoices("DB_USER", "POSTGRES_USER", "POSTGRESQL_USER"),
+    )
+    db_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("DB_PASSWORD", "POSTGRES_PASSWORD", "POSTGRESQL_PASSWORD"),
+    )
+    db_name: str = Field(
+        default="app",
+        validation_alias=AliasChoices("DB_NAME", "POSTGRES_DB", "POSTGRESQL_DB"),
+    )
 
     # Mongo
     mongo_host: str = Field(default="localhost", validation_alias="MONGO_HOST")

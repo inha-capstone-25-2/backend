@@ -9,7 +9,7 @@ from app.core.settings import settings
 
 # 추가: Auth 라우터 & DB 초기화
 from app.api.routes.auth import router as auth_router
-from app.db.mysql import init_db
+from app.db.postgres import init_db
 
 logger = logging.getLogger(__name__)
 
