@@ -18,28 +18,74 @@ jobs:
           submodules: recursive
           persist-credentials: false
           ssh-key: ${{ secrets.SUBMODULES_SSH_KEY }}
-          # 필요 시 엄격 검증 해제(호스트 키 문제 시만):
-          # ssh-strict: false
 
       - name: Verify env submodule
         run: ls -la env/prod || (echo "env/prod missing" && exit 1)
+
+      - name: Write EC2 SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          grep -q "PRIVATE KEY" ~/.ssh/ec2_key || (echo "Invalid EC2_KEY" && exit 1)
+
+      - name: Remote pre-check
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key_path: ~/.ssh/ec2_key
+          script: |
+            set -e
+            echo "[whoami]"; whoami
+            echo "[pwd]"; pwd
+            echo "[uname]"; uname -a
+            TARGET="${{ secrets.EC2_PATH }}"
+            echo "[ls -ld target parent]"
+            ls -ld "$(dirname "$TARGET")" || true
+            ls -ld "$TARGET" || true
+            echo "[disk usage]"
+            df -h
+            echo "[inode usage]"
+            df -i
+            echo "[touch test]"
+            mkdir -p "$TARGET"
+            touch "$TARGET/__write_probe" || (echo "Cannot write to $TARGET" && exit 1)
+            rm -f "$TARGET/__write_probe"
+            echo "Pre-check OK"
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
+          key_path: ~/.ssh/ec2_key
           source: "."
           target: ${{ secrets.EC2_PATH }}
+          debug: true
+          overwrite: true
+
+      - name: Remote post-check
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key_path: ~/.ssh/ec2_key
+          script: |
+            set -e
+            cd ${{ secrets.EC2_PATH }}
+            ls -la | head -50
+            grep -R "FastAPI" -n app/main.py || true
 
       - name: Build & Restart
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
+          key_path: ~/.ssh/ec2_key
           script: |
             cd ${{ secrets.EC2_PATH }}
             docker compose -f docker-compose.prod.yml up -d --build
+            docker ps
+            docker logs fastapi_prod --tail=50 || true
             docker image prune -f || true
