@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # FastAPI
+  app:
+    image: python:3.11-slim
+    container_name: fastapi_local
+    working_dir: /app
+    command: >
+      bash -lc "pip install --no-cache-dir -r requirements.txt &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - env/local/.env
+    environment:
+      - PYTHONUNBUFFERED=1   # 컨테이너 편의용 (필요 시 env로 이동 가능)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+  # PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: postgres_local
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=rsrs
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      # 사용자명 root로 맞춤
+      test: ["CMD-SHELL", "pg_isready -U root -d rsrs"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # MongoDB
+  mongo:
+    image: mongo:6
+    container_name: mongodb_local
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=1234
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep mongod >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pg_data:
+  mongo_data:
