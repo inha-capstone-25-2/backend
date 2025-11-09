@@ -11,3 +11,4 @@ python-jose[cryptography]
 email-validator
 pydantic-settings>=2.2
 python-multipart
+kaggle

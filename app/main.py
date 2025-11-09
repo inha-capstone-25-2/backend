@@ -9,13 +9,24 @@ from app.core.settings import settings
 
 # 추가: Auth 라우터 & DB 초기화
 from app.api.routes.auth import router as auth_router
+from app.api.routes.jobs import router as jobs_router  # 추가
 from app.db.postgres import init_db
+from app.scheduler.scheduler import load_arxiv_data_to_mongodb  # 추가
 
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
-JOB_ID = "dblp_loader_daily_4am"
+JOB_ID = "arxiv_loader_daily_4am"
 
+
+def _run_scheduled_arxiv_job():
+    log = logging.getLogger("uvicorn.error")
+    log.info("[arxiv-job][scheduled] triggered")
+    ok = load_arxiv_data_to_mongodb()
+    if ok:
+        log.info("[arxiv-job][scheduled] success")
+    else:
+        log.error("[arxiv-job][scheduled] failed")
 
 def _ensure_daily_job():
     """중복 등록을 피하면서 매일 04:00 작업을 보장."""
@@ -24,7 +35,7 @@ def _ensure_daily_job():
         return
     try:
         scheduler.add_job(
-            lambda: None,
+            _run_scheduled_arxiv_job,   # 래퍼로 교체
             trigger="cron",
             id=JOB_ID,
             hour=4,
@@ -33,7 +44,7 @@ def _ensure_daily_job():
             misfire_grace_time=3600,
             max_instances=1,
         )
-        logger.info("Scheduled dblp loader at 04:00 Asia/Seoul.")
+        logger.info("Scheduled arxiv loader at 04:00 Asia/Seoul.")
     except ConflictingIdError:
         logger.info("Scheduler job conflict. Using existing job.")
 
@@ -57,6 +68,7 @@ app = FastAPI(lifespan=lifespan)
 
 # Auth 라우터 등록
 app.include_router(auth_router)
+app.include_router(jobs_router)  # 추가
 
 
 @app.get("/")

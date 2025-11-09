@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 from typing import Sequence
-from pydantic import BaseModel, Field, AliasChoices
+from pydantic import BaseModel, Field  # ...existing code...
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def _base_dir() -> Path:
@@ -27,12 +27,12 @@ def _env_files() -> Sequence[Path]:
 class Settings(BaseSettings):
     app_env: str = Field(default="local", validation_alias="APP_ENV")
 
-    # PostgreSQL: DB_* 별칭 제거
-    db_host: str = Field(default="localhost", validation_alias=AliasChoices("POSTGRESQL_HOST", "POSTGRES_HOST"))
-    db_port: int = Field(default=5432, validation_alias=AliasChoices("POSTGRESQL_PORT", "POSTGRES_PORT"))
-    db_user: str = Field(default="postgres", validation_alias=AliasChoices("POSTGRESQL_USER", "POSTGRES_USER"))
-    db_password: str = Field(default="", validation_alias=AliasChoices("POSTGRESQL_PASSWORD", "POSTGRES_PASSWORD"))
-    db_name: str = Field(default="app", validation_alias=AliasChoices("POSTGRESQL_DB", "POSTGRES_DB"))
+    # PostgreSQL: POSTGRES_*만 사용
+    db_host: str = Field(default="localhost", validation_alias="POSTGRES_HOST")
+    db_port: int = Field(default=5432, validation_alias="POSTGRES_PORT")
+    db_user: str = Field(default="postgres", validation_alias="POSTGRES_USER")
+    db_password: str = Field(default="", validation_alias="POSTGRES_PASSWORD")
+    db_name: str = Field(default="app", validation_alias="POSTGRES_DB")
 
     # Mongo
     mongo_host: str = Field(default="localhost", validation_alias="MONGO_HOST")
@@ -54,7 +54,7 @@ class Settings(BaseSettings):
         env_prefix="",
         case_sensitive=False,
         extra="ignore",
-        env_ignore_empty=True,  # 빈 환경변수는 없는 것으로 간주
+        env_ignore_empty=True,
     )
 
 settings = Settings()
