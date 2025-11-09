@@ -11,12 +11,13 @@ services:
       uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - .:/app
+      - C:/Users/chosh/.kaggle:/root/.kaggle:ro   # 호스트 Kaggle 자격 증명 마운트
     ports:
       - "8000:8000"
     env_file:
       - env/local/.env
     environment:
-      - PYTHONUNBUFFERED=1   # 컨테이너 편의용 (필요 시 env로 이동 가능)
+      - PYTHONUNBUFFERED=1
     depends_on:
       postgres:
         condition: service_healthy
@@ -27,17 +28,14 @@ services:
   postgres:
     image: postgres:15
     container_name: postgres_local
-    environment:
-      - POSTGRES_USER=root
-      - POSTGRES_PASSWORD=1234
-      - POSTGRES_DB=rsrs
+    env_file:
+      - env/local/.env
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      # 사용자명 root로 맞춤
-      test: ["CMD-SHELL", "pg_isready -U root -d rsrs"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -46,9 +44,8 @@ services:
   mongo:
     image: mongo:6
     container_name: mongodb_local
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=1234
+    env_file:
+      - env/local/.env
     ports:
       - "27017:27017"
     volumes:
