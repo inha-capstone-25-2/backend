@@ -17,11 +17,6 @@ scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
 JOB_ID = "dblp_loader_daily_4am"
 
 
-# 추가: 실제 실행 함수 정의
-def load_dblp_data_to_mongodb():
-    parse_and_load(NT_FILE_PATH)
-
-
 def _ensure_daily_job():
     """중복 등록을 피하면서 매일 04:00 작업을 보장."""
     if scheduler.get_job(JOB_ID):
@@ -29,7 +24,7 @@ def _ensure_daily_job():
         return
     try:
         scheduler.add_job(
-            load_dblp_data_to_mongodb,
+            lambda: None,
             trigger="cron",
             id=JOB_ID,
             hour=4,
@@ -45,8 +40,11 @@ def _ensure_daily_job():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # DB 테이블 준비
-    init_db()
+    try:
+        # DB 테이블 준비
+        init_db()
+    except Exception as e:
+        logger.error(f"init_db failed: {e}")
     _ensure_daily_job()
     if not scheduler.running:
         scheduler.start()

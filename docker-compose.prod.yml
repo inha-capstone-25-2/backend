@@ -7,12 +7,12 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_prod
     env_file:
-      - env/prod/.env   # POSTGRESQL_*, MONGO_* 등을 이 파일에서 주입
+      - env/prod/.env
     environment:
-      - APP_ENV=prod
-      # 필요 시 추가(미설정 시 기본값 사용)
-      # - SECRET_KEY=change-me
-      # - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      APP_ENV: prod
     ports:
-      - "80:8000"       # 외부 80 → 컨테이너 8000
+      - "80:8000"
+    # EC2의 Docker 호스트로 접근할 수 있게 매핑
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always

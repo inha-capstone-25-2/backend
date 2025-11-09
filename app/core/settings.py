@@ -6,20 +6,18 @@ from pydantic import BaseModel, Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def _base_dir() -> Path:
-    # 프로젝트 루트 (backend)
     return Path(__file__).resolve().parents[2]
 
 def _env_files() -> Sequence[Path]:
     base = _base_dir()
     app_env = os.getenv("APP_ENV", "local")
     candidates = [
-        base / ".env",                          # 기본
-        base / f".env.{app_env}",               # 프로필
-        base / ".env.local",                    # 로컬 공통 오버라이드
-        base / f".env.{app_env}.local",         # 프로필 로컬 오버라이드
-        base / "env" / app_env / ".env",        # 서브모듈(backend/env/<APP_ENV>/.env)
+        base / ".env",
+        base / f".env.{app_env}",
+        base / ".env.local",
+        base / f".env.{app_env}.local",
+        base / "env" / app_env / ".env",
     ]
-    # 존재하는 파일만 유지(순서대로 로드)
     seen = []
     for p in candidates:
         if p.is_file() and p not in seen:
@@ -27,30 +25,14 @@ def _env_files() -> Sequence[Path]:
     return seen
 
 class Settings(BaseSettings):
-    # 앱
     app_env: str = Field(default="local", validation_alias="APP_ENV")
 
-    # DB (PostgreSQL 전용)
-    db_host: str = Field(
-        default="localhost",
-        validation_alias=AliasChoices("DB_HOST", "POSTGRES_HOST", "POSTGRESQL_HOST"),
-    )
-    db_port: int = Field(
-        default=5432,
-        validation_alias=AliasChoices("DB_PORT", "POSTGRES_PORT", "POSTGRESQL_PORT"),
-    )
-    db_user: str = Field(
-        default="postgres",
-        validation_alias=AliasChoices("DB_USER", "POSTGRES_USER", "POSTGRESQL_USER"),
-    )
-    db_password: str = Field(
-        default="",
-        validation_alias=AliasChoices("DB_PASSWORD", "POSTGRES_PASSWORD", "POSTGRESQL_PASSWORD"),
-    )
-    db_name: str = Field(
-        default="app",
-        validation_alias=AliasChoices("DB_NAME", "POSTGRES_DB", "POSTGRESQL_DB"),
-    )
+    # PostgreSQL: DB_* 별칭 제거
+    db_host: str = Field(default="localhost", validation_alias=AliasChoices("POSTGRESQL_HOST", "POSTGRES_HOST"))
+    db_port: int = Field(default=5432, validation_alias=AliasChoices("POSTGRESQL_PORT", "POSTGRES_PORT"))
+    db_user: str = Field(default="postgres", validation_alias=AliasChoices("POSTGRESQL_USER", "POSTGRES_USER"))
+    db_password: str = Field(default="", validation_alias=AliasChoices("POSTGRESQL_PASSWORD", "POSTGRES_PASSWORD"))
+    db_name: str = Field(default="app", validation_alias=AliasChoices("POSTGRESQL_DB", "POSTGRES_DB"))
 
     # Mongo
     mongo_host: str = Field(default="localhost", validation_alias="MONGO_HOST")
@@ -72,6 +54,7 @@ class Settings(BaseSettings):
         env_prefix="",
         case_sensitive=False,
         extra="ignore",
+        env_ignore_empty=True,  # 빈 환경변수는 없는 것으로 간주
     )
 
 settings = Settings()

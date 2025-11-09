@@ -4,21 +4,23 @@ on:
   push:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (include submodules with PAT)
+      - name: Checkout with submodules (SSH Deploy Key)
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
-          token: ${{ secrets.SUBMODULES_TOKEN }}
+          submodules: recursive
+          persist-credentials: false
+          ssh-key: ${{ secrets.SUBMODULES_SSH_KEY }}
 
       - name: Verify env submodule
-        run: |
-          ls -la env || true
-          ls -la env/prod || true
+        run: ls -la env/prod || (echo "env/prod missing" && exit 1)
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -26,8 +28,33 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "."
+          source: "app/**,requirements.txt,Dockerfile,docker-compose.prod.yml,env/prod/.env"
           target: ${{ secrets.EC2_PATH }}
+          overwrite: true
+
+      - name: Prepare docker on EC2 (install/enable if needed)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            if ! command -v docker >/dev/null 2>&1; then
+              # Ubuntu 예시 (Amazon Linux면 yum 사용)
+              if command -v apt-get >/dev/null 2>&1; then
+                sudo apt-get update -y
+                sudo apt-get install -y docker.io docker-compose-plugin
+                sudo systemctl enable --now docker
+              elif command -v yum >/dev/null 2>&1; then
+                sudo yum install -y docker
+                sudo systemctl enable --now docker
+              fi
+            else
+              sudo systemctl start docker || true
+            fi
+            docker --version || true
+            docker compose version || true
 
       - name: Build & Restart
         uses: appleboy/ssh-action@v1.2.0
@@ -36,6 +63,9 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
+            set -e
             cd ${{ secrets.EC2_PATH }}
-            docker compose -f docker-compose.prod.yml up -d --build
-            docker image prune -f || true
+            # 권한 문제 방지 위해 sudo 사용
+            sudo docker compose -f docker-compose.prod.yml up -d --build
+            sudo docker ps
+            sudo docker logs fastapi_prod --tail=50 || true
