@@ -28,7 +28,6 @@ def _run_scheduled_arxiv_job():
     else:
         log.error("[arxiv-job][scheduled] failed")
 
-
 def _ensure_daily_job():
     """중복 등록을 피하면서 매일 04:00 작업을 보장."""
     if scheduler.get_job(JOB_ID):
