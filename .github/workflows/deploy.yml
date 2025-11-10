@@ -97,6 +97,24 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.EC2_PATH }}
-            sudo docker compose -f docker-compose.prod.yml up -d --build
-            sudo docker ps
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE="docker-compose"
+            else
+              echo "Installing compose plugin..."
+              sudo apt-get update -y
+              sudo apt-get install -y docker-compose-plugin || true
+              if docker compose version >/dev/null 2>&1; then
+                COMPOSE="docker compose"
+              else
+                curl -L "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-$(uname -s)-$(uname -m)" -o docker-compose
+                chmod +x docker-compose
+                sudo mv docker-compose /usr/local/bin/docker-compose
+                COMPOSE="docker-compose"
+              fi
+            fi
+            echo "Using: $COMPOSE"
+            sudo $COMPOSE -f docker-compose.prod.yml up -d --build
+            sudo $COMPOSE -f docker-compose.prod.yml ps
             sudo docker logs fastapi_prod --tail=50 || true
