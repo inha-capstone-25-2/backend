@@ -51,6 +51,19 @@ jobs:
             chmod 600 .kaggle/kaggle.json
             ls -la .kaggle
 
+      - name: Ensure data/.kaggle dirs on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.EC2_PATH }}
+            mkdir -p data .kaggle
+            chmod 700 .kaggle
+            ls -la .
+
       - name: Prepare docker on EC2 (install/enable if needed)
         uses: appleboy/ssh-action@v1.2.0
         with:

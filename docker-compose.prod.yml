@@ -11,8 +11,10 @@ services:
     environment:
       APP_ENV: prod
       KAGGLE_CONFIG_DIR: /root/.kaggle
+      DATA_DIR: /app/data
     volumes:
       - ./.kaggle:/root/.kaggle:ro
+      - ./data:/app/data
     ports:
       - "80:8000"
     extra_hosts:

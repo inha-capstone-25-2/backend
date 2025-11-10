@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from pymongo import UpdateOne
 from pymongo.errors import PyMongoError, BulkWriteError
+import shutil  # 추가
 
 from app.db.connection import get_mongo_collection
 
@@ -18,9 +19,19 @@ DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai
 
 BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "1000"))
 PROGRESS_EVERY = int(os.getenv("ARXIV_PROGRESS_EVERY", "5000"))
+MIN_FREE_GB = int(os.getenv("ARXIV_MIN_FREE_GB", "10"))  # 추가
 
 DATASET = "Cornell-University/arxiv"
 FILENAME = "arxiv-metadata-oai-snapshot.json"
+
+
+def _has_enough_space(path: Path, need_gb: int) -> bool:
+    total, used, free = shutil.disk_usage(path)
+    free_gb = free // (1024**3)
+    if free_gb < need_gb:
+        logger.error(f"Not enough disk space at {path}: free={free_gb}GB need>={need_gb}GB")
+        return False
+    return True
 
 
 def download_arxiv_snapshot() -> bool:
@@ -30,8 +41,11 @@ def download_arxiv_snapshot() -> bool:
     - 성공 시 True, 실패 시 False
     """
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info(f"[arxiv-job] DATA_DIR={DATA_DIR} FILE={DATA_FILE_PATH}")  # 추가
     if DATA_FILE_PATH.exists():
         return True
+    if not _has_enough_space(DATA_DIR, MIN_FREE_GB):  # 추가
+        return False
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
 
