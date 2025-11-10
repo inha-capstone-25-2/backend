@@ -31,6 +31,7 @@ jobs:
           source: "app/**,requirements.txt,Dockerfile,docker-compose.prod.yml,env/prod/.env"
           target: ${{ secrets.EC2_PATH }}
           overwrite: true
+          debug: true  # 디버그 활성화
 
       - name: Prepare docker on EC2 (install/enable if needed)
         uses: appleboy/ssh-action@v1.2.0
