@@ -5,11 +5,13 @@ import os
 from pathlib import Path
 from pymongo import UpdateOne
 from pymongo.errors import PyMongoError, BulkWriteError
-import shutil  # 추가
+import shutil
+from zipfile import ZipFile  # 추가
+import sys  # 추가
 
 from app.db.connection import get_mongo_collection
 
-logger = logging.getLogger("uvicorn.error")  # FastAPI 기본 콘솔 출력 로거 사용
+logger = logging.getLogger("uvicorn.error")
 
 # 데이터 파일 경로
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -19,7 +21,7 @@ DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai
 
 BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "1000"))
 PROGRESS_EVERY = int(os.getenv("ARXIV_PROGRESS_EVERY", "5000"))
-MIN_FREE_GB = int(os.getenv("ARXIV_MIN_FREE_GB", "10"))  # 추가
+MIN_FREE_GB = int(os.getenv("ARXIV_MIN_FREE_GB", "10"))
 
 DATASET = "Cornell-University/arxiv"
 FILENAME = "arxiv-metadata-oai-snapshot.json"
@@ -36,35 +38,46 @@ def _has_enough_space(path: Path, need_gb: int) -> bool:
 
 def download_arxiv_snapshot() -> bool:
     """
-    arxiv-metadata-oai-snapshot.json을 Kaggle에서 다운로드 및 압축해제.
-    - KAGGLE_USERNAME/KAGGLE_KEY 또는 ~/.kaggle/kaggle.json 필요
-    - 성공 시 True, 실패 시 False
+    arxiv-metadata-oai-snapshot.json 단일 파일만 Kaggle에서 다운로드.
+    Kaggle 모듈의 sys.exit()로 인한 프로세스 종료를 방지하기 위해 BaseException까지 포착.
     """
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info(f"[arxiv-job] DATA_DIR={DATA_DIR} FILE={DATA_FILE_PATH}")  # 추가
+    logger.info(f"[arxiv-job] DATA_DIR={DATA_DIR} FILE={DATA_FILE_PATH}")
     if DATA_FILE_PATH.exists():
+        logger.info("[arxiv-job] file already present; skip download")
         return True
-    if not _has_enough_space(DATA_DIR, MIN_FREE_GB):  # 추가
+    if not _has_enough_space(DATA_DIR, MIN_FREE_GB):
         return False
+
+    zip_path = DATA_DIR / f"{FILENAME}.zip"
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
-
         api = KaggleApi()
         api.authenticate()
-        api.dataset_download_files(DATASET, path=str(DATA_DIR), unzip=True, quiet=True)
-        # 남은 zip 정리
-        for z in DATA_DIR.glob("*.zip"):
+        logger.info("[arxiv-job] kaggle auth ok")
+
+        # 단일 파일만 다운로드 (CLI 출력에 의한 종료/부하 완화)
+        logger.info("[arxiv-job] downloading single file from dataset")
+        api.dataset_download_file(DATASET, FILENAME, path=str(DATA_DIR), force=True, quiet=False)
+
+        if zip_path.exists():
+            logger.info("[arxiv-job] extracting zip")
+            with ZipFile(zip_path) as zf:
+                zf.extract(FILENAME, path=str(DATA_DIR))
             try:
-                z.unlink()
+                zip_path.unlink()
             except OSError:
                 pass
+
         if not DATA_FILE_PATH.exists():
-            logger.error("Downloaded but target JSON not found.")
+            logger.error("[arxiv-job] downloaded but JSON not found")
             return False
-        logger.info("Downloaded arXiv snapshot from Kaggle.")
+
+        logger.info("[arxiv-job] download complete")
         return True
-    except Exception as e:
-        logger.error(f"Kaggle download failed: {e}")
+
+    except BaseException as e:  # SystemExit 포함
+        logger.error(f"[arxiv-job] kaggle download failed: {e.__class__.__name__}: {e}")
         return False
 
 
