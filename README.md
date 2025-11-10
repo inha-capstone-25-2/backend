@@ -5,7 +5,7 @@
 3. `python -m pip install --upgrade pip`
 4. `pip install -r requirements.txt`
 
-## kaggle dataset 수동 다운로드
+## main 브랜치 push 시 github actions이 실패한다면
 
-1. ~/.kaggle 에 kaggle.json 저장
-2. POST http://localhost:8000/jobs/arxiv/run 호출
+1. EC2_HOST를 적절한 퍼블릭 IP 주소로 변경
+2. 
