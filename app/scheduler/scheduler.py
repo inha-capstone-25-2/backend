@@ -8,6 +8,7 @@ from pymongo.errors import PyMongoError, BulkWriteError
 import shutil
 from zipfile import ZipFile  # 추가
 import sys  # 추가
+import subprocess
 
 from app.db.connection import get_mongo_collection
 
@@ -39,7 +40,7 @@ def _has_enough_space(path: Path, need_gb: int) -> bool:
 def download_arxiv_snapshot() -> bool:
     """
     arxiv-metadata-oai-snapshot.json 단일 파일만 Kaggle에서 다운로드.
-    Kaggle 모듈의 sys.exit()로 인한 프로세스 종료를 방지하기 위해 BaseException까지 포착.
+    - Kaggle CLI를 서브프로세스로 실행하여 sys.exit가 서버 프로세스를 종료하지 않도록 격리
     """
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     logger.info(f"[arxiv-job] DATA_DIR={DATA_DIR} FILE={DATA_FILE_PATH}")
@@ -51,15 +52,27 @@ def download_arxiv_snapshot() -> bool:
 
     zip_path = DATA_DIR / f"{FILENAME}.zip"
     try:
-        from kaggle.api.kaggle_api_extended import KaggleApi
-        api = KaggleApi()
-        api.authenticate()
-        logger.info("[arxiv-job] kaggle auth ok")
+        # Kaggle CLI 실행
+        env = os.environ.copy()
+        env.setdefault("KAGGLE_CONFIG_DIR", "/root/.kaggle")
+        cmd = [
+            "kaggle", "datasets", "download",
+            "-d", DATASET,
+            "-f", FILENAME,
+            "-p", str(DATA_DIR),
+            "--quiet",
+        ]
+        logger.info(f"[arxiv-job] running CLI: {' '.join(cmd)}")
+        res = subprocess.run(
+            cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3600
+        )
+        if res.returncode != 0:
+            logger.error(f"[arxiv-job] kaggle CLI failed (rc={res.returncode}) stderr={res.stderr.strip()}")
+            return False
+        if res.stdout.strip():
+            logger.info(f"[arxiv-job] kaggle CLI stdout: {res.stdout.strip().splitlines()[-1]}")
 
-        # 단일 파일만 다운로드 (CLI 출력에 의한 종료/부하 완화)
-        logger.info("[arxiv-job] downloading single file from dataset")
-        api.dataset_download_file(DATASET, FILENAME, path=str(DATA_DIR), force=True, quiet=False)
-
+        # unzip 및 검증
         if zip_path.exists():
             logger.info("[arxiv-job] extracting zip")
             with ZipFile(zip_path) as zf:
@@ -76,8 +89,14 @@ def download_arxiv_snapshot() -> bool:
         logger.info("[arxiv-job] download complete")
         return True
 
-    except BaseException as e:  # SystemExit 포함
-        logger.error(f"[arxiv-job] kaggle download failed: {e.__class__.__name__}: {e}")
+    except FileNotFoundError:
+        logger.error("[arxiv-job] kaggle CLI not found. Ensure 'kaggle' package is installed.")
+        return False
+    except subprocess.TimeoutExpired:
+        logger.error("[arxiv-job] kaggle CLI timed out")
+        return False
+    except Exception as e:
+        logger.error(f"[arxiv-job] kaggle download failed: {e}")
         return False
 
 
