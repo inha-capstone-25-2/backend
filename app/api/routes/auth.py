@@ -4,10 +4,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import timedelta
 from app.api.deps import get_current_user
+from fastapi import Query  # 추가
 
 from app.db.postgres import get_db
 from app.models.user import User
-from app.schemas.auth import UserCreate, UserOut, Token
+from app.schemas.auth import UserCreate, UserOut, Token, UsernameExists  # 추가
 from app.core.security import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -41,6 +42,15 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/username-exists", response_model=UsernameExists)
+def username_exists(
+    username: str = Query(min_length=3, max_length=50),
+    db: Session = Depends(get_db),
+) -> UsernameExists:
+    """중복 아이디 존재 여부 조회(비인증)."""
+    exists = db.query(User.id).filter(User.username == username).first() is not None
+    return UsernameExists(exists=exists)
 
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
