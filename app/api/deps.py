@@ -20,12 +20,12 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str | None = payload.get("sub")
-        if email is None:
+        username: str | None = payload.get("sub")  # sub은 username
+        if username is None:
             raise credentials_error
     except JWTError:
         raise credentials_error
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.username == username).first()
     if not user:
         raise credentials_error
     return user
