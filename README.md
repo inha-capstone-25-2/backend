@@ -7,7 +7,7 @@
 5. `python -m pip install --upgrade pip`
 6. `pip install -r requirements.txt`
 
-## 현 백엔드 레포에서 환경변수가 의미하는 게 뭔가요
+## Q. 현 백엔드 레포에서 환경변수가 의미하는 게 뭔가요
 
 - `EC2_HOST` : EC2 퍼블릭 IP 주소
 - `EC2_KEY` : pem키
@@ -25,7 +25,7 @@
 `sudo cat /var/log/cloud-init-output.log`
 
 - Kaggle dataset 로그 관련 스크립트가 제대로 수행되었는가 ?
-`sudo cat /var/log/arxiv_sync.log`
+`sudo cat /home/ubuntu/arxiv_sync.log`
 
 - OOM으로 인해 서버가 죽었는가
 `sudo dmesg -T | grep -i -E 'killed process|out of memory|oom' || true`
@@ -35,5 +35,8 @@
 
 - 현재 서버의 스왑 메모리 상황이 어떻게 되는가
 `swapon --show`
+
+- 캐글 데이터셋을 다운받는 프로세스 상황 확인
+`pgrep -fa kaggle`
 
 ## 

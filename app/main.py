@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import ConflictingIdError
+import os
 
 # Settings를 초기화하여 .env 계층을 로드
 from app.core.settings import settings
@@ -65,6 +67,21 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# 우아한 CORS 처리:
+# - 환경변수 CORS_ORIGINS에 comma-separated origin 지정 허용
+# - 기본값은 로컬 개발용 "http://localhost:3000"
+cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["Authorization"],
+)
 
 # Auth 라우터 등록
 app.include_router(auth_router)
