@@ -68,9 +68,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# 우아한 CORS 처리:
-# - 환경변수 CORS_ORIGINS에 comma-separated origin 지정 허용
-# - 기본값은 로컬 개발용 "http://localhost:3000"
 cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000")
 allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
 
