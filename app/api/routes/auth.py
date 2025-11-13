@@ -5,6 +5,7 @@ from sqlalchemy import or_
 from datetime import timedelta
 from app.api.deps import get_current_user
 from fastapi import Query  # 추가
+from fastapi import Response  # 추가
 
 from app.db.postgres import get_db
 from app.models.user import User
@@ -55,3 +56,21 @@ def username_exists(
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(current_user: User = Depends(get_current_user)):
+    # 204 응답을 명시적으로 생성하고 쿠키 삭제
+    resp = Response(status_code=status.HTTP_204_NO_CONTENT)
+    resp.delete_cookie("access_token")
+    resp.delete_cookie("refreshToken")
+    return resp
+
+# 탈퇴: hard delete
+@router.delete("/quit", status_code=status.HTTP_204_NO_CONTENT)
+def quit_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db.delete(current_user)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
