@@ -12,6 +12,7 @@ from app.core.settings import settings
 # 추가: Auth 라우터 & DB 초기화
 from app.api.routes.auth import router as auth_router
 from app.api.routes.jobs import router as jobs_router  # 추가
+from app.api.routes.papers import router as papers_router  # 추가
 from app.db.postgres import init_db
 from app.scheduler.scheduler import load_arxiv_data_to_mongodb  # 추가
 
@@ -83,6 +84,7 @@ app.add_middleware(
 # Auth 라우터 등록
 app.include_router(auth_router)
 app.include_router(jobs_router)  # 추가
+app.include_router(papers_router)  # 추가
 
 
 @app.get("/")

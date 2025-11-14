@@ -39,5 +39,8 @@
 - 캐글 데이터셋을 다운받는 프로세스 상황 확인
 `pgrep -fa kaggle`
 
-## 도커 볼륨까지 제거
+- 도커 볼륨까지 제거
 `docker compose -f docker-compose.local.yml down -v`
+
+- 로컬 develop -> 원격 main force push
+`git push origin develop:main --force-with-lease`
