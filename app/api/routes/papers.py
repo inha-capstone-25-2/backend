@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
-from app.db.connection import get_mongo_collection  # [`app.db.connection.get_mongo_collection`](app/db/connection.py)
+from app.db.connection import get_mongo_collection_for_search  # 변경
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -20,7 +20,7 @@ def search_papers(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    client, coll = get_mongo_collection()
+    client, coll = get_mongo_collection_for_search()  # 변경: prod 검색용 커넥션
     if coll is None:
         raise HTTPException(status_code=500, detail="Mongo collection unavailable")
 

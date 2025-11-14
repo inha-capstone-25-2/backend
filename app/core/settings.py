@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=60, validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES")
 
+    # Mongo (검색 전용: prod 접속용, 없으면 기본 MONGO_* 사용)
+    prod_mongo_host: str | None = Field(default=None, validation_alias="PROD_MONGO_HOST")
+    prod_mongo_port: int | None = Field(default=None, validation_alias="PROD_MONGO_PORT")
+    prod_mongo_user: str | None = Field(default=None, validation_alias="PROD_MONGO_USER")
+    prod_mongo_password: str | None = Field(default=None, validation_alias="PROD_MONGO_PASSWORD")
+    prod_mongo_auth_source: str | None = Field(default=None, validation_alias="PROD_MONGO_AUTH_SOURCE")
+    prod_mongo_db: str | None = Field(default=None, validation_alias="PROD_MONGO_DB")
+    prod_mongo_collection: str | None = Field(default=None, validation_alias="PROD_MONGO_COLLECTION")
+
     model_config = SettingsConfigDict(
         env_file=_env_files(),
         env_file_encoding="utf-8",
