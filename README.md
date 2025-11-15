@@ -44,3 +44,11 @@
 
 - 로컬 develop -> 원격 main force push
 `git push origin develop:main --force-with-lease`
+
+## TODO
+- [ ] 서버 재구축 시 kaggle API를 통해 데이터셋 받고, MongoDB에 적재까지 이루어지는 프로세스 구축 (현재는 S3에 미리 저장된 데이터셋을 로드 중)
+- [ ] 검색 속도 최적화
+- [ ] 카테고리 이름 정규화 및 PostgreSQL에 저장 (categories 테이블)
+- [ ] 모든 분야의 카테고리 적재 (현재는 컴퓨터과학 관련만)
+- [ ] 임시 API 추후 삭제
+

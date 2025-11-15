@@ -13,8 +13,11 @@ from app.core.settings import settings
 from app.api.routes.auth import router as auth_router
 from app.api.routes.jobs import router as jobs_router  # 추가
 from app.api.routes.papers import router as papers_router  # 추가
-from app.db.postgres import init_db
+from app.api.routes.categories import router as categories_router  # 추가
+from app.api.routes.user_interests import router as user_interests_router  # 추가
+from app.db.postgres import init_db, get_db
 from app.scheduler.scheduler import load_arxiv_data_to_mongodb  # 추가
+from app.seed.categories_seed import seed_categories  # 추가
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,7 @@ def _run_scheduled_arxiv_job():
         log.info("[arxiv-job][scheduled] success")
     else:
         log.error("[arxiv-job][scheduled] failed")
+
 
 def _ensure_daily_job():
     """중복 등록을 피하면서 매일 04:00 작업을 보장."""
@@ -59,6 +63,7 @@ async def lifespan(app: FastAPI):
         init_db()
     except Exception as e:
         logger.error(f"init_db failed: {e}")
+
     _ensure_daily_job()
     if not scheduler.running:
         scheduler.start()
@@ -83,8 +88,10 @@ app.add_middleware(
 
 # Auth 라우터 등록
 app.include_router(auth_router)
-app.include_router(jobs_router)  # 추가
-app.include_router(papers_router)  # 추가
+app.include_router(jobs_router)
+app.include_router(papers_router)
+app.include_router(categories_router)
+app.include_router(user_interests_router)  # 추가
 
 
 @app.get("/")
