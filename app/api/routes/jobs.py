@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks
-from app.scheduler.scheduler import load_arxiv_data_to_mongodb
+from app.loader.arxiv_loader import load_arxiv_data_to_mongodb
 import logging
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])

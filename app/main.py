@@ -16,7 +16,7 @@ from app.api.routes.papers import router as papers_router  # 추가
 from app.api.routes.categories import router as categories_router  # 추가
 from app.api.routes.user_interests import router as user_interests_router  # 추가
 from app.db.postgres import init_db, get_db
-from app.scheduler.scheduler import load_arxiv_data_to_mongodb  # 추가
+from app.loader.arxiv_loader import load_arxiv_data_to_mongodb
 from app.seed.categories_seed import seed_categories  # 추가
 
 logger = logging.getLogger(__name__)
