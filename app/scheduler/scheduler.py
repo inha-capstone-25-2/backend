@@ -263,6 +263,16 @@ def download_arxiv_from_url() -> bool:
         return False
 
 
+def _parse_categories(raw: str | None) -> list[str]:
+    """
+    공백 구분 문자열 -> 코드 배열.
+    예: "math.NT math.AG" -> ["math.NT", "math.AG"]
+    """
+    if not raw:
+        return []
+    return [c.strip() for c in raw.split() if c.strip()]
+
+
 def load_arxiv_data_to_mongodb() -> bool:
     """
     로컬에서 호출 시 배포 서버(prod) MongoDB의 arxiv_papers 컬렉션을 그대로 가져옴.
