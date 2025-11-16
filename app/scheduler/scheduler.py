@@ -14,7 +14,7 @@ from botocore.exceptions import BotoCoreError, NoCredentialsError, ClientError
 import requests  # 추가
 import time  # 추가
 
-from app.db.connection import get_mongo_collection
+from app.db.connection import get_mongo_collection, get_mongo_collection_for_search  # prod mongo 사용
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -232,28 +232,27 @@ def download_arxiv_from_url() -> bool:
                     downloaded += len(chunk)
 
                     now = time.time()
-                    # 로그 최소 간격 보장
                     if (now - last_log) < PROGRESS_MIN_LOG_SEC:
                         continue
 
-                    if total > 0:
+                    if total:
                         pct = (downloaded / total) * 100.0
                         if pct >= (next_pct or 1000):
+                            last_log = now
                             speed = downloaded / max(now - start_t, 1e-3)
                             eta = _fmt_eta(downloaded, total, now - start_t)
                             logger.info(f"[arxiv-job] downloading {pct:.1f}% "
                                         f"({_fmt_bytes(downloaded)}/{_fmt_bytes(total)}) "
                                         f"at {_fmt_bytes(speed)}/s ETA {eta}")
-                            last_log = now
                             while next_pct is not None and pct >= next_pct:
                                 next_pct += PROGRESS_STEP_PERCENT
                     else:
-                        # Content-Length 없으면 MB 기준 주기 로그
+                        # 총 크기 미상: MB 기준 주기 로그
                         mb = downloaded / (1024 * 1024)
-                        if int(mb) % PROGRESS_EVERY_MB == 0 and mb >= 1:
+                        if int(mb) % PROGRESS_EVERY_MB == 0:
+                            last_log = now
                             speed = downloaded / max(now - start_t, 1e-3)
                             logger.info(f"[arxiv-job] downloading {_fmt_bytes(downloaded)} at {_fmt_bytes(speed)}/s")
-                            last_log = now
 
         tmp_path.replace(DATA_FILE_PATH)
         took = time.time() - start_t
@@ -261,94 +260,54 @@ def download_arxiv_from_url() -> bool:
         return True
     except Exception as e:
         logger.error(f"[arxiv-job] URL download failed: {e}")
-        try:
-            if tmp_path.exists():
-                tmp_path.unlink()
-        except Exception:
-            pass
         return False
 
 
 def load_arxiv_data_to_mongodb() -> bool:
     """
-    내부 스케줄러/API가 호출하는 Mongo 적재 작업.
-    - 파일이 없으면 S3에서 내려받아 사용
+    로컬에서 호출 시 배포 서버(prod) MongoDB의 arxiv_papers 컬렉션을 그대로 가져옴.
+    - 데이터 적재/동기화는 prod에서만 수행
+    - 로컬에서는 복제만 수행
     """
-    logger.info("[arxiv-job] start")
-    if not DATA_FILE_PATH.exists():
-        # 1) 프리사인 URL 우선
-        if ARXIV_URL and download_arxiv_from_url():
-            pass
-        # 2) URL 실패 시 S3 시도(자격 없으면 자동 실패)
-        elif download_arxiv_from_s3():
-            pass
-        else:
-            logger.error(f"Data file unavailable: {DATA_FILE_PATH}")
-            return False
-
-    client, collection = get_mongo_collection()
-    if collection is None:
-        logger.error("Mongo collection unavailable.")
-        if client:
-            client.close()
+    # prod mongo 연결
+    prod_client, prod_coll = get_mongo_collection_for_search()
+    if prod_coll is None:
+        logger.error("[arxiv-job] prod Mongo collection unavailable")
         return False
 
+    # 로컬 mongo 연결
+    from app.db.connection import get_mongo_collection
+    local_client, local_coll = get_mongo_collection()
+    if local_coll is None:
+        logger.error("[arxiv-job] local Mongo collection unavailable")
+        return False
+
+    logger.info("[arxiv-job] copying arxiv_papers from prod to local mongo")
     try:
-        collection.create_index("id", unique=True)
-    except Exception as e:
-        logger.debug(f"Index create skipped: {e}")
-
-    processed = 0
-    ops: list[UpdateOne] = []
-
-    try:
-        with DATA_FILE_PATH.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    data = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                _id = data.get("id")
-                if not _id:
-                    continue
-
-                doc = {
-                    "id": _id,
-                    "title": data.get("title"),
-                    "authors": data.get("authors"),
-                    "abstract": data.get("abstract"),
-                    "categories": data.get("categories"),
-                    "update_date": data.get("update_date"),
-                }
-                doc = {k: v for k, v in doc.items() if v is not None}
-
-                ops.append(UpdateOne({"id": _id}, {"$set": doc}, upsert=True))
-                processed += 1
-
-                if len(ops) >= BATCH_SIZE:
-                    collection.bulk_write(ops, ordered=False)
-                    ops.clear()
-                    logger.info(f"[arxiv-job] processed={processed} (batch flush)")
-
-                if processed and processed % PROGRESS_EVERY == 0:
-                    logger.info(f"Processed {processed} records...")
-
-        if ops:
-            collection.bulk_write(ops, ordered=False)
-
-        logger.info(f"[arxiv-job] complete total={processed}")
+        local_coll.delete_many({})
+        cursor = prod_coll.find({}, no_cursor_timeout=True)
+        batch = []
+        BATCH_SIZE = 1000
+        count = 0
+        for doc in cursor:
+            doc.pop("_id", None)  # _id 제거(로컬에서 새로 생성)
+            batch.append(doc)
+            if len(batch) >= BATCH_SIZE:
+                local_coll.insert_many(batch)
+                count += len(batch)
+                logger.info(f"[arxiv-job] copied {count} docs so far")
+                batch.clear()
+        if batch:
+            local_coll.insert_many(batch)
+            count += len(batch)
+        logger.info(f"[arxiv-job] copy complete: total {count} docs")
+        cursor.close()
         return True
-    except (PyMongoError, BulkWriteError) as e:
-        logger.error(f"[arxiv-job] mongo bulk write error: {e}")
-        return False
-    except FileNotFoundError:
-        logger.error(f"[arxiv-job] file missing: {DATA_FILE_PATH}")
-        return False
     except Exception as e:
-        logger.error(f"[arxiv-job] unexpected error: {e}")
+        logger.error(f"[arxiv-job] copy failed: {e}")
         return False
     finally:
-        if client:
-            client.close()
-            logger.info("[arxiv-job] mongo client closed")
+        if prod_client:
+            prod_client.close()
+        if local_client:
+            local_client.close()
