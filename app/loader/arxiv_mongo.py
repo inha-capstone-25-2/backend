@@ -26,19 +26,18 @@ def read_and_parse_data(data_file_path: Path) -> list[UpdateOne]:
     JSON 파일을 읽어 UpdateOne 배치 리스트를 생성.
     """
     ops: list[UpdateOne] = []
+    logger.info(f"[arxiv-job] read_and_parse_data: 시작, 파일={data_file_path}")
     with open(data_file_path, "r", encoding="utf-8") as f:
-        for line in f:
+        for i, line in enumerate(f):
             if not line.strip():
                 continue
             try:
                 data = json.loads(line)
             except json.JSONDecodeError:
                 continue
-
             _id = data.get("id")
             if not _id:
                 continue
-
             codes = parse_categories(data.get("categories"))
             doc = {
                 "id": _id,
@@ -50,6 +49,9 @@ def read_and_parse_data(data_file_path: Path) -> list[UpdateOne]:
             }
             doc = {k: v for k, v in doc.items() if v is not None}
             ops.append(UpdateOne({"id": _id}, {"$set": doc}, upsert=True))
+            if (i + 1) % 10000 == 0:
+                logger.info(f"[arxiv-job] read_and_parse_data: {i + 1} lines parsed")
+    logger.info(f"[arxiv-job] read_and_parse_data: 완료, 총 {len(ops)} ops 생성")
     return ops
 
 def batch_insert_documents(collection, ops: list[UpdateOne], batch_size: int, progress_every: int) -> int:
@@ -114,10 +116,12 @@ def ingest_arxiv_to_mongo() -> bool:
     logger.info(f"[arxiv-job] MongoDB collection: {collection.full_name}")
 
     try:
+        logger.info("[arxiv-job] 인덱스 생성 시작")
         collection.create_index("id", unique=True)
         collection.create_index("categories_codes")
         collection.create_index("categories_groups")
         collection.create_index([("categories_codes", 1), ("update_date", -1)])
+        logger.info("[arxiv-job] 인덱스 생성 완료")
     except Exception as e:
         logger.debug(f"Index create skipped (categories): {e}")
 
@@ -126,12 +130,12 @@ def ingest_arxiv_to_mongo() -> bool:
         collection.delete_many({})
 
     try:
+        logger.info("[arxiv-job] 데이터 파싱 시작")
         ops = read_and_parse_data(DATA_FILE_PATH)
+        logger.info("[arxiv-job] 데이터 파싱 완료, 적재 시작")
         processed = batch_insert_documents(collection, ops, BATCH_SIZE, PROGRESS_EVERY)
         logger.info(f"[arxiv-job] data load complete total={processed}")
-        
         seed_categories_from_mongo(collection)
-        
         return True
     except FileNotFoundError:
         logger.error(f"[arxiv-job] file not found: {DATA_FILE_PATH}")
