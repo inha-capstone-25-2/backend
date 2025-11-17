@@ -12,7 +12,7 @@ class Paper(BaseModel):
     title: Optional[str] = None
     abstract: Optional[str] = None
     authors: Optional[str] = None
-    categories: Optional[str] = None
+    categories: Optional[List[str]] = None  # 수정: str -> List[str]
     update_date: Optional[str] = None
 
 class PaperSearchResponse(BaseModel):  # 추가: 페이징 응답 모델
