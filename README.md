@@ -1,13 +1,4 @@
-## Q. 로컬 개발 환경 세팅 어떻게 하나요
-
-1. `git clone https://github.com/inha-capstone-25-2/backend.git`
-2. `cd backend`
-3. `py -3.11 -m venv .venv`
-4. `source .venv\Scripts\activate`
-5. `python -m pip install --upgrade pip`
-6. `pip install -r requirements.txt`
-
-## Q. 현 백엔드 레포에서 환경변수가 의미하는 게 뭔가요
+## 현 백엔드 레포에서 환경변수가 의미하는 게 뭔가요
 
 - `EC2_HOST` : EC2 퍼블릭 IP 주소
 - `EC2_KEY` : pem키
@@ -44,6 +35,16 @@
 
 - 로컬 develop -> 원격 main force push
 `git push origin develop:main --force-with-lease`
+
+- 서브모듈 최신화
+`git submodule update --remote`
+
+- 배포 서버 MongoDB down & up
+`docker compose -f docker-compose.mongodb.yml down -v`
+`docker compose -f docker-compose.mongodb.yml up -d`
+
+- 현재 브랜치 내용을 깃허브의 develop으로 덮어쓰기
+`git reset --hard origin/develop`
 
 ## TODO
 - [ ] 서버 재구축 시 kaggle API를 통해 데이터셋 받고, MongoDB에 적재까지 이루어지는 프로세스 구축 (현재는 S3에 미리 저장된 데이터셋을 로드 중)
