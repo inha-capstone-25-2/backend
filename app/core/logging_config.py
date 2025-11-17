@@ -31,7 +31,7 @@ LOGGING_CONFIG = {
             "propagate": False,
         },
         "uvicorn.access": {
-            "level": "WARNING",
+            "level": "INFO",  # <--- 여기서 WARNING -> INFO로 변경
             "handlers": ["console"],
             "propagate": False,
         },

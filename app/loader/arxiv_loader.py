@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging  # <-- 반드시 추가!
 from app.loader.arxiv_download import ensure_arxiv_file
 from app.loader.arxiv_mongo import ingest_arxiv_to_mongo, copy_prod_to_local_mongo
 from app.core.settings import settings
