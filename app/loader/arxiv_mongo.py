@@ -21,7 +21,90 @@ DEFAULT_DATA_DIR = BACKEND_ROOT / "data"
 DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR)))
 DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json")))
 
+def read_and_parse_data(data_file_path: Path) -> list[UpdateOne]:
+    """
+    JSON 파일을 읽어 UpdateOne 배치 리스트를 생성.
+    """
+    ops: list[UpdateOne] = []
+    with open(data_file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            _id = data.get("id")
+            if not _id:
+                continue
+
+            codes = parse_categories(data.get("categories"))
+            doc = {
+                "id": _id,
+                "title": data.get("title"),
+                "authors": data.get("authors"),
+                "abstract": data.get("abstract"),
+                "categories": codes,
+                "update_date": data.get("update_date"),
+            }
+            doc = {k: v for k, v in doc.items() if v is not None}
+            ops.append(UpdateOne({"id": _id}, {"$set": doc}, upsert=True))
+    return ops
+
+def batch_insert_documents(collection, ops: list[UpdateOne], batch_size: int, progress_every: int) -> int:
+    """
+    배치 리스트를 MongoDB에 삽입.
+    """
+    processed = 0
+    for i, op in enumerate(ops):
+        if (i + 1) % batch_size == 0:
+            try:
+                collection.bulk_write(ops[i - batch_size + 1:i + 1], ordered=False)
+                logger.info(f"[arxiv-job] upserted {batch_size} records")
+            except BulkWriteError as bwe:
+                logger.warning(f"[arxiv-job] BulkWriteError: {bwe.details}")
+                for e in bwe.details.get("writeErrors", []):
+                    if failures_collection:
+                        failures_collection.insert_one({"id": e.get("op", {}).get("id")})
+            except Exception as e:
+                logger.error(f"[arxiv-job] unexpected bulk_write error: {e}")
+        if (i + 1) % progress_every == 0:
+            logger.info(f"[arxiv-job] processed {i + 1} records")
+        processed += 1
+    # 남은 배치 처리
+    if ops:
+        try:
+            collection.bulk_write(ops, ordered=False)
+            logger.info(f"[arxiv-job] upserted {len(ops)} records")
+        except BulkWriteError as bwe:
+            logger.warning(f"[arxiv-job] BulkWriteError: {bwe.details}")
+            for e in bwe.details.get("writeErrors", []):
+                if failures_collection:
+                    failures_collection.insert_one({"id": e.get("op", {}).get("id")})
+        except Exception as e:
+            logger.error(f"[arxiv-job] unexpected bulk_write error: {e}")
+    return processed
+
+def seed_categories_from_mongo(collection) -> None:
+    """
+    MongoDB의 카테고리 코드를 기반으로 PostgreSQL 시드.
+    """
+    unique_codes = set()
+    cursor = collection.find({}, {"categories": 1})
+    for doc in cursor:
+        if "categories" in doc and isinstance(doc["categories"], list):
+            unique_codes.update(doc["categories"])
+    cursor.close()
+    
+    if unique_codes:
+        logger.info(f"[arxiv-job] seeding PostgreSQL categories from {len(unique_codes)} codes")
+        seed_categories_from_codes(list(unique_codes))
+
 def ingest_arxiv_to_mongo() -> bool:
+    """
+    arXiv 데이터를 MongoDB에 적재.
+    """
     client, collection = get_mongo_collection()
     if collection is None:
         logger.error("[arxiv-job] Mongo collection unavailable")
@@ -43,63 +126,11 @@ def ingest_arxiv_to_mongo() -> bool:
         collection.delete_many({})
 
     try:
-        with open(DATA_FILE_PATH, "r", encoding="utf-8") as f:
-            total_lines = sum(1 for _ in f)
-            f.seek(0)
-
-            start_t = time.time()
-            batch: list[UpdateOne] = []
-            for i, line in enumerate(f):
-                if not line.strip():
-                    continue
-                doc = json.loads(line)
-                codes = parse_categories(doc.get("categories"))
-                doc["categories"] = codes  # categories를 배열로 설정 (기존 문자열 대체)
-                upsert = UpdateOne({"id": doc["id"]}, {"$set": doc}, upsert=True)
-                batch.append(upsert)
-
-                if len(batch) >= BATCH_SIZE:
-                    try:
-                        collection.bulk_write(batch, ordered=False)
-                        logger.info(f"[arxiv-job] upserted {len(batch)} records")
-                    except BulkWriteError as bwe:
-                        logger.warning(f"[arxiv-job] BulkWriteError: {bwe.details}")
-                        for e in bwe.details.get("writeErrors", []):
-                            if failures_collection:
-                                failures_collection.insert_one({"id": e.get("op", {}).get("id")})
-                    except Exception as e:
-                        logger.error(f"[arxiv-job] unexpected bulk_write error: {e}")
-                    batch.clear()
-
-                if (i + 1) % PROGRESS_EVERY == 0:
-                    logger.info(f"[arxiv-job] processed {i + 1}/{total_lines} lines")
-
-            if batch:
-                try:
-                    collection.bulk_write(batch, ordered=False)
-                    logger.info(f"[arxiv-job] upserted {len(batch)} records")
-                except BulkWriteError as bwe:
-                    logger.warning(f"[arxiv-job] BulkWriteError: {bwe.details}")
-                    for e in bwe.details.get("writeErrors", []):
-                        if failures_collection:
-                            failures_collection.insert_one({"id": e.get("op", {}).get("id")})
-                except Exception as e:
-                    logger.error(f"[arxiv-job] unexpected bulk_write error: {e}")
-
-        took = time.time() - start_t
-        logger.info(f"[arxiv-job] data load complete in {took:.1f}s")
+        ops = read_and_parse_data(DATA_FILE_PATH)
+        processed = batch_insert_documents(collection, ops, BATCH_SIZE, PROGRESS_EVERY)
+        logger.info(f"[arxiv-job] data load complete total={processed}")
         
-        # 추가: MongoDB의 카테고리 코드를 기반으로 PostgreSQL 시드
-        unique_codes = set()
-        cursor = collection.find({}, {"categories": 1})
-        for doc in cursor:
-            if "categories" in doc and isinstance(doc["categories"], list):
-                unique_codes.update(doc["categories"])
-        cursor.close()
-        
-        if unique_codes:
-            logger.info(f"[arxiv-job] seeding PostgreSQL categories from {len(unique_codes)} codes")
-            seed_categories_from_codes(list(unique_codes))
+        seed_categories_from_mongo(collection)
         
         return True
     except FileNotFoundError:
