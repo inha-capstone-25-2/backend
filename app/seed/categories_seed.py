@@ -324,3 +324,76 @@ def seed_categories(db: Session) -> None:
                 )
 
     db.commit()
+
+
+def seed_categories_from_codes(codes: list[str]) -> None:
+    """
+    MongoDB의 카테고리 코드를 기반으로 categories / category_names를 upsert.
+    - 기존 CATEGORY_SEED에서 코드가 일치하는 항목만 시드
+    - 없는 코드는 기본 이름으로 생성 (영어: 코드, ko: 빈칸)
+    """
+    db = next(get_db())
+    try:
+        existing_by_code: Dict[str, Category] = {
+            c.code: c for c in db.query(Category).all()
+        }
+
+        for code in codes:
+            if code in existing_by_code:
+                continue  # 이미 존재하면 스킵
+
+            # CATEGORY_SEED에서 찾기
+            seed_item = next((item for item in CATEGORY_SEED if item["code"] == code), None)
+            if seed_item:
+                _create_category_from_seed(db, seed_item, existing_by_code)
+            else:
+                # 기본 생성: 부모 없음, 깊이 1, 이름: 영어=코드, ko=빈칸
+                cat = Category(
+                    code=code,
+                    parent_id=None,
+                    depth=1,
+                    sort_order=0,
+                )
+                db.add(cat)
+                db.flush()
+                db.add(CategoryName(
+                    category_id=cat.id,
+                    locale="en",
+                    name=code,
+                ))
+                existing_by_code[code] = cat
+
+        db.commit()
+    finally:
+        db.close()
+
+
+def _create_category_from_seed(db: Session, item: Dict, existing_by_code: Dict[str, Category]):
+    code = item["code"]
+    parent_obj = None
+    parent_code = item.get("parent")
+    if parent_code:
+        parent_obj = existing_by_code.get(parentCode)
+        if not parent_obj:
+            # 부모가 없으면 재귀 생성 (단순화)
+            parent_seed = next((s for s in CATEGORY_SEED if s["code"] == parentCode), None)
+            if parent_seed:
+                _create_category_from_seed(db, parent_seed, existing_by_code)
+                parent_obj = existing_by_code.get(parentCode)
+
+    cat = Category(
+        code=code,
+        parent_id=parent_obj.id if parent_obj else None,
+        depth=item.get("depth", 1),
+        sort_order=0,
+    )
+    db.add(cat)
+    db.flush()
+    existing_by_code[code] = cat
+
+    for locale, name in item.get("names", {}).items():
+        db.add(CategoryName(
+            category_id=cat.id,
+            locale=locale,
+            name=name,
+        ))

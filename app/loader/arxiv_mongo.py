@@ -9,6 +9,7 @@ from pymongo.errors import BulkWriteError
 from app.db.connection import get_mongo_collection, get_mongo_collection_for_search
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
+from app.seed.categories_seed import seed_categories_from_codes  # 추가
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -88,6 +89,19 @@ def ingest_arxiv_to_mongo() -> bool:
 
         took = time.time() - start_t
         logger.info(f"[arxiv-job] data load complete in {took:.1f}s")
+        
+        # 추가: MongoDB의 카테고리 코드를 기반으로 PostgreSQL 시드
+        unique_codes = set()
+        cursor = collection.find({}, {"categories": 1})
+        for doc in cursor:
+            if "categories" in doc and isinstance(doc["categories"], list):
+                unique_codes.update(doc["categories"])
+        cursor.close()
+        
+        if unique_codes:
+            logger.info(f"[arxiv-job] seeding PostgreSQL categories from {len(unique_codes)} codes")
+            seed_categories_from_codes(list(unique_codes))
+        
         return True
     except FileNotFoundError:
         logger.error(f"[arxiv-job] file not found: {DATA_FILE_PATH}")
