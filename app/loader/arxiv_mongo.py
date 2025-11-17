@@ -54,7 +54,8 @@ def ingest_arxiv_to_mongo() -> bool:
                     continue
                 doc = json.loads(line)
                 codes = parse_categories(doc.get("categories"))
-                doc["categories_codes"] = codes
+                doc["categories"] = codes  # 변경: categories를 배열로 설정 (기존 문자열 대체)
+                # doc["categories_codes"] = codes  # 제거: 불필요 (categories로 통합)
                 upsert = UpdateOne({"id": doc["id"]}, {"$set": doc}, upsert=True)
                 batch.append(upsert)
 
