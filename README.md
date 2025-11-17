@@ -45,6 +45,9 @@
 - 로컬 develop -> 원격 main force push
 `git push origin develop:main --force-with-lease`
 
+- 서브모듈 최신화
+`git submodule update --remote`
+
 ## TODO
 - [ ] 서버 재구축 시 kaggle API를 통해 데이터셋 받고, MongoDB에 적재까지 이루어지는 프로세스 구축 (현재는 S3에 미리 저장된 데이터셋을 로드 중)
 - [ ] 검색 속도 최적화
