@@ -6,7 +6,7 @@ from pathlib import Path
 from pymongo import UpdateOne
 from pymongo.errors import BulkWriteError
 
-from app.db.connection import get_mongo_collection, get_mongo_collection_for_search
+from app.db.mongodb import get_mongo_collection, get_mongo_collection_for_search
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes

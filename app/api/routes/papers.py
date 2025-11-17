@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
 import math  # 추가
-from app.db.connection import get_mongo_collection_for_search  # 변경
+from app.db.mongodb import get_mongo_collection_for_search  # 변경
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
