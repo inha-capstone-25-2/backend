@@ -3,6 +3,7 @@ from typing import Dict, List
 from sqlalchemy.orm import Session
 
 from app.models.category import Category, CategoryName
+from app.db.postgres import get_db
 
 CATEGORY_SEED: List[Dict] = [
     # 상위 분류 예시

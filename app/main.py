@@ -6,6 +6,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import ConflictingIdError
 import os
 
+# 3. 앱 시작 시 로깅 설정 적용
+from app.core.logging_config import setup_logging  # 추가
+setup_logging()  # 가장 먼저 호출
+
 # Settings를 초기화하여 .env 계층을 로드
 from app.core.settings import settings
 

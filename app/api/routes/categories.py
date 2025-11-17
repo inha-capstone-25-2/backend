@@ -9,11 +9,6 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 
 @router.post("/seed")
 def seed(force: bool = False, db: Session = Depends(get_db)):
-    """
-    카테고리 seed 수행.
-    - force=false: 비어있을 때만 실행
-    - force=true: 항상 upsert 실행
-    """
     existing = db.query(Category).count()
     if existing > 0 and not force:
         return {"seeded": False, "reason": "categories already present", "count": existing}

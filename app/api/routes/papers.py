@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
-import math  # 추가
-from app.db.connection import get_mongo_collection_for_search  # 변경
+import math
+from app.db.mongodb import get_mongo_collection_for_search
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -12,10 +12,10 @@ class Paper(BaseModel):
     title: Optional[str] = None
     abstract: Optional[str] = None
     authors: Optional[str] = None
-    categories: Optional[List[str]] = None  # 수정: str -> List[str]
+    categories: Optional[List[str]] = None
     update_date: Optional[str] = None
 
-class PaperSearchResponse(BaseModel):  # 추가: 페이징 응답 모델
+class PaperSearchResponse(BaseModel):
     page: int
     page_size: int
     total: int
