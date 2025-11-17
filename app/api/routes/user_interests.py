@@ -32,7 +32,6 @@ def add_interests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 중복 제거
     codes = list(dict.fromkeys(payload.category_codes))
     if not codes:
         raise HTTPException(400, "empty category_codes")
@@ -43,14 +42,12 @@ def add_interests(
     if missing:
         raise HTTPException(404, f"categories not found: {missing}")
 
-    # 이미 있는 관심 조회
     existing = db.query(UserInterest).filter(
         UserInterest.user_id == current_user.id,
         UserInterest.category_id.in_([c.id for c in categories])
     ).all()
     existing_ids = {e.category_id for e in existing}
 
-    # 신규만 추가
     for c in categories:
         if c.id in existing_ids:
             continue
@@ -72,10 +69,8 @@ def list_interests(
     )
     categories = q.all()
 
-    # 다국어 이름 선택(ko/en 둘 다 시도)
     items: list[InterestItem] = []
     for c in categories:
-        # locale별 이름 조회(메모리상의 relationship 활용)
         name_ko = next((n.name for n in c.names if n.locale == "ko"), None)
         name_en = next((n.name for n in c.names if n.locale == "en"), None)
         items.append(InterestItem(code=c.code, name_ko=name_ko, name_en=name_en))
@@ -88,7 +83,6 @@ def remove_interests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 중복 제거
     target_codes = list(dict.fromkeys(codes))
     if not target_codes:
         raise HTTPException(400, "empty codes")
@@ -97,7 +91,6 @@ def remove_interests(
     found_map = {c.code: c for c in categories}
     missing = [c for c in target_codes if c not in found_map]
 
-    # 관심 항목 중 대상
     to_delete = (
         db.query(UserInterest)
         .filter(
@@ -112,7 +105,6 @@ def remove_interests(
         db.delete(ui)
     db.commit()
 
-    # 남은 관심 목록 재조회
     q = (
         db.query(Category)
         .join(UserInterest, UserInterest.category_id == Category.id)
@@ -131,8 +123,3 @@ def remove_interests(
         not_found=missing,
         remaining=InterestList(items=remaining_items),
     )
-
-# 기존 단일 삭제 엔드포인트 필요 없으면 주석 처리하거나 제거
-# @router.delete("/{category_code}", status_code=status.HTTP_204_NO_CONTENT)
-# def remove_interest(...):
-#     ...
