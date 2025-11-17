@@ -7,10 +7,10 @@ import shutil
 import boto3
 from botocore.exceptions import BotoCoreError, NoCredentialsError, ClientError
 import requests
-import time
 
 from app.core.settings import settings
-from app.loader.config import DATA_DIR, DATA_FILE_PATH, MIN_FREE_GB, S3_BUCKET, S3_KEY, ARXIV_URL  # 추가
+from app.loader.config import DATA_DIR, DATA_FILE_PATH, MIN_FREE_GB, S3_BUCKET, S3_KEY, ARXIV_URL
+from app.loader.utils import _fmt_bytes, _fmt_eta, get_current_time  # 추가
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -37,29 +37,6 @@ def _has_enough_space(path: Path, need_gb: int) -> bool:
         return False
     return True
 
-def _fmt_bytes(n: float) -> str:
-    for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if n < 1024.0:
-            return f"{n:.1f}{unit}"
-        n /= 1024.0
-    return f"{n:.1f}PB"
-
-def _fmt_eta(bytes_done: int, total: int, elapsed: float) -> str:
-    if bytes_done <= 0 or total <= 0:
-        return "unknown"
-    speed = bytes_done / max(elapsed, 1e-6)
-    remain = max(total - bytes_done, 0)
-    sec = int(remain / max(speed, 1e-6))
-    h, m, s = sec // 3600, (sec % 3600) // 60, sec % 60
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-def _has_aws_credentials() -> bool:
-    try:
-        sess = boto3.Session()
-        return sess.get_credentials() is not None
-    except Exception:
-        return False
-
 def download_arxiv_from_s3() -> bool:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     logger.info(f"[arxiv-job] S3 download target: {S3_BUCKET}/{S3_KEY} -> {DATA_FILE_PATH}")
@@ -84,7 +61,7 @@ def download_arxiv_from_s3() -> bool:
         except Exception:
             pass
 
-        start_t = time.time()
+        start_t = get_current_time()
         last_log = start_t
         downloaded = 0
         next_pct = 5.0 if total else None
@@ -92,7 +69,7 @@ def download_arxiv_from_s3() -> bool:
         def _cb(bytes_amount: int):
             nonlocal downloaded, last_log, next_pct
             downloaded += int(bytes_amount)
-            now = time.time()
+            now = get_current_time()
             if (now - last_log) < 2:
                 return
 
@@ -110,7 +87,7 @@ def download_arxiv_from_s3() -> bool:
 
         s3.download_file(S3_BUCKET, S3_KEY, str(tmp_path), Callback=_cb)
         tmp_path.replace(DATA_FILE_PATH)
-        took = time.time() - start_t
+        took = get_current_time() - start_t
         logger.info(f"[arxiv-job] S3 download complete in {took:.1f}s size={_fmt_bytes(DATA_FILE_PATH.stat().st_size)}")
         return True
     except (NoCredentialsError, ClientError, BotoCoreError) as e:
@@ -137,7 +114,7 @@ def download_arxiv_from_presigned_url() -> bool:
         with requests.get(ARXIV_URL, stream=True, timeout=60) as r:
             r.raise_for_status()
             total = int(r.headers.get("Content-Length") or 0)
-            start_t = time.time()
+            start_t = get_current_time()
             last_log = start_t
             downloaded = 0
             next_pct = 5.0 if total else None
@@ -147,7 +124,7 @@ def download_arxiv_from_presigned_url() -> bool:
                         continue
                     f.write(chunk)
                     downloaded += len(chunk)
-                    now = time.time()
+                    now = get_current_time()
                     if total and (now - last_log) >= 2:
                         pct = (downloaded / total) * 100.0
                         if pct >= (next_pct or 1000):
@@ -160,7 +137,7 @@ def download_arxiv_from_presigned_url() -> bool:
                             while next_pct is not None and pct >= next_pct:
                                 next_pct += 5.0
         tmp_path.replace(DATA_FILE_PATH)
-        took = time.time() - start_t
+        took = get_current_time() - start_t
         logger.info(f"[arxiv-job] URL download complete in {took:.1f}s size={_fmt_bytes(DATA_FILE_PATH.stat().st_size)}")
         return True
     except Exception as e:

@@ -9,8 +9,9 @@ from pymongo.errors import BulkWriteError
 from app.db.connection import get_mongo_collection, get_mongo_collection_for_search
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
-from app.seed.categories_seed import seed_categories_from_codes  # 추가
-from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY  # 추가
+from app.seed.categories_seed import seed_categories_from_codes
+from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY
+from app.loader.utils import get_current_time  # 추가
 
 logger = logging.getLogger("uvicorn.error")
 
