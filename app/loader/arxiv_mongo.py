@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from pymongo import UpdateOne
 from pymongo.errors import BulkWriteError
+import time  # 추가: time 모듈 import
 
 from app.db.connection import get_mongo_collection, get_mongo_collection_for_search
 from app.core.settings import settings
