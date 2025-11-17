@@ -12,7 +12,7 @@ from app.core.settings import settings
 from app.loader.config import DATA_DIR, DATA_FILE_PATH, MIN_FREE_GB, S3_BUCKET, S3_KEY, ARXIV_URL
 from app.loader.utils import _fmt_bytes, _fmt_eta, get_current_time  # 추가
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
 # 데이터 파일 경로
 BACKEND_ROOT = Path(__file__).resolve().parents[2]

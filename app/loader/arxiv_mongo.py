@@ -13,7 +13,7 @@ from app.seed.categories_seed import seed_categories_from_codes
 from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY
 from app.loader.utils import get_current_time  # 추가
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
 # 데이터 파일 경로
 BACKEND_ROOT = Path(__file__).resolve().parents[2]

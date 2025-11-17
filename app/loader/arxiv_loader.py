@@ -1,10 +1,9 @@
 from __future__ import annotations
-import logging
 from app.loader.arxiv_download import ensure_arxiv_file
 from app.loader.arxiv_mongo import ingest_arxiv_to_mongo, copy_prod_to_local_mongo
 from app.core.settings import settings
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
 def load_arxiv_data_to_mongodb() -> bool:
     """
