@@ -10,6 +10,7 @@ from app.db.connection import get_mongo_collection, get_mongo_collection_for_sea
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes  # 추가
+from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY  # 추가
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -18,9 +19,6 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = BACKEND_ROOT / "data"
 DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR)))
 DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json")))
-
-BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "1000"))
-PROGRESS_EVERY = int(os.getenv("ARXIV_PROGRESS_EVERY", "5000"))
 
 def ingest_arxiv_to_mongo() -> bool:
     client, collection = get_mongo_collection()

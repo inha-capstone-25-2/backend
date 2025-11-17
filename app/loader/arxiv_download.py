@@ -10,6 +10,7 @@ import requests
 import time
 
 from app.core.settings import settings
+from app.loader.config import DATA_DIR, DATA_FILE_PATH, MIN_FREE_GB, S3_BUCKET, S3_KEY, ARXIV_URL  # 추가
 
 logger = logging.getLogger("uvicorn.error")
 
