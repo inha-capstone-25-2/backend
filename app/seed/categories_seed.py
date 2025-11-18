@@ -374,13 +374,13 @@ def _create_category_from_seed(db: Session, item: Dict, existing_by_code: Dict[s
     parent_obj = None
     parent_code = item.get("parent")
     if parent_code:
-        parent_obj = existing_by_code.get(parentCode)
+        parent_obj = existing_by_code.get(parent_code)  # 수정: parentCode → parent_code
         if not parent_obj:
             # 부모가 없으면 재귀 생성 (단순화)
-            parent_seed = next((s for s in CATEGORY_SEED if s["code"] == parentCode), None)
+            parent_seed = next((s for s in CATEGORY_SEED if s["code"] == parent_code), None)  # 수정
             if parent_seed:
                 _create_category_from_seed(db, parent_seed, existing_by_code)
-                parent_obj = existing_by_code.get(parentCode)
+                parent_obj = existing_by_code.get(parent_code)  # 수정
 
     cat = Category(
         code=code,
