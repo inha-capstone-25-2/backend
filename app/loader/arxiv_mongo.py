@@ -98,10 +98,12 @@ def seed_categories_from_mongo(collection) -> None:
         if "categories" in doc and isinstance(doc["categories"], list):
             unique_codes.update(doc["categories"])
     cursor.close()
-    
     if unique_codes:
         logger.info(f"[arxiv-job] seeding PostgreSQL categories from {len(unique_codes)} codes")
-        seed_categories_from_codes(list(unique_codes))
+        try:
+            seed_categories_from_codes(list(unique_codes))
+        except Exception as e:
+            logger.error(f"[arxiv-job] category seeding failed: {e}")
 
 def ingest_arxiv_to_mongo() -> bool:
     """
