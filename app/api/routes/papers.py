@@ -26,7 +26,8 @@ class PaperSearchResponse(BaseModel):
 
 @router.get("/search", response_model=PaperSearchResponse)
 def search_papers(
-    q: str = Query(..., min_length=1, description="검색어"),
+    q: Optional[str] = Query(None, min_length=1, description="검색어"),
+    categories: Optional[List[str]] = Query(None, description="카테고리 코드(복수 선택 가능)"),
     page: int = Query(1, ge=1, description="페이지 (1부터)"),
 ):
     client, coll = get_mongo_collection_for_search()
@@ -34,8 +35,13 @@ def search_papers(
         raise HTTPException(status_code=500, detail="Mongo collection unavailable")
 
     try:
-        regex = {"$regex": q, "$options": "i"}
-        query = {"$or": [{"title": regex}, {"abstract": regex}, {"authors": regex}]}
+        query = {}
+        if q:
+            regex = {"$regex": q, "$options": "i"}
+            query["$or"] = [{"title": regex}, {"abstract": regex}, {"authors": regex}]
+        if categories:
+            query["categories"] = {"$in": categories}
+
         projection = {
             "_id": 1,
             "id": 1,
