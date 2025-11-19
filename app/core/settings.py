@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 from typing import Sequence
-from pydantic import BaseModel, Field  # ...existing code...
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def _base_dir() -> Path:
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     mongo_password: str | None = Field(default=None, validation_alias="MONGO_PASSWORD")
     mongo_auth_source: str = Field(default="admin", validation_alias="MONGO_AUTH_SOURCE")
     mongo_db: str = Field(default="dblp", validation_alias="MONGO_DB")
-    mongo_collection: str = Field(default="publications", validation_alias="MONGO_COLLECTION")
+    mongo_collection: str = Field(default="arxiv_paper", validation_alias="MONGO_COLLECTION")
 
     # Auth/JWT
     secret_key: str = Field(default="change-me-in-prod", validation_alias="SECRET_KEY")

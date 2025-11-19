@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 import math
 from app.db.mongodb import get_mongo_collection_for_search
+from bson import ObjectId
+from bson.errors import InvalidId
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -73,6 +75,29 @@ def search_papers(
             "has_prev": page > 1,
             "items": items,
         }
+    finally:
+        if client:
+            client.close()
+
+
+@router.get("/{paper_id}", response_model=Paper)
+def get_paper(paper_id: str):
+    client, coll = get_mongo_collection_for_search()
+    if coll is None:
+        raise HTTPException(status_code=500, detail="Mongo collection unavailable")
+
+    try:
+        try:
+            oid = ObjectId(paper_id)
+        except InvalidId:
+            raise HTTPException(status_code=400, detail="Invalid paper ID format")
+
+        doc = coll.find_one({"_id": oid})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Paper not found")
+
+        doc["_id"] = str(doc["_id"])
+        return doc
     finally:
         if client:
             client.close()
