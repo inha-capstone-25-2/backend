@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     mongo_user: str | None = Field(default=None, validation_alias="MONGO_USER")
     mongo_password: str | None = Field(default=None, validation_alias="MONGO_PASSWORD")
     mongo_auth_source: str = Field(default="admin", validation_alias="MONGO_AUTH_SOURCE")
-    mongo_db: str = Field(default="dblp", validation_alias="MONGO_DB")
+    mongo_db: str = Field(default="arxiv", validation_alias="MONGO_DB")
     mongo_collection: str = Field(default="arxiv_paper", validation_alias="MONGO_COLLECTION")
 
     # Auth/JWT
