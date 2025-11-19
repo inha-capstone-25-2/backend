@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from bson import ObjectId
-from app.db.mongodb import get_mongo_collection
+from pymongo.database import Database
+from app.db.mongodb import get_mongo_db
 from app.api.deps import get_current_user
 from app.models.user import User
 
@@ -24,17 +25,15 @@ class BookmarkOut(BaseModel):
 def create_bookmark(
     payload: BookmarkCreate,
     current_user: User = Depends(get_current_user),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
     doc = {
         "user_id": current_user.id,
         "paper_id": ObjectId(payload.paper_id),
         "bookmarked_at": datetime.utcnow(),
         "notes": payload.notes,
     }
-    result = coll.database["bookmarks"].insert_one(doc)
+    result = db["bookmarks"].insert_one(doc)
     doc["_id"] = result.inserted_id
     doc["id"] = str(result.inserted_id)
     doc["paper_id"] = str(doc["paper_id"])
@@ -47,14 +46,12 @@ class BookmarkListOut(BaseModel):
 def list_bookmarks(
     current_user: User = Depends(get_current_user),
     paper_id: Optional[str] = Query(None, description="특정 논문 북마크만 조회"),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
     query = {"user_id": current_user.id}
     if paper_id:
         query["paper_id"] = ObjectId(paper_id)
-    cursor = coll.database["bookmarks"].find(query).sort("bookmarked_at", -1)
+    cursor = db["bookmarks"].find(query).sort("bookmarked_at", -1)
     items = []
     for doc in cursor:
         doc["id"] = str(doc["_id"])
@@ -76,16 +73,14 @@ def update_bookmark(
     bookmark_id: str,
     payload: BookmarkUpdate,
     current_user: User = Depends(get_current_user),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
     try:
         obj_id = ObjectId(bookmark_id)
     except Exception:
         raise HTTPException(400, "Invalid bookmark_id")
     # 본인 북마크만 수정 가능
-    result = coll.database["bookmarks"].find_one_and_update(
+    result = db["bookmarks"].find_one_and_update(
         {"_id": obj_id, "user_id": current_user.id},
         {"$set": {"notes": payload.notes, "bookmarked_at": datetime.utcnow()}},
         return_document=True,
@@ -106,15 +101,13 @@ def update_bookmark(
 def delete_bookmark(
     bookmark_id: str,
     current_user: User = Depends(get_current_user),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
     try:
         obj_id = ObjectId(bookmark_id)
     except Exception:
         raise HTTPException(400, "Invalid bookmark_id")
-    result = coll.database["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
+    result = db["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(404, "Bookmark not found")
     return

@@ -63,18 +63,36 @@ def _ensure_daily_job():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup
     try:
-        # DB 테이블 준비
+        # PostgreSQL 테이블 준비
         init_db()
     except Exception as e:
         logger.error(f"init_db failed: {e}")
 
+    # MongoDB 연결 초기화
+    try:
+        from app.db.mongodb import init_mongo
+        init_mongo()
+    except Exception as e:
+        logger.error(f"init_mongo failed: {e}")
+
     _ensure_daily_job()
     if not scheduler.running:
         scheduler.start()
+    
     yield
+    
+    # Shutdown
     if scheduler.running:
         scheduler.shutdown(wait=False)
+    
+    # MongoDB 연결 종료
+    try:
+        from app.db.mongodb import close_mongo
+        close_mongo()
+    except Exception as e:
+        logger.error(f"close_mongo failed: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
