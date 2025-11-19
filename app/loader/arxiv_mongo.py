@@ -119,10 +119,14 @@ def ingest_arxiv_to_mongo() -> bool:
 
     try:
         logger.info("[arxiv-job] 인덱스 생성 시작")
+        # 기존 인덱스
         collection.create_index("id", unique=True)
-        collection.create_index("categories_codes")
-        collection.create_index("categories_groups")
-        collection.create_index([("categories_codes", 1), ("update_date", -1)])
+        # 검색 성능 향상용 인덱스 추가
+        collection.create_index("title")
+        collection.create_index("abstract")
+        collection.create_index("authors")
+        collection.create_index("categories")
+        collection.create_index([("categories", 1), ("update_date", -1)])
         logger.info("[arxiv-job] 인덱스 생성 완료")
     except Exception as e:
         logger.debug(f"Index create skipped (categories): {e}")
@@ -183,6 +187,8 @@ def copy_prod_to_local_mongo() -> bool:
             count += len(batch)
         logger.info(f"[arxiv-job] copy complete: total {count} docs")
         cursor.close()
+        # 복제 후 카테고리 시딩 추가
+        seed_categories_from_mongo(local_coll)
         return True
     except Exception as e:
         logger.error(f"[arxiv-job] copy failed: {e}")
