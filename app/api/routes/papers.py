@@ -149,27 +149,6 @@ def get_search_history(
     """
     collection = db["search_history"]
     
-    # 전체 개수
-    total = collection.count_documents({})
-    
-    # 최신순으로 정렬하여 조회
-    cursor = collection.find({}).sort("searched_at", -1).limit(limit)
-    
-    items = []
-    for doc in cursor:
-        # _id를 id로 변환
-        serialize_object_id(doc)
-        doc["id"] = doc.pop("_id")
-        
-        # Pydantic 모델로 변환
-        items.append(SearchHistoryItem(**doc))
-    
-    return SearchHistoryResponse(total=total, items=items)
-
-
-@router.get("/{paper_id}", response_model=Paper)
-def get_paper(
-    paper_id: str,
     db: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),  # 인증 필수
 ):
@@ -182,6 +161,9 @@ def get_paper(
     
     # 논문 조회 활동 로그
     log_activity(
+        doc.setdefault("user_id", None)
+        doc.setdefault("filters", None)
+        doc.setdefault("result_count", None),
         db=db,
         user_id=current_user.id,
         activity_type="view",
