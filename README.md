@@ -47,6 +47,7 @@
 `git reset --hard origin/develop`
 
 - 목데이터 세팅 (dev)
+`sudo docker exec -it fastapi_dev bash`
 `python run_seed.py`
 
 ## TODO
