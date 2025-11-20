@@ -1,64 +1,61 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import List
 from datetime import datetime
-from bson import ObjectId
-from app.db.mongodb import get_mongo_collection
+from pymongo.database import Database
+
+from app.db.mongodb import get_mongo_db
 from app.api.deps import get_current_user
 from app.models.user import User
+from app.schemas.bookmark import (
+    BookmarkCreate,
+    BookmarkOut,
+    BookmarkUpdate,
+    BookmarkListOut,
+)
+from app.utils.mongodb import safe_object_id, serialize_object_id
 
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 
-class BookmarkCreate(BaseModel):
-    paper_id: str = Field(..., description="MongoDB papers._id")
-    notes: Optional[str] = None
-
-class BookmarkOut(BaseModel):
-    id: str
-    user_id: int
-    paper_id: str
-    bookmarked_at: datetime
-    notes: Optional[str] = None
 
 @router.post("", response_model=BookmarkOut, status_code=status.HTTP_201_CREATED)
 def create_bookmark(
     payload: BookmarkCreate,
     current_user: User = Depends(get_current_user),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
+    paper_oid = safe_object_id(payload.paper_id, "paper ID")
+    
     doc = {
         "user_id": current_user.id,
-        "paper_id": ObjectId(payload.paper_id),
+        "paper_id": paper_oid,
         "bookmarked_at": datetime.utcnow(),
         "notes": payload.notes,
     }
-    result = coll.database["bookmarks"].insert_one(doc)
+    result = db["bookmarks"].insert_one(doc)
     doc["_id"] = result.inserted_id
-    doc["id"] = str(result.inserted_id)
-    doc["paper_id"] = str(doc["paper_id"])
+    
+    # API 응답용으로 변환: _id → id, ObjectId → 문자열
+    serialize_object_id(doc, "_id", "paper_id")
+    doc["id"] = doc.pop("_id")
+    
     return BookmarkOut(**doc)
 
-class BookmarkListOut(BaseModel):
-    items: List[BookmarkOut]
 
 @router.get("", response_model=BookmarkListOut)
 def list_bookmarks(
     current_user: User = Depends(get_current_user),
-    paper_id: Optional[str] = Query(None, description="특정 논문 북마크만 조회"),
+    paper_id: str | None = Query(None, description="특정 논문 북마크만 조회"),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
     query = {"user_id": current_user.id}
     if paper_id:
-        query["paper_id"] = ObjectId(paper_id)
-    cursor = coll.database["bookmarks"].find(query).sort("bookmarked_at", -1)
+        query["paper_id"] = safe_object_id(paper_id, "paper ID")
+    
+    cursor = db["bookmarks"].find(query).sort("bookmarked_at", -1)
     items = []
     for doc in cursor:
-        doc["id"] = str(doc["_id"])
-        doc["paper_id"] = str(doc["paper_id"])
+        serialize_object_id(doc, "_id", "paper_id")
+        doc["id"] = doc.pop("_id")
         items.append(BookmarkOut(
             id=doc["id"],
             user_id=doc["user_id"],
@@ -68,32 +65,31 @@ def list_bookmarks(
         ))
     return BookmarkListOut(items=items)
 
-class BookmarkUpdate(BaseModel):
-    notes: Optional[str] = None
 
 @router.put("/{bookmark_id}", response_model=BookmarkOut)
 def update_bookmark(
     bookmark_id: str,
     payload: BookmarkUpdate,
     current_user: User = Depends(get_current_user),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
-    try:
-        obj_id = ObjectId(bookmark_id)
-    except Exception:
-        raise HTTPException(400, "Invalid bookmark_id")
+    obj_id = safe_object_id(bookmark_id, "bookmark ID")
+    
     # 본인 북마크만 수정 가능
-    result = coll.database["bookmarks"].find_one_and_update(
+    result = db["bookmarks"].find_one_and_update(
         {"_id": obj_id, "user_id": current_user.id},
         {"$set": {"notes": payload.notes, "bookmarked_at": datetime.utcnow()}},
         return_document=True,
     )
     if not result:
-        raise HTTPException(404, "Bookmark not found")
-    result["id"] = str(result["_id"])
-    result["paper_id"] = str(result["paper_id"])
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bookmark not found"
+        )
+    
+    serialize_object_id(result, "_id", "paper_id")
+    result["id"] = result.pop("_id")
+    
     return BookmarkOut(
         id=result["id"],
         user_id=result["user_id"],
@@ -102,19 +98,19 @@ def update_bookmark(
         notes=result.get("notes"),
     )
 
+
 @router.delete("/{bookmark_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_bookmark(
     bookmark_id: str,
     current_user: User = Depends(get_current_user),
+    db: Database = Depends(get_mongo_db),
 ):
-    client, coll = get_mongo_collection()
-    if coll is None:
-        raise HTTPException(500, "MongoDB collection unavailable")
-    try:
-        obj_id = ObjectId(bookmark_id)
-    except Exception:
-        raise HTTPException(400, "Invalid bookmark_id")
-    result = coll.database["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
+    obj_id = safe_object_id(bookmark_id, "bookmark ID")
+    
+    result = db["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
     if result.deleted_count == 0:
-        raise HTTPException(404, "Bookmark not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bookmark not found"
+        )
     return

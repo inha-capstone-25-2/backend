@@ -6,12 +6,12 @@ from pathlib import Path
 from pymongo import UpdateOne
 from pymongo.errors import BulkWriteError
 
-from app.db.mongodb import get_mongo_collection, get_mongo_collection_for_search
+from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes
 from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY
-from app.loader.utils import get_current_time  # 추가
+from app.loader.utils import get_current_time
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def read_and_parse_data(data_file_path: Path) -> list[UpdateOne]:
     logger.info(f"[arxiv-job] read_and_parse_data: 완료, 총 {len(ops)} ops 생성")
     return ops
 
-def batch_insert_documents(collection, ops: list[UpdateOne], batch_size: int, progress_every: int) -> int:
+def batch_insert_documents(collection, failures_collection, ops: list[UpdateOne], batch_size: int, progress_every: int) -> int:
     """
     배치 리스트를 MongoDB에 삽입.
     """
@@ -109,12 +109,15 @@ def ingest_arxiv_to_mongo() -> bool:
     """
     arXiv 데이터를 MongoDB에 적재.
     """
-    client, collection = get_mongo_collection()
-    if collection is None:
-        logger.error("[arxiv-job] Mongo collection unavailable")
+    try:
+        client = get_mongo_client_direct()
+    except RuntimeError as e:
+        logger.error(f"[arxiv-job] MongoDB not initialized: {e}")
         return False
 
-    failures_collection = client[settings.mongo_db]["arxiv_failures"]
+    db = client[settings.mongo_db]
+    collection = db[settings.mongo_collection]
+    failures_collection = db["arxiv_failures"]
     logger.info(f"[arxiv-job] MongoDB collection: {collection.full_name}")
 
     try:
@@ -139,7 +142,7 @@ def ingest_arxiv_to_mongo() -> bool:
         logger.info("[arxiv-job] 데이터 파싱 시작")
         ops = read_and_parse_data(DATA_FILE_PATH)
         logger.info("[arxiv-job] 데이터 파싱 완료, 적재 시작")
-        processed = batch_insert_documents(collection, ops, BATCH_SIZE, PROGRESS_EVERY)
+        processed = batch_insert_documents(collection, failures_collection, ops, BATCH_SIZE, PROGRESS_EVERY)
         logger.info(f"[arxiv-job] data load complete total={processed}")
         seed_categories_from_mongo(collection)
         return True
@@ -149,52 +152,91 @@ def ingest_arxiv_to_mongo() -> bool:
         logger.error(f"[arxiv-job] JSON decode error: {e}")
     except Exception as e:
         logger.error(f"[arxiv-job] unexpected error: {e}")
-    finally:
-        try:
-            client.close()
-        except Exception:
-            pass
     return False
 
 def copy_prod_to_local_mongo() -> bool:
-    prod_client, prod_coll = get_mongo_collection_for_search()
-    if prod_coll is None:
-        logger.error("[arxiv-job] prod Mongo collection unavailable")
-        return False
-
-    local_client, local_coll = get_mongo_collection()
-    if local_coll is None:
-        logger.error("[arxiv-job] local Mongo collection unavailable")
-        return False
-
-    logger.info("[arxiv-job] copying arxiv_papers from prod to local mongo")
+    """
+    Production MongoDB에서 로컬 MongoDB로 arxiv_papers 데이터 복제.
+    복제 완료 후 카테고리 시딩을 수행.
+    """
+    logger.info("[arxiv-job] Starting data copy from production to local MongoDB")
+    
+    # Production MongoDB 연결
     try:
+        prod_client = get_prod_mongo_client()
+    except RuntimeError as e:
+        logger.error(f"[arxiv-job] Failed to connect to production MongoDB: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"[arxiv-job] Unexpected error connecting to production: {e}")
+        return False
+
+    # Local MongoDB 연결
+    try:
+        local_client = get_mongo_client_direct()
+    except RuntimeError as e:
+        logger.error(f"[arxiv-job] Local MongoDB not initialized: {e}")
+        if prod_client:
+            prod_client.close()
+        return False
+
+    try:
+        # Production 컬렉션
+        prod_db = prod_client[settings.prod_mongo_db]
+        prod_coll = prod_db[settings.prod_mongo_collection]
+        
+        # Local 컬렉션
+        local_db = local_client[settings.mongo_db]
+        local_coll = local_db[settings.mongo_collection]
+
+        logger.info(f"[arxiv-job] Source: {prod_coll.full_name}")
+        logger.info(f"[arxiv-job] Destination: {local_coll.full_name}")
+
+        # 로컬 컬렉션 초기화
+        logger.info("[arxiv-job] Clearing local collection")
         local_coll.delete_many({})
+
+        # 데이터 복제
+        logger.info("[arxiv-job] Starting data copy...")
         cursor = prod_coll.find({}, no_cursor_timeout=True)
         batch = []
         BATCH_SIZE = 1000
         count = 0
-        for doc in cursor:
-            doc.pop("_id", None)
-            batch.append(doc)
-            if len(batch) >= BATCH_SIZE:
+
+        try:
+            for doc in cursor:
+                # _id는 MongoDB가 자동 생성하도록 제거
+                doc.pop("_id", None)
+                batch.append(doc)
+                
+                if len(batch) >= BATCH_SIZE:
+                    local_coll.insert_many(batch)
+                    count += len(batch)
+                    logger.info(f"[arxiv-job] Copied {count} documents so far...")
+                    batch.clear()
+            
+            # 남은 배치 처리
+            if batch:
                 local_coll.insert_many(batch)
                 count += len(batch)
-                logger.info(f"[arxiv-job] copied {count} docs so far")
-                batch.clear()
-        if batch:
-            local_coll.insert_many(batch)
-            count += len(batch)
-        logger.info(f"[arxiv-job] copy complete: total {count} docs")
-        cursor.close()
-        # 복제 후 카테고리 시딩 추가
+                logger.info(f"[arxiv-job] Copied final batch. Total: {count} documents")
+        finally:
+            cursor.close()
+
+        logger.info(f"[arxiv-job] Data copy complete: total {count} documents")
+
+        # 카테고리 시딩
+        logger.info("[arxiv-job] Starting category seeding...")
         seed_categories_from_mongo(local_coll)
+        logger.info("[arxiv-job] Category seeding complete")
+
         return True
+
     except Exception as e:
-        logger.error(f"[arxiv-job] copy failed: {e}")
+        logger.error(f"[arxiv-job] Copy failed: {e}")
         return False
     finally:
+        # Production 클라이언트는 반드시 닫아야 함 (임시 연결)
         if prod_client:
             prod_client.close()
-        if local_client:
-            local_client.close()
+            logger.info("[arxiv-job] Production MongoDB connection closed")

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -7,24 +6,15 @@ from app.db.postgres import get_db
 from app.models.user import User
 from app.models.category import Category
 from app.models.user_interest import UserInterest
+from app.schemas.user_interest import (
+    InterestAddPayload,
+    InterestItem,
+    InterestList,
+    InterestRemovalResult,
+)
 
 router = APIRouter(prefix="/user-interests", tags=["user-interests"])
 
-class InterestAddPayload(BaseModel):
-    category_codes: list[str] = Field(min_length=1)
-
-class InterestItem(BaseModel):
-    code: str
-    name_ko: str | None = None
-    name_en: str | None = None
-
-class InterestList(BaseModel):
-    items: list[InterestItem]
-
-class InterestRemovalResult(BaseModel):
-    removed: int
-    not_found: list[str]
-    remaining: InterestList
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def add_interests(
@@ -34,13 +24,19 @@ def add_interests(
 ):
     codes = list(dict.fromkeys(payload.category_codes))
     if not codes:
-        raise HTTPException(400, "empty category_codes")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="empty category_codes"
+        )
 
     categories = db.query(Category).filter(Category.code.in_(codes)).all()
     found_codes = {c.code for c in categories}
     missing = [c for c in codes if c not in found_codes]
     if missing:
-        raise HTTPException(404, f"categories not found: {missing}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"categories not found: {missing}"
+        )
 
     existing = db.query(UserInterest).filter(
         UserInterest.user_id == current_user.id,
@@ -55,6 +51,7 @@ def add_interests(
 
     db.commit()
     return {"added": len(categories) - len(existing_ids), "skipped": len(existing_ids)}
+
 
 @router.get("", response_model=InterestList)
 def list_interests(
@@ -77,6 +74,7 @@ def list_interests(
 
     return InterestList(items=items)
 
+
 @router.delete("", response_model=InterestRemovalResult)
 def remove_interests(
     codes: list[str] = Query(..., alias="codes", min_length=1, description="삭제할 카테고리 코드(복수 가능)"),
@@ -85,7 +83,10 @@ def remove_interests(
 ):
     target_codes = list(dict.fromkeys(codes))
     if not target_codes:
-        raise HTTPException(400, "empty codes")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="empty codes"
+        )
 
     categories = db.query(Category).filter(Category.code.in_(target_codes)).all()
     found_map = {c.code: c for c in categories}
