@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -7,24 +6,15 @@ from app.db.postgres import get_db
 from app.models.user import User
 from app.models.category import Category
 from app.models.user_interest import UserInterest
+from app.schemas.user_interest import (
+    InterestAddPayload,
+    InterestItem,
+    InterestList,
+    InterestRemovalResult,
+)
 
 router = APIRouter(prefix="/user-interests", tags=["user-interests"])
 
-class InterestAddPayload(BaseModel):
-    category_codes: list[str] = Field(min_length=1)
-
-class InterestItem(BaseModel):
-    code: str
-    name_ko: str | None = None
-    name_en: str | None = None
-
-class InterestList(BaseModel):
-    items: list[InterestItem]
-
-class InterestRemovalResult(BaseModel):
-    removed: int
-    not_found: list[str]
-    remaining: InterestList
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def add_interests(
@@ -62,6 +52,7 @@ def add_interests(
     db.commit()
     return {"added": len(categories) - len(existing_ids), "skipped": len(existing_ids)}
 
+
 @router.get("", response_model=InterestList)
 def list_interests(
     db: Session = Depends(get_db),
@@ -82,6 +73,7 @@ def list_interests(
         items.append(InterestItem(code=c.code, name_ko=name_ko, name_en=name_en))
 
     return InterestList(items=items)
+
 
 @router.delete("", response_model=InterestRemovalResult)
 def remove_interests(

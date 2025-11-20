@@ -1,37 +1,21 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
-from pydantic import BaseModel
-from typing import Optional, List
+from typing import List
 import math
 from pymongo.database import Database
-from app.db.mongodb import get_mongo_db
-from app.core.settings import settings
 from bson import ObjectId
 from bson.errors import InvalidId
 
+from app.db.mongodb import get_mongo_db
+from app.core.settings import settings
+from app.schemas.paper import Paper, PaperSearchResponse
+
 router = APIRouter(prefix="/papers", tags=["papers"])
 
-class Paper(BaseModel):
-    _id: str
-    id: Optional[str] = None
-    title: Optional[str] = None
-    abstract: Optional[str] = None
-    authors: Optional[str] = None
-    categories: Optional[List[str]] = None
-    update_date: Optional[str] = None
-
-class PaperSearchResponse(BaseModel):
-    page: int
-    page_size: int
-    total: int
-    total_pages: int
-    has_next: bool
-    has_prev: bool
-    items: List[Paper]
 
 @router.get("/search", response_model=PaperSearchResponse)
 def search_papers(
-    q: Optional[str] = Query(None, min_length=1, description="검색어"),
-    categories: Optional[List[str]] = Query(None, description="카테고리 코드(복수 선택 가능)"),
+    q: str | None = Query(None, min_length=1, description="검색어"),
+    categories: List[str] | None = Query(None, description="카테고리 코드(복수 선택 가능)"),
     page: int = Query(1, ge=1, description="페이지 (1부터)"),
     db: Database = Depends(get_mongo_db),
 ):

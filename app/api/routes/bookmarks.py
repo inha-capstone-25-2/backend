@@ -1,25 +1,21 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import List
 from datetime import datetime
 from bson import ObjectId
 from pymongo.database import Database
+
 from app.db.mongodb import get_mongo_db
 from app.api.deps import get_current_user
 from app.models.user import User
+from app.schemas.bookmark import (
+    BookmarkCreate,
+    BookmarkOut,
+    BookmarkUpdate,
+    BookmarkListOut,
+)
 
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 
-class BookmarkCreate(BaseModel):
-    paper_id: str = Field(..., description="MongoDB papers._id")
-    notes: Optional[str] = None
-
-class BookmarkOut(BaseModel):
-    id: str
-    user_id: int
-    paper_id: str
-    bookmarked_at: datetime
-    notes: Optional[str] = None
 
 @router.post("", response_model=BookmarkOut, status_code=status.HTTP_201_CREATED)
 def create_bookmark(
@@ -39,13 +35,11 @@ def create_bookmark(
     doc["paper_id"] = str(doc["paper_id"])
     return BookmarkOut(**doc)
 
-class BookmarkListOut(BaseModel):
-    items: List[BookmarkOut]
 
 @router.get("", response_model=BookmarkListOut)
 def list_bookmarks(
     current_user: User = Depends(get_current_user),
-    paper_id: Optional[str] = Query(None, description="특정 논문 북마크만 조회"),
+    paper_id: str | None = Query(None, description="특정 논문 북마크만 조회"),
     db: Database = Depends(get_mongo_db),
 ):
     query = {"user_id": current_user.id}
@@ -65,8 +59,6 @@ def list_bookmarks(
         ))
     return BookmarkListOut(items=items)
 
-class BookmarkUpdate(BaseModel):
-    notes: Optional[str] = None
 
 @router.put("/{bookmark_id}", response_model=BookmarkOut)
 def update_bookmark(
@@ -102,6 +94,7 @@ def update_bookmark(
         bookmarked_at=result["bookmarked_at"],
         notes=result.get("notes"),
     )
+
 
 @router.delete("/{bookmark_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_bookmark(
