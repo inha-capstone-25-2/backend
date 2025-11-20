@@ -34,13 +34,19 @@ def add_interests(
 ):
     codes = list(dict.fromkeys(payload.category_codes))
     if not codes:
-        raise HTTPException(400, "empty category_codes")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="empty category_codes"
+        )
 
     categories = db.query(Category).filter(Category.code.in_(codes)).all()
     found_codes = {c.code for c in categories}
     missing = [c for c in codes if c not in found_codes]
     if missing:
-        raise HTTPException(404, f"categories not found: {missing}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"categories not found: {missing}"
+        )
 
     existing = db.query(UserInterest).filter(
         UserInterest.user_id == current_user.id,
@@ -85,7 +91,10 @@ def remove_interests(
 ):
     target_codes = list(dict.fromkeys(codes))
     if not target_codes:
-        raise HTTPException(400, "empty codes")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="empty codes"
+        )
 
     categories = db.query(Category).filter(Category.code.in_(target_codes)).all()
     found_map = {c.code: c for c in categories}

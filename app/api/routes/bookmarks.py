@@ -78,7 +78,10 @@ def update_bookmark(
     try:
         obj_id = ObjectId(bookmark_id)
     except Exception:
-        raise HTTPException(400, "Invalid bookmark_id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid bookmark_id"
+        )
     # 본인 북마크만 수정 가능
     result = db["bookmarks"].find_one_and_update(
         {"_id": obj_id, "user_id": current_user.id},
@@ -86,7 +89,10 @@ def update_bookmark(
         return_document=True,
     )
     if not result:
-        raise HTTPException(404, "Bookmark not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bookmark not found"
+        )
     result["id"] = str(result["_id"])
     result["paper_id"] = str(result["paper_id"])
     return BookmarkOut(
@@ -106,8 +112,14 @@ def delete_bookmark(
     try:
         obj_id = ObjectId(bookmark_id)
     except Exception:
-        raise HTTPException(400, "Invalid bookmark_id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid bookmark_id"
+        )
     result = db["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
     if result.deleted_count == 0:
-        raise HTTPException(404, "Bookmark not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bookmark not found"
+        )
     return
