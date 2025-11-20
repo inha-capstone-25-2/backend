@@ -33,7 +33,7 @@ from app.seed.bookmarks_seed import seed_bookmarks
 from app.seed.activities_seed import seed_activities
 from app.seed.search_history_seed import seed_search_history
 from app.db.postgres import get_db
-from app.db.mongodb import get_mongo_db
+from app.db.mongodb import get_mongo_db, init_mongo
 
 logging.basicConfig(
     level=logging.INFO,
@@ -102,6 +102,9 @@ def seed_mongo_all() -> None:
     logger.info("MongoDB Mock Data Seeding")
     logger.info("=" * 60)
 
+    # MongoDB 초기화
+    init_mongo()
+    
     db = next(get_mongo_db())
     
     try:
