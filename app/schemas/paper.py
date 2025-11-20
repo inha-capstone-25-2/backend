@@ -48,11 +48,11 @@ class SearchHistoryFilters(BaseModel):
 class SearchHistoryItem(BaseModel):
     """검색 기록 항목"""
     id: str  # _id를 id로 변환
-    user_id: int
     query: str
-    filters: SearchHistoryFilters
-    result_count: int
     searched_at: datetime
+    user_id: Optional[int] = None
+    filters: Optional[SearchHistoryFilters] = None
+    result_count: Optional[int] = None
 
 
 class SearchHistoryResponse(BaseModel):
