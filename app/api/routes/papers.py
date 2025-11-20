@@ -15,6 +15,7 @@ from app.schemas.paper import (
     SearchHistoryFilters,
 )
 from app.utils.mongodb import safe_object_id, serialize_object_id
+from app.utils.activity_logger import log_activity
 from app.api.deps import get_current_user
 from app.models.user import User
 
@@ -105,6 +106,18 @@ def search_papers(
             categories=categories,
             result_count=total
         )
+        
+        # 검색 활동 로그
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="search",
+            metadata={
+                "search_query": q,
+                "categories": categories,
+                "result_count": total
+            }
+        )
 
     return {
         "page": page,
@@ -158,6 +171,7 @@ def get_search_history(
 def get_paper(
     paper_id: str,
     db: Database = Depends(get_mongo_db),
+    current_user: User = Depends(get_current_user),  # 인증 필수
 ):
     coll = db[settings.mongo_collection]
 
@@ -165,5 +179,13 @@ def get_paper(
     doc = coll.find_one({"_id": oid})
     if not doc:
         raise HTTPException(status_code=404, detail="Paper not found")
+    
+    # 논문 조회 활동 로그
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        activity_type="view",
+        paper_id=paper_id
+    )
 
     return serialize_object_id(doc)

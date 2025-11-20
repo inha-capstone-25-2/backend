@@ -25,11 +25,12 @@ from app.core.exceptions import (
 
 # 추가: Auth 라우터 & DB 초기화
 from app.api.routes.auth import router as auth_router
-from app.api.routes.jobs import router as jobs_router  # 추가
-from app.api.routes.papers import router as papers_router  # 추가
-from app.api.routes.categories import router as categories_router  # 추가
-from app.api.routes.user_interests import router as user_interests_router  # 추가
-from app.api.routes.bookmarks import router as bookmarks_router  # 추가
+from app.api.routes.jobs import router as jobs_router
+from app.api.routes.papers import router as papers_router
+from app.api.routes.categories import router as categories_router
+from app.api.routes.user_interests import router as user_interests_router
+from app.api.routes.bookmarks import router as bookmarks_router
+from app.api.routes.activities import router as activities_router  # NEW
 from app.db.postgres import init_db, get_db
 from app.loader.arxiv_loader import load_arxiv_data_to_mongodb
 from app.seed.categories_seed import seed_categories  # 추가
@@ -198,6 +199,7 @@ app.include_router(papers_router)
 app.include_router(categories_router)
 app.include_router(user_interests_router)
 app.include_router(bookmarks_router)
+app.include_router(activities_router)  # NEW
 
 
 @app.get("/")
