@@ -12,5 +12,6 @@ email-validator
 pydantic-settings>=2.2
 python-multipart
 kaggle
+faker
 boto3
 requests
