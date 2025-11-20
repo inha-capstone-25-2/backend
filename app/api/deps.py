@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 
 from app.db.postgres import get_db
 from app.models.user import User
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.settings import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -19,7 +19,7 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
         username: str | None = payload.get("sub")   # sub은 username
         token_ver = payload.get("ver", 0)           # 토큰 버전(없으면 0으로 간주)
         if username is None:

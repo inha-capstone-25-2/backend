@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import ConflictingIdError
@@ -12,13 +13,24 @@ setup_logging()  # 가장 먼저 호출
 
 # Settings를 초기화하여 .env 계층을 로드
 from app.core.settings import settings
+from app.core.exceptions import (
+    AppException,
+    DatabaseException,
+    MongoDBException,
+    PostgreSQLException,
+    BusinessLogicException,
+    ResourceNotFoundException,
+    ValidationException,
+)
 
 # 추가: Auth 라우터 & DB 초기화
 from app.api.routes.auth import router as auth_router
-from app.api.routes.jobs import router as jobs_router  # 추가
-from app.api.routes.papers import router as papers_router  # 추가
-from app.api.routes.categories import router as categories_router  # 추가
-from app.api.routes.user_interests import router as user_interests_router  # 추가
+from app.api.routes.jobs import router as jobs_router
+from app.api.routes.papers import router as papers_router
+from app.api.routes.categories import router as categories_router
+from app.api.routes.user_interests import router as user_interests_router
+from app.api.routes.bookmarks import router as bookmarks_router
+from app.api.routes.activities import router as activities_router  # NEW
 from app.db.postgres import init_db, get_db
 from app.loader.arxiv_loader import load_arxiv_data_to_mongodb
 from app.seed.categories_seed import seed_categories  # 추가
@@ -62,21 +74,111 @@ def _ensure_daily_job():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup
     try:
-        # DB 테이블 준비
+        # PostgreSQL 테이블 준비
         init_db()
     except Exception as e:
         logger.error(f"init_db failed: {e}")
 
+    # MongoDB 연결 초기화
+    try:
+        from app.db.mongodb import init_mongo
+        init_mongo()
+    except Exception as e:
+        logger.error(f"init_mongo failed: {e}")
+
     _ensure_daily_job()
     if not scheduler.running:
         scheduler.start()
+    
     yield
+    
+    # Shutdown
     if scheduler.running:
         scheduler.shutdown(wait=False)
+    
+    # MongoDB 연결 종료
+    try:
+        from app.db.mongodb import close_mongo
+        close_mongo()
+    except Exception as e:
+        logger.error(f"close_mongo failed: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# Exception handlers
+@app.exception_handler(DatabaseException)
+async def database_exception_handler(request: Request, exc: DatabaseException):
+    """데이터베이스 관련 예외 처리"""
+    logger.error(f"Database error at {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Database operation failed",
+            "type": "database_error",
+            "path": str(request.url.path),
+        }
+    )
+
+
+@app.exception_handler(ResourceNotFoundException)
+async def resource_not_found_handler(request: Request, exc: ResourceNotFoundException):
+    """리소스를 찾을 수 없음 예외 처리"""
+    logger.warning(f"Resource not found at {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=404,
+        content={
+            "detail": str(exc),
+            "type": "resource_not_found",
+            "path": str(request.url.path),
+        }
+    )
+
+
+@app.exception_handler(ValidationException)
+async def validation_exception_handler(request: Request, exc: ValidationException):
+    """입력값 검증 실패 예외 처리"""
+    logger.warning(f"Validation error at {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": str(exc),
+            "type": "validation_error",
+            "path": str(request.url.path),
+        }
+    )
+
+
+@app.exception_handler(BusinessLogicException)
+async def business_logic_exception_handler(request: Request, exc: BusinessLogicException):
+    """비즈니스 로직 예외 처리"""
+    logger.warning(f"Business logic error at {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": str(exc),
+            "type": "business_logic_error",
+            "path": str(request.url.path),
+        }
+    )
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    """일반 애플리케이션 예외 처리"""
+    logger.warning(f"Application error at {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": str(exc),
+            "type": "application_error",
+            "path": str(request.url.path),
+        }
+    )
+
 
 cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001")
 allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
@@ -95,7 +197,9 @@ app.include_router(auth_router)
 app.include_router(jobs_router)
 app.include_router(papers_router)
 app.include_router(categories_router)
-app.include_router(user_interests_router)  # 추가
+app.include_router(user_interests_router)
+app.include_router(bookmarks_router)
+app.include_router(activities_router)  # NEW
 
 
 @app.get("/")
