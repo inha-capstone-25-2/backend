@@ -106,3 +106,49 @@ def get_mongo_client_direct() -> MongoClient:
             "MongoDB is not initialized. Call init_mongo() first."
         )
     return _mongo_client
+
+
+def get_prod_mongo_client() -> MongoClient:
+    """
+    Production MongoDB 클라이언트를 생성하여 반환.
+    로컬 환경에서 데이터 복제 시에만 사용.
+    
+    Warning: 
+    - 이 함수는 새로운 연결을 생성하므로 사용 후 반드시 close() 해야 함.
+    - 글로벌 클라이언트가 아닌 임시 연결임.
+    
+    Raises:
+        RuntimeError: PROD_MONGO_HOST가 설정되지 않은 경우
+    """
+    host = settings.prod_mongo_host
+    port = settings.prod_mongo_port
+    user = settings.prod_mongo_user
+    password = settings.prod_mongo_password
+    auth_source = settings.prod_mongo_auth_source
+
+    if not host:
+        raise RuntimeError(
+            "PROD_MONGO_HOST is not set. Cannot connect to production MongoDB."
+        )
+
+    if user and password:
+        mongo_uri = f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
+    else:
+        mongo_uri = f"mongodb://{host}:{port}/"
+
+    try:
+        client = MongoClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=10000,  # prod는 외부 네트워크이므로 타임아웃 길게
+            maxPoolSize=10,  # 임시 연결이므로 작은 풀 사용
+        )
+        # 연결 테스트
+        client.admin.command("ping")
+        logger.info(
+            f"Production MongoDB client created: host={host}:{port} "
+            f"user={user or 'none'}"
+        )
+        return client
+    except PyMongoError as e:
+        logger.error(f"Failed to connect to production MongoDB: {e}")
+        raise

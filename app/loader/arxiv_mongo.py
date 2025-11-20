@@ -6,7 +6,7 @@ from pathlib import Path
 from pymongo import UpdateOne
 from pymongo.errors import BulkWriteError
 
-from app.db.mongodb import get_mongo_client_direct
+from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes
@@ -156,30 +156,87 @@ def ingest_arxiv_to_mongo() -> bool:
 
 def copy_prod_to_local_mongo() -> bool:
     """
-    Production MongoDB에서 로컬로 데이터 복제.
-    Note: 현재 구현은 동일한 클라이언트를 사용하므로 실제로는 동작하지 않음.
-    이 함수는 별도의 prod/local 설정이 필요합니다.
+    Production MongoDB에서 로컬 MongoDB로 arxiv_papers 데이터 복제.
+    복제 완료 후 카테고리 시딩을 수행.
     """
-    try:
-        client = get_mongo_client_direct()
-    except RuntimeError as e:
-        logger.error(f"[arxiv-job] MongoDB not initialized: {e}")
-        return False
-
-    # TODO: prod와 local을 구분하려면 별도의 연결 설정이 필요
-    # 현재는 동일한 클라이언트를 사용
-    db = client[settings.mongo_db]
-    local_coll = db[settings.mongo_collection]
-
-    logger.info("[arxiv-job] copying arxiv_papers from prod to local mongo")
-    logger.warning("[arxiv-job] WARNING: prod and local are the same instance")
+    logger.info("[arxiv-job] Starting data copy from production to local MongoDB")
     
+    # Production MongoDB 연결
     try:
-        # 실제 복제 로직은 prod 연결이 별도로 설정된 경우에만 의미가 있음
-        # 현재는 카테고리 시딩만 수행
-        seed_categories_from_mongo(local_coll)
-        logger.info("[arxiv-job] category seeding complete")
-        return True
-    except Exception as e:
-        logger.error(f"[arxiv-job] copy failed: {e}")
+        prod_client = get_prod_mongo_client()
+    except RuntimeError as e:
+        logger.error(f"[arxiv-job] Failed to connect to production MongoDB: {e}")
         return False
+    except Exception as e:
+        logger.error(f"[arxiv-job] Unexpected error connecting to production: {e}")
+        return False
+
+    # Local MongoDB 연결
+    try:
+        local_client = get_mongo_client_direct()
+    except RuntimeError as e:
+        logger.error(f"[arxiv-job] Local MongoDB not initialized: {e}")
+        if prod_client:
+            prod_client.close()
+        return False
+
+    try:
+        # Production 컬렉션
+        prod_db = prod_client[settings.prod_mongo_db]
+        prod_coll = prod_db[settings.prod_mongo_collection]
+        
+        # Local 컬렉션
+        local_db = local_client[settings.mongo_db]
+        local_coll = local_db[settings.mongo_collection]
+
+        logger.info(f"[arxiv-job] Source: {prod_coll.full_name}")
+        logger.info(f"[arxiv-job] Destination: {local_coll.full_name}")
+
+        # 로컬 컬렉션 초기화
+        logger.info("[arxiv-job] Clearing local collection")
+        local_coll.delete_many({})
+
+        # 데이터 복제
+        logger.info("[arxiv-job] Starting data copy...")
+        cursor = prod_coll.find({}, no_cursor_timeout=True)
+        batch = []
+        BATCH_SIZE = 1000
+        count = 0
+
+        try:
+            for doc in cursor:
+                # _id는 MongoDB가 자동 생성하도록 제거
+                doc.pop("_id", None)
+                batch.append(doc)
+                
+                if len(batch) >= BATCH_SIZE:
+                    local_coll.insert_many(batch)
+                    count += len(batch)
+                    logger.info(f"[arxiv-job] Copied {count} documents so far...")
+                    batch.clear()
+            
+            # 남은 배치 처리
+            if batch:
+                local_coll.insert_many(batch)
+                count += len(batch)
+                logger.info(f"[arxiv-job] Copied final batch. Total: {count} documents")
+        finally:
+            cursor.close()
+
+        logger.info(f"[arxiv-job] Data copy complete: total {count} documents")
+
+        # 카테고리 시딩
+        logger.info("[arxiv-job] Starting category seeding...")
+        seed_categories_from_mongo(local_coll)
+        logger.info("[arxiv-job] Category seeding complete")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"[arxiv-job] Copy failed: {e}")
+        return False
+    finally:
+        # Production 클라이언트는 반드시 닫아야 함 (임시 연결)
+        if prod_client:
+            prod_client.close()
+            logger.info("[arxiv-job] Production MongoDB connection closed")
