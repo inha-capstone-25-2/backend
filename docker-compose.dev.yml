@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_dev
+    env_file:
+      - env/dev/.env
+    environment:
+      APP_ENV: dev
+      KAGGLE_CONFIG_DIR: /root/.kaggle
+      DATA_DIR: /app/data
+    volumes:
+      - ./.kaggle:/root/.kaggle:ro
+      - ./data:/app/data
+    ports:
+      - "80:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always

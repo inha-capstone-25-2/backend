@@ -1,8 +1,8 @@
-name: Deploy via SSH
+name: Deploy to Dev via SSH
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "develop" ]
 
 permissions:
   contents: read
@@ -20,15 +20,15 @@ jobs:
           ssh-key: ${{ secrets.SUBMODULES_SSH_KEY }}
 
       - name: Verify env submodule
-        run: ls -la env/prod || (echo "env/prod missing" && exit 1)
+        run: ls -la env/dev || (echo "env/dev missing" && exit 1)
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.EC2_PROD_HOST }}
+          host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "app/**,requirements.txt,Dockerfile,docker-compose.prod.yml,env/prod/.env"
+          source: "app/**,requirements.txt,Dockerfile,docker-compose.dev.yml,env/dev/.env"
           target: ${{ secrets.EC2_PATH }}
           overwrite: true
           debug: true  # 디버그 활성화
@@ -38,7 +38,7 @@ jobs:
         env:
           KAGGLE_JSON: ${{ secrets.KAGGLE_JSON }}
         with:
-          host: ${{ secrets.EC2_PROD_HOST }}
+          host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           envs: KAGGLE_JSON
@@ -54,7 +54,7 @@ jobs:
       - name: Ensure data/.kaggle dirs on EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.EC2_PROD_HOST }}
+          host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
@@ -67,7 +67,7 @@ jobs:
       - name: Prepare docker on EC2 (install/enable if needed)
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.EC2_PROD_HOST }}
+          host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
@@ -91,7 +91,7 @@ jobs:
       - name: Build & Restart
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.EC2_PROD_HOST }}
+          host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
@@ -115,6 +115,6 @@ jobs:
               fi
             fi
             echo "Using: $COMPOSE"
-            sudo $COMPOSE -f docker-compose.prod.yml up -d --build
-            sudo $COMPOSE -f docker-compose.prod.yml ps
-            sudo docker logs fastapi_prod --tail=50 || true
+            sudo $COMPOSE -f docker-compose.dev.yml up -d --build
+            sudo $COMPOSE -f docker-compose.dev.yml ps
+            sudo docker logs fastapi_dev --tail=50 || true
