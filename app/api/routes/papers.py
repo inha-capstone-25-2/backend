@@ -161,6 +161,11 @@ def get_search_history(
         serialize_object_id(doc)
         doc["id"] = doc.pop("_id")
         
+        # mock 데이터 호환: 필수 필드 없으면 None 처리
+        doc.setdefault("user_id", None)
+        doc.setdefault("filters", None)
+        doc.setdefault("result_count", None)
+        
         # Pydantic 모델로 변환
         items.append(SearchHistoryItem(**doc))
     
