@@ -28,7 +28,7 @@ jobs:
           host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "app/**,requirements.txt,Dockerfile,docker-compose.dev.yml,env/dev/.env"
+          source: "app/**,requirements.txt,Dockerfile,docker-compose.dev.yml,env/dev/.env,run_seed.py"
           target: ${{ secrets.EC2_PATH }}
           overwrite: true
           debug: true  # 디버그 활성화
