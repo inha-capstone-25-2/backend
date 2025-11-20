@@ -8,6 +8,7 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pymongo.database import Database
+from bson import ObjectId
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
@@ -66,7 +67,7 @@ def seed_activities(db: Database) -> int:
         paper_id = None
         if activity_type in ["view", "bookmark", "unbookmark"]:
             paper = random.choice(paper_ids)
-            paper_id = str(paper["_id"])
+            paper_id = paper["_id"]  # ObjectId로 저장
         
         activity = {
             "user_id": user_id,
@@ -75,7 +76,7 @@ def seed_activities(db: Database) -> int:
         }
         
         if paper_id:
-            activity["paper_id"] = paper_id
+            activity["paper_id"] = paper_id  # ObjectId 그대로 저장
         
         # metadata (선택적)
         if activity_type == "search":
