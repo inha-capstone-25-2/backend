@@ -46,6 +46,9 @@
 - 현재 브랜치 내용을 깃허브의 develop으로 덮어쓰기
 `git reset --hard origin/develop`
 
+- 목데이터 세팅 (dev)
+`python run_seed.py`
+
 ## TODO
 - [ ] 서버 재구축 시 kaggle API를 통해 데이터셋 받고, MongoDB에 적재까지 이루어지는 프로세스 구축 (현재는 S3에 미리 저장된 데이터셋을 로드 중)
 - [ ] 검색 속도 최적화
