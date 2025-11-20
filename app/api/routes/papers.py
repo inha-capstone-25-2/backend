@@ -7,7 +7,13 @@ from pymongo.database import Database
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
-from app.schemas.paper import Paper, PaperSearchResponse
+from app.schemas.paper import (
+    Paper,
+    PaperSearchResponse,
+    SearchHistoryResponse,
+    SearchHistoryItem,
+    SearchHistoryFilters,
+)
 from app.utils.mongodb import safe_object_id, serialize_object_id
 from app.api.deps import get_current_user
 from app.models.user import User
@@ -109,6 +115,43 @@ def search_papers(
         "has_prev": page > 1,
         "items": items,
     }
+
+
+@router.get("/search-history", response_model=SearchHistoryResponse)
+def get_search_history(
+    limit: int = Query(100, ge=1, le=1000, description="조회할 기록 수"),
+    db: Database = Depends(get_mongo_db),
+):
+    """
+    전체 검색 기록 조회 (인증 불필요).
+    
+    최신순으로 정렬된 검색 기록을 반환합니다.
+    
+    Args:
+        limit: 조회할 기록 수 (기본 100, 최대 1000)
+        db: MongoDB Database
+    
+    Returns:
+        SearchHistoryResponse: 검색 기록 목록
+    """
+    collection = db["search_history"]
+    
+    # 전체 개수
+    total = collection.count_documents({})
+    
+    # 최신순으로 정렬하여 조회
+    cursor = collection.find({}).sort("searched_at", -1).limit(limit)
+    
+    items = []
+    for doc in cursor:
+        # _id를 id로 변환
+        serialize_object_id(doc)
+        doc["id"] = doc.pop("_id")
+        
+        # Pydantic 모델로 변환
+        items.append(SearchHistoryItem(**doc))
+    
+    return SearchHistoryResponse(total=total, items=items)
 
 
 @router.get("/{paper_id}", response_model=Paper)
