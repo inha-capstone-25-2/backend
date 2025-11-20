@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import List
 from datetime import datetime
-from bson import ObjectId
 from pymongo.database import Database
 
 from app.db.mongodb import get_mongo_db
@@ -13,6 +12,7 @@ from app.schemas.bookmark import (
     BookmarkUpdate,
     BookmarkListOut,
 )
+from app.utils.mongodb import safe_object_id, serialize_object_id
 
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
 
@@ -23,16 +23,21 @@ def create_bookmark(
     current_user: User = Depends(get_current_user),
     db: Database = Depends(get_mongo_db),
 ):
+    paper_oid = safe_object_id(payload.paper_id, "paper ID")
+    
     doc = {
         "user_id": current_user.id,
-        "paper_id": ObjectId(payload.paper_id),
+        "paper_id": paper_oid,
         "bookmarked_at": datetime.utcnow(),
         "notes": payload.notes,
     }
     result = db["bookmarks"].insert_one(doc)
     doc["_id"] = result.inserted_id
-    doc["id"] = str(result.inserted_id)
-    doc["paper_id"] = str(doc["paper_id"])
+    
+    # API 응답용으로 변환: _id → id, ObjectId → 문자열
+    serialize_object_id(doc, "_id", "paper_id")
+    doc["id"] = doc.pop("_id")
+    
     return BookmarkOut(**doc)
 
 
@@ -44,12 +49,13 @@ def list_bookmarks(
 ):
     query = {"user_id": current_user.id}
     if paper_id:
-        query["paper_id"] = ObjectId(paper_id)
+        query["paper_id"] = safe_object_id(paper_id, "paper ID")
+    
     cursor = db["bookmarks"].find(query).sort("bookmarked_at", -1)
     items = []
     for doc in cursor:
-        doc["id"] = str(doc["_id"])
-        doc["paper_id"] = str(doc["paper_id"])
+        serialize_object_id(doc, "_id", "paper_id")
+        doc["id"] = doc.pop("_id")
         items.append(BookmarkOut(
             id=doc["id"],
             user_id=doc["user_id"],
@@ -67,13 +73,8 @@ def update_bookmark(
     current_user: User = Depends(get_current_user),
     db: Database = Depends(get_mongo_db),
 ):
-    try:
-        obj_id = ObjectId(bookmark_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid bookmark_id"
-        )
+    obj_id = safe_object_id(bookmark_id, "bookmark ID")
+    
     # 본인 북마크만 수정 가능
     result = db["bookmarks"].find_one_and_update(
         {"_id": obj_id, "user_id": current_user.id},
@@ -85,8 +86,10 @@ def update_bookmark(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Bookmark not found"
         )
-    result["id"] = str(result["_id"])
-    result["paper_id"] = str(result["paper_id"])
+    
+    serialize_object_id(result, "_id", "paper_id")
+    result["id"] = result.pop("_id")
+    
     return BookmarkOut(
         id=result["id"],
         user_id=result["user_id"],
@@ -102,13 +105,8 @@ def delete_bookmark(
     current_user: User = Depends(get_current_user),
     db: Database = Depends(get_mongo_db),
 ):
-    try:
-        obj_id = ObjectId(bookmark_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid bookmark_id"
-        )
+    obj_id = safe_object_id(bookmark_id, "bookmark ID")
+    
     result = db["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(

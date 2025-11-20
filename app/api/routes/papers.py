@@ -2,12 +2,11 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List
 import math
 from pymongo.database import Database
-from bson import ObjectId
-from bson.errors import InvalidId
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
 from app.schemas.paper import Paper, PaperSearchResponse
+from app.utils.mongodb import safe_object_id, serialize_object_id
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -47,7 +46,7 @@ def search_papers(
     cursor = coll.find(query, projection).skip(skip).limit(page_size)
     items = []
     for doc in cursor:
-        doc["_id"] = str(doc.get("_id"))
+        serialize_object_id(doc)  # _id를 문자열로 변환
         items.append(doc)
 
     return {
@@ -68,14 +67,9 @@ def get_paper(
 ):
     coll = db[settings.mongo_collection]
 
-    try:
-        oid = ObjectId(paper_id)
-    except InvalidId:
-        raise HTTPException(status_code=400, detail="Invalid paper ID format")
-
+    oid = safe_object_id(paper_id, "paper ID")
     doc = coll.find_one({"_id": oid})
     if not doc:
         raise HTTPException(status_code=404, detail="Paper not found")
 
-    doc["_id"] = str(doc["_id"])
-    return doc
+    return serialize_object_id(doc)
