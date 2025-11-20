@@ -71,6 +71,10 @@ def get_activities(
         if "paper_id" in doc:
             doc["paper_id"] = str(doc["paper_id"])
         
+        # metadata가 없으면 None으로 설정
+        if "metadata" not in doc:
+            doc["metadata"] = None
+        
         # Pydantic 모델로 변환
         items.append(UserActivityOut(**doc))
     

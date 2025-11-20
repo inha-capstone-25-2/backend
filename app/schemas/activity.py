@@ -33,7 +33,7 @@ class UserActivityOut(BaseModel):
     user_id: int
     paper_id: Optional[str] = None
     activity_type: str
-    metadata: Dict[str, Any]
+    metadata: Optional[Dict[str, Any]] = None
     timestamp: datetime
 
 
