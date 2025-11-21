@@ -132,15 +132,18 @@ def search_papers(
 
 @router.get("/search-history", response_model=SearchHistoryResponse)
 def get_search_history(
+    user_id: int | None = Query(None, description="사용자 ID로 필터링"),
     limit: int = Query(100, ge=1, le=1000, description="조회할 기록 수"),
     db: Database = Depends(get_mongo_db),
 ):
     """
-    전체 검색 기록 조회 (인증 불필요).
+    검색 기록 조회 (인증 불필요).
     
-    최신순으로 정렬된 검색 기록을 반환합니다.
+    필터 옵션으로 특정 사용자의 검색 기록만 조회 가능합니다.
+    최신순으로 정렬되어 반환됩니다.
     
     Args:
+        user_id: 특정 사용자의 검색 기록만 조회
         limit: 조회할 기록 수 (기본 100, 최대 1000)
         db: MongoDB Database
     
@@ -149,11 +152,16 @@ def get_search_history(
     """
     collection = db["search_history"]
     
+    # 필터 쿼리 구성
+    query = {}
+    if user_id is not None:
+        query["user_id"] = user_id
+    
     # 전체 개수
-    total = collection.count_documents({})
+    total = collection.count_documents(query)
     
     # 최신순으로 정렬하여 조회
-    cursor = collection.find({}).sort("searched_at", -1).limit(limit)
+    cursor = collection.find(query).sort("searched_at", -1).limit(limit)
     
     items = []
     for doc in cursor:
