@@ -48,6 +48,26 @@ def init_mongo() -> None:
             f"MongoDB initialized: host={host}:{port} db={db_name} "
             f"user={user or 'none'}"
         )
+        
+        # TTL 인덱스 생성
+        try:
+            # search_history: 30일 후 자동 삭제
+            _mongo_db["search_history"].create_index(
+                "searched_at",
+                expireAfterSeconds=30 * 24 * 60 * 60,  # 30일
+                name="ttl_searched_at"
+            )
+            logger.info("TTL index created for search_history (30 days)")
+            
+            # user_activities: 90일 후 자동 삭제
+            _mongo_db["user_activities"].create_index(
+                "timestamp",
+                expireAfterSeconds=90 * 24 * 60 * 60,  # 90일
+                name="ttl_timestamp"
+            )
+            logger.info("TTL index created for user_activities (90 days)")
+        except Exception as e:
+            logger.warning(f"TTL index creation failed (may already exist): {e}")
     except PyMongoError as e:
         logger.error(f"MongoDB initialization failed: {e}")
         _mongo_client = None
