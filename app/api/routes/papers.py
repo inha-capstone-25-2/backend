@@ -94,7 +94,7 @@ def search_papers(
     cursor = coll.find(query, projection).skip(skip).limit(page_size)
     items = []
     for doc in cursor:
-        serialize_object_id(doc)  # _id를 문자열로 변환
+        serialize_object_id(doc)
         items.append(doc)
 
     # 검색 기록 저장 (검색어나 카테고리가 있을 때만)
@@ -152,20 +152,16 @@ def get_search_history(
     """
     collection = db["search_history"]
     
-    # 필터 쿼리 구성
     query = {}
     if user_id is not None:
         query["user_id"] = user_id
     
-    # 전체 개수
     total = collection.count_documents(query)
     
-    # 최신순으로 정렬하여 조회
     cursor = collection.find(query).sort("searched_at", -1).limit(limit)
     
     items = []
     for doc in cursor:
-        # _id를 id로 변환
         serialize_object_id(doc)
         doc["id"] = doc.pop("_id")
         
@@ -174,7 +170,6 @@ def get_search_history(
         doc.setdefault("filters", None)
         doc.setdefault("result_count", None)
         
-        # Pydantic 모델로 변환
         items.append(SearchHistoryItem(**doc))
     
     return SearchHistoryResponse(total=total, items=items)

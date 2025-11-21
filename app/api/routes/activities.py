@@ -43,7 +43,6 @@ def get_activities(
     """
     collection = db["user_activities"]
     
-    # 필터 쿼리 구성
     query = {}
     if user_id is not None:
         query["user_id"] = user_id
@@ -57,15 +56,12 @@ def get_activities(
             # 유효하지 않은 paper_id면 빈 결과 반환
             return UserActivityListResponse(total=0, items=[])
     
-    # 전체 개수
     total = collection.count_documents(query)
     
-    # 최신순으로 정렬하여 조회
     cursor = collection.find(query).sort("timestamp", -1).limit(limit)
     
     items = []
     for doc in cursor:
-        # ObjectId를 문자열로 변환
         serialize_object_id(doc)
         doc["id"] = doc.pop("_id")
         if "paper_id" in doc:
@@ -75,7 +71,6 @@ def get_activities(
         if "metadata" not in doc:
             doc["metadata"] = None
         
-        # Pydantic 모델로 변환
         items.append(UserActivityOut(**doc))
     
     return UserActivityListResponse(total=total, items=items)

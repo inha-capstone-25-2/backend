@@ -35,7 +35,6 @@ def create_bookmark(
     result = db["bookmarks"].insert_one(doc)
     doc["_id"] = result.inserted_id
     
-    # API 응답용으로 변환: _id → id, ObjectId → 문자열
     serialize_object_id(doc, "_id", "paper_id")
     doc["id"] = doc.pop("_id")
     
