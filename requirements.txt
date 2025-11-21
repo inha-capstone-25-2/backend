@@ -16,3 +16,4 @@ faker
 boto3
 requests
 cachetools
+numpy

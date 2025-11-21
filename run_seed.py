@@ -32,6 +32,7 @@ from app.seed.user_interests_seed import seed_user_interests
 from app.seed.bookmarks_seed import seed_bookmarks
 from app.seed.activities_seed import seed_activities
 from app.seed.search_history_seed import seed_search_history
+from app.seed.papers_enrichment_seed import enrich_papers
 from app.db.postgres import get_db
 from app.db.mongodb import get_mongo_db, init_mongo
 
@@ -109,16 +110,20 @@ def seed_mongo_all() -> None:
     
     try:
         # 1. Bookmarks
-        logger.info("\n[1/3] Seeding Bookmarks (500 bookmarks)...")
+        logger.info("\n[1/4] Seeding Bookmarks (500 bookmarks)...")
         seed_bookmarks(db)
 
         # 2. User Activities
-        logger.info("\n[2/3] Seeding User Activities (1,000 activities)...")
+        logger.info("\n[2/4] Seeding User Activities (1,000 activities)...")
         seed_activities(db)
 
         # 3. Search History
-        logger.info("\n[3/3] Seeding Search History (300 searches)...")
+        logger.info("\n[3/4] Seeding Search History (300 searches)...")
         seed_search_history(db)
+        
+        # 4. Papers Enrichment
+        logger.info("\n[4/4] Enriching Papers collection...")
+        enrich_papers(db)
 
     except Exception as e:
         logger.error(f"❌ Error during MongoDB seeding: {e}")
@@ -194,13 +199,20 @@ def seed_searches_only() -> None:
     logger.info("✅ Search History seeding completed!")
 
 
+def enrich_papers_only() -> None:
+    logger.info("Enriching Papers collection only...")
+    db = next(get_mongo_db())
+    enrich_papers(db)
+    logger.info("✅ Papers enrichment completed!")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Dev 환경용 Mock 데이터 생성 CLI"
     )
     parser.add_argument(
         "--only",
-        choices=["categories", "users", "interests", "bookmarks", "activities", "searches", "all"],
+        choices=["categories", "users", "interests", "bookmarks", "activities", "searches", "papers", "all"],
         default="all",
         help="특정 테이블/컬렉션만 시딩 (기본값: all)",
     )
@@ -242,6 +254,8 @@ def main():
         seed_activities_only()
     elif args.only == "searches":
         seed_searches_only()
+    elif args.only == "papers":
+        enrich_papers_only()
     else:
         seed_all()
 
