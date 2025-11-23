@@ -103,37 +103,44 @@ def search_papers(
     skip = (page - 1) * page_size
 
     # Count 계산: 근사치 전략 (성능 최적화)
-    MAX_TOTAL = 10000  # 최대 표시 개수
+    # Text Search 시 성능을 위해 상위 N개만 검사
+    CANDIDATE_LIMIT = 2000
     is_approximate = False
     
     if use_text_search:
-        # Text search: 정확한 count는 매우 느림 (전체 도큐먼트 스캔)
-        # 근사치 전략: $limit을 사용하여 빠른 추정
+        # Text Search 최적화: 2단계 파이프라인 전략 (Count)
+        # 1. Text Search로 상위 N개 후보군만 먼저 확보
+        # 2. 확보된 후보군 내에서 카테고리 필터링 및 카운트
         try:
             pipeline = [
-                {"$match": query},
-                {"$limit": MAX_TOTAL + 1},  # +1로 초과 여부 판단
-                {"$count": "total"}
+                # 1단계: Text Search & Limit
+                {"$match": {"$text": {"$search": q}}},
+                {"$sort": {"score": {"$meta": "textScore"}}},
+                {"$limit": CANDIDATE_LIMIT},
             ]
-            result = list(coll.aggregate(pipeline))
-            exact_count = result[0]["total"] if result else 0
             
-            if exact_count > MAX_TOTAL:
-                # 최대값 초과 시 근사치로 표시
-                total = MAX_TOTAL
-                is_approximate = True
-                logger.info(f"[Search] Text search results exceed {MAX_TOTAL}, showing approximate count")
-            else:
-                total = exact_count
+            # 2단계: 카테고리 필터링
+            if categories:
+                pipeline.append({"$match": {"categories": {"$in": categories}}})
+            
+            # 3단계: Count
+            pipeline.append({"$count": "total"})
+            
+            result = list(coll.aggregate(pipeline))
+            total = result[0]["total"] if result else 0
+            
+            # Text Search는 항상 근사치로 간주 (CANDIDATE_LIMIT 때문에)
+            is_approximate = True
+            
         except Exception as e:
             logger.error(f"[Search] Count aggregation failed: {e}")
-            # 실패 시 기본값
-            total = MAX_TOTAL
+            total = 0
             is_approximate = True
     else:
         # 일반 쿼리: count_documents() 사용 (빠름)
-        total = coll.count_documents(query, limit=MAX_TOTAL)
-        if total >= MAX_TOTAL:
+        # 일반 쿼리도 너무 많으면 느릴 수 있으므로 limit 적용
+        total = coll.count_documents(query, limit=10000)
+        if total >= 10000:
             is_approximate = True
     
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
@@ -142,33 +149,27 @@ def search_papers(
     items = []
     
     if use_text_search:
-        # Text Search 최적화: 2단계 파이프라인 전략
-        # 1. Text Search로 상위 N개(예: 2000개) 후보군만 먼저 확보 (속도 보장)
-        # 2. 확보된 후보군 내에서 카테고리 필터링 수행
-        
-        CANDIDATE_LIMIT = 2000  # 성능을 위해 검사할 최대 문서 수 제한
-        
-        pipeline = [
-            # 1단계: Text Search (가장 먼저 실행되어야 함)
-            {"$match": {"$text": {"$search": q}}},
-            {"$addFields": {"score": {"$meta": "textScore"}}},
-            {"$sort": {"score": -1}},
-            {"$limit": CANDIDATE_LIMIT},  # 핵심: 검색 범위를 상위 N개로 제한
-        ]
-        
-        # 2단계: 카테고리 필터링 (있을 경우)
-        if categories:
-            pipeline.append({"$match": {"categories": {"$in": categories}}})
-            
-        # 3단계: 페이지네이션 및 프로젝션
-        pipeline.extend([
-            {"$skip": skip},
-            {"$limit": page_size},
-            {"$project": projection}
-        ])
-        
+        # Text Search 최적화: 2단계 파이프라인 전략 (Find)
         try:
-            # Aggregation 실행
+            pipeline = [
+                # 1단계: Text Search & Limit
+                {"$match": {"$text": {"$search": q}}},
+                {"$addFields": {"score": {"$meta": "textScore"}}},
+                {"$sort": {"score": -1}},
+                {"$limit": CANDIDATE_LIMIT},
+            ]
+            
+            # 2단계: 카테고리 필터링
+            if categories:
+                pipeline.append({"$match": {"categories": {"$in": categories}}})
+            
+            # 3단계: 페이지네이션 및 프로젝션
+            pipeline.extend([
+                {"$skip": skip},
+                {"$limit": page_size},
+                {"$project": projection}
+            ])
+            
             cursor = coll.aggregate(pipeline)
             for doc in cursor:
                 serialize_object_id(doc)
