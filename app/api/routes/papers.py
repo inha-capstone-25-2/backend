@@ -138,18 +138,38 @@ def search_papers(
     
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
 
-    # 정렬: Text Search 시 관련도 순, 아니면 최신순
-    if use_text_search:
-        cursor = coll.find(query, projection).sort([("score", {"$meta": "textScore"})]).skip(skip).limit(page_size)
-    else:
-        cursor = coll.find(query, projection).sort([("update_date", -1)]).skip(skip).limit(page_size)
-    
+    # 정렬 및 페이징: Text Search 최적화
     items = []
-    for doc in cursor:
-        serialize_object_id(doc)
-        # score 필드는 응답에서 제거 (내부 사용만)
-        doc.pop("score", None)
-        items.append(doc)
+    
+    if use_text_search:
+        # Text Search 최적화: Aggregation Pipeline 사용
+        # $sort + $limit을 함께 사용하여 Top-k 최적화 유도
+        pipeline = [
+            {"$match": query},
+            {"$addFields": {"score": {"$meta": "textScore"}}},
+            {"$sort": {"score": -1}},
+            {"$limit": skip + page_size},  # 필요한 만큼만 가져옴 (Top-k 최적화)
+            {"$skip": skip},
+            {"$project": projection}
+        ]
+        
+        try:
+            # Aggregation 실행
+            cursor = coll.aggregate(pipeline)
+            for doc in cursor:
+                serialize_object_id(doc)
+                doc.pop("score", None)  # 내부용 score 제거
+                items.append(doc)
+        except Exception as e:
+            logger.error(f"[Search] Aggregation failed: {e}")
+            raise HTTPException(status_code=500, detail="Search operation failed")
+            
+    else:
+        # 일반 검색: find() 사용 (인덱스 활용 최적화)
+        cursor = coll.find(query, projection).sort([("update_date", -1)]).skip(skip).limit(page_size)
+        for doc in cursor:
+            serialize_object_id(doc)
+            items.append(doc)
 
     # 검색 기록 저장 (검색어나 카테고리가 있을 때만)
     if q or categories:
