@@ -69,12 +69,17 @@ def search_papers(
     coll = db[settings.mongo_collection]
 
     query = {}
+    use_text_search = False
+    
+    # Text Search 사용 (단어 기반 전문 검색)
     if q:
-        regex = {"$regex": q, "$options": "i"}
-        query["$or"] = [{"title": regex}, {"abstract": regex}, {"authors": regex}]
+        query["$text"] = {"$search": q}
+        use_text_search = True
+    
     if categories:
         query["categories"] = {"$in": categories}
 
+    # Projection 설정
     projection = {
         "_id": 1,
         "id": 1,
@@ -84,17 +89,30 @@ def search_papers(
         "categories": 1,
         "update_date": 1,
     }
+    
+    # Text Search 사용 시 관련도 점수 추가
+    if use_text_search:
+        projection["score"] = {"$meta": "textScore"}
 
     page_size = 10
     skip = (page - 1) * page_size
 
-    total = coll.count_documents(query)
+    # Count 최적화: 최대 10,000개까지만 카운트
+    MAX_TOTAL = 10000
+    total = coll.count_documents(query, limit=MAX_TOTAL)
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
 
-    cursor = coll.find(query, projection).skip(skip).limit(page_size)
+    # 정렬: Text Search 시 관련도 순, 아니면 최신순
+    if use_text_search:
+        cursor = coll.find(query, projection).sort([("score", {"$meta": "textScore"})]).skip(skip).limit(page_size)
+    else:
+        cursor = coll.find(query, projection).sort([("update_date", -1)]).skip(skip).limit(page_size)
+    
     items = []
     for doc in cursor:
         serialize_object_id(doc)
+        # score 필드는 응답에서 제거 (내부 사용만)
+        doc.pop("score", None)
         items.append(doc)
 
     # 검색 기록 저장 (검색어나 카테고리가 있을 때만)
