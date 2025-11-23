@@ -114,8 +114,8 @@ def search_papers(
         try:
             pipeline = [
                 # 1단계: Text Search & Limit
+                # 성능을 위해 $sort 제거 (전체 정렬 비용 방지)
                 {"$match": {"$text": {"$search": q}}},
-                {"$sort": {"score": {"$meta": "textScore"}}},
                 {"$limit": CANDIDATE_LIMIT},
             ]
             
@@ -153,9 +153,10 @@ def search_papers(
         try:
             pipeline = [
                 # 1단계: Text Search & Limit
+                # 성능을 위해 $sort 제거
                 {"$match": {"$text": {"$search": q}}},
                 {"$addFields": {"score": {"$meta": "textScore"}}},
-                {"$sort": {"score": -1}},
+                # {"$sort": {"score": -1}},  # 정렬 제거
                 {"$limit": CANDIDATE_LIMIT},
             ]
             
