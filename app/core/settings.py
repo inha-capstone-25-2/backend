@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     mongo_password: str | None = Field(default=None, validation_alias="MONGO_PASSWORD")
     mongo_auth_source: str = Field(default="admin", validation_alias="MONGO_AUTH_SOURCE")
     mongo_db: str = Field(default="arxiv", validation_alias="MONGO_DB")
-    mongo_collection: str = Field(default="arxiv_papers", validation_alias="MONGO_COLLECTION")
+    mongo_collection: str = Field(default="papers", validation_alias="MONGO_COLLECTION")
 
     # Production Mongo (for local env data copy)
     prod_mongo_host: str | None = Field(default=None, validation_alias="PROD_MONGO_HOST")
