@@ -97,9 +97,21 @@ def search_papers(
     page_size = 10
     skip = (page - 1) * page_size
 
-    # Count 최적화: 최대 10,000개까지만 카운트
+    # Count 계산: $text 쿼리 사용 시 aggregation pipeline 사용
     MAX_TOTAL = 10000
-    total = coll.count_documents(query, limit=MAX_TOTAL)
+    if use_text_search:
+        # $text 쿼리는 count_documents()에서 지원되지 않으므로 aggregation 사용
+        pipeline = [
+            {"$match": query},
+            {"$count": "total"}
+        ]
+        result = list(coll.aggregate(pipeline))
+        total = result[0]["total"] if result else 0
+        total = min(total, MAX_TOTAL)  # 최대값 제한
+    else:
+        # 일반 쿼리는 count_documents() 사용
+        total = coll.count_documents(query, limit=MAX_TOTAL)
+    
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
 
     # 정렬: Text Search 시 관련도 순, 아니면 최신순
