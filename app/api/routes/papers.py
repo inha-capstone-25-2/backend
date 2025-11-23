@@ -96,6 +96,7 @@ def search_papers(
     }
     
     # Text Search 사용 시 관련도 점수 추가
+    # Two-Step 전략에서는 1단계에서 score를 가져오므로 여기서는 제거해도 됨 (하지만 호환성을 위해 유지)
     if use_text_search:
         projection["score"] = {"$meta": "textScore"}
 
@@ -110,54 +111,73 @@ def search_papers(
     total = 0
     
     if use_text_search:
-        # Text Search 최적화: Facet & Barrier 전략
-        # 1. $limit으로 후보군 제한
-        # 2. $project로 Barrier 생성 (Optimizer Merge 방지)
-        # 3. $facet으로 Count와 Data 동시 추출 (Round Trip 감소)
+        # Text Search 최적화: Two-Step 전략 (Application-Level Join)
+        # MongoDB Optimizer의 비효율적인 실행 계획(Merge)을 방지하기 위해
+        # 애플리케이션 레벨에서 2단계로 나누어 실행
+        
         try:
-            pipeline = [
-                # 1단계: Text Search & Limit
-                {"$match": {"$text": {"$search": q}}},
-                {"$limit": CANDIDATE_LIMIT},
+            # Step 1: Text Search로 후보군 ID와 Score만 먼저 가져옴 (Index Only Scan에 가까움 -> 매우 빠름)
+            # 정렬 없이 가져오면 MongoDB가 가장 효율적인 순서로 반환함 (보통 관련도 순)
+            candidates_cursor = coll.find(
+                {"$text": {"$search": q}},
+                {"score": {"$meta": "textScore"}}
+            ).limit(CANDIDATE_LIMIT)
+            
+            candidates = []
+            for doc in candidates_cursor:
+                candidates.append({"_id": doc["_id"], "score": doc.get("score", 0)})
+            
+            # Step 2: 카테고리 필터링 및 데이터 조회
+            if not candidates:
+                total = 0
+                items = []
+            else:
+                candidate_ids = [c["_id"] for c in candidates]
                 
-                # 2단계: Barrier (Optimizer가 $match를 합치지 못하게 함)
-                # 필요한 필드만 명시하여 메모리 사용량도 최적화
-                {"$project": projection},
-            ]
-            
-            # 3단계: 카테고리 필터링 (Barrier 이후에 실행됨)
-            if categories:
-                pipeline.append({"$match": {"categories": {"$in": categories}}})
-            
-            # 4단계: Facet으로 Count와 Data 분리 실행
-            pipeline.append({
-                "$facet": {
-                    "metadata": [{"$count": "total"}],
-                    "data": [{"$skip": skip}, {"$limit": page_size}]
-                }
-            })
-            
-            result = list(coll.aggregate(pipeline))
-            
-            # 결과 파싱
-            if result:
-                facet_result = result[0]
-                # Total Count
-                metadata = facet_result.get("metadata", [])
-                total = metadata[0]["total"] if metadata else 0
+                # 2차 쿼리: 후보군 ID 중에서 카테고리 조건 만족하는 것 조회
+                filter_query = {"_id": {"$in": candidate_ids}}
+                if categories:
+                    filter_query["categories"] = {"$in": categories}
+                    
+                # 실제 데이터 조회
+                # score는 1단계에서 가져왔으므로 projection에서 제외해도 되지만, 
+                # find() 결과에는 score가 없으므로 나중에 병합해야 함
+                data_projection = projection.copy()
+                if "score" in data_projection:
+                    del data_projection["score"]
                 
-                # Data Items
-                data = facet_result.get("data", [])
-                for doc in data:
-                    serialize_object_id(doc)
-                    doc.pop("score", None)
-                    items.append(doc)
-            
-            # Text Search는 항상 근사치로 간주
-            is_approximate = True
+                docs_cursor = coll.find(filter_query, data_projection)
+                
+                # ID를 키로 하는 딕셔너리로 변환 (빠른 조회를 위해)
+                docs_map = {doc["_id"]: doc for doc in docs_cursor}
+                
+                # Step 3: 결과 조합 및 정렬 (메모리 연산)
+                final_items = []
+                for cand in candidates:
+                    if cand["_id"] in docs_map:
+                        doc = docs_map[cand["_id"]]
+                        # score 주입 (정렬 및 반환을 위해)
+                        doc["score"] = cand["score"]
+                        final_items.append(doc)
+                
+                # 점수 내림차순 정렬 (이미 대략 정렬되어 있지만 확실하게)
+                final_items.sort(key=lambda x: x["score"], reverse=True)
+                
+                total = len(final_items)
+                is_approximate = True # 2000개 제한이므로 항상 근사치
+                
+                # Step 4: 페이징
+                start = skip
+                end = skip + page_size
+                items = final_items[start:end]
+                
+                # score 제거 및 ID 직렬화
+                for item in items:
+                    serialize_object_id(item)
+                    item.pop("score", None)
             
         except Exception as e:
-            logger.error(f"[Search] Facet aggregation failed: {e}")
+            logger.error(f"[Search] Two-step search failed: {e}")
             raise HTTPException(status_code=500, detail="Search operation failed")
             
     else:
