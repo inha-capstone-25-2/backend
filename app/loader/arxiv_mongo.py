@@ -2,8 +2,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from pathlib import Path
-from pymongo import UpdateOne
+from pymongo import UpdateOne, WriteConcern
 from pymongo.errors import BulkWriteError
 
 from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client
@@ -15,29 +16,38 @@ from app.loader.utils import get_current_time
 
 logger = logging.getLogger(__name__)
 
-# 데이터 파일 경로
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DATA_DIR = BACKEND_ROOT / "data"
-DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR)))
-DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json")))
 
-def read_and_parse_data(data_file_path: Path) -> list[UpdateOne]:
+def stream_and_insert_data(
+    collection, 
+    failures_collection, 
+    data_file_path: Path, 
+    batch_size: int
+) -> int:
     """
-    JSON 파일을 읽어 UpdateOne 배치 리스트를 생성.
+    스트리밍 방식으로 JSON 파일을 읽고 즉시 배치 삽입.
+    메모리에 전체 데이터를 로드하지 않고 배치 단위로 처리.
     """
-    ops: list[UpdateOne] = []
-    logger.info(f"[arxiv-job] read_and_parse_data: 시작, 파일={data_file_path}")
+    batch = []
+    count = 0
+    start_time = time.time()
+    
+    logger.info(f"[arxiv-job] 데이터 스트리밍 시작: {data_file_path}")
+    
     with open(data_file_path, "r", encoding="utf-8") as f:
-        for i, line in enumerate(f):
+        for i, line in enumerate(f, 1):
             if not line.strip():
                 continue
+            
             try:
                 data = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            
             _id = data.get("id")
             if not _id:
                 continue
+            
+            # 파싱
             codes = parse_categories(data.get("categories"))
             doc = {
                 "id": _id,
@@ -48,45 +58,120 @@ def read_and_parse_data(data_file_path: Path) -> list[UpdateOne]:
                 "update_date": data.get("update_date"),
             }
             doc = {k: v for k, v in doc.items() if v is not None}
-            ops.append(UpdateOne({"id": _id}, {"$set": doc}, upsert=True))
-            if (i + 1) % 10000 == 0:
-                logger.info(f"[arxiv-job] read_and_parse_data: {i + 1} lines parsed")
-    logger.info(f"[arxiv-job] read_and_parse_data: 완료, 총 {len(ops)} ops 생성")
-    return ops
-
-def batch_insert_documents(collection, failures_collection, ops: list[UpdateOne], batch_size: int, progress_every: int) -> int:
-    """
-    배치 리스트를 MongoDB에 삽입.
-    """
-    processed = 0
-    for i, op in enumerate(ops):
-        if (i + 1) % batch_size == 0:
+            batch.append(UpdateOne({"id": _id}, {"$set": doc}, upsert=True))
+            
+            # 배치 크기 도달 시 즉시 삽입
+            if len(batch) >= batch_size:
+                try:
+                    collection.bulk_write(batch, ordered=False)
+                    count += len(batch)
+                    
+                    # 진행상황 로깅 (50,000건마다)
+                    if count % 50000 == 0:
+                        elapsed = time.time() - start_time
+                        rate = count / elapsed if elapsed > 0 else 0
+                        logger.info(
+                            f"[arxiv-job] 진행: {count:,}건 처리 | "
+                            f"속도: {rate:.0f}건/초 | "
+                            f"경과시간: {elapsed:.1f}초"
+                        )
+                    
+                    batch.clear()
+                except BulkWriteError as bwe:
+                    logger.warning(f"[arxiv-job] BulkWriteError: {bwe.details}")
+                    # 실패한 문서 기록
+                    for e in bwe.details.get("writeErrors", []):
+                        if failures_collection:
+                            try:
+                                failures_collection.insert_one({"id": e.get("op", {}).get("id")})
+                            except Exception:
+                                pass
+                    batch.clear()
+                except Exception as e:
+                    logger.error(f"[arxiv-job] unexpected bulk_write error: {e}")
+                    batch.clear()
+        
+        # 남은 배치 처리
+        if batch:
             try:
-                collection.bulk_write(ops[i - batch_size + 1:i + 1], ordered=False)
-                logger.info(f"[arxiv-job] upserted {batch_size} records")
+                collection.bulk_write(batch, ordered=False)
+                count += len(batch)
+                logger.info(f"[arxiv-job] 남은 배치 처리: {len(batch)}건")
             except BulkWriteError as bwe:
-                logger.warning(f"[arxiv-job] BulkWriteError: {bwe.details}")
-                for e in bwe.details.get("writeErrors", []):
-                    if failures_collection:
-                        failures_collection.insert_one({"id": e.get("op", {}).get("id")})
+                logger.warning(f"[arxiv-job] BulkWriteError (마지막 배치): {bwe.details}")
             except Exception as e:
-                logger.error(f"[arxiv-job] unexpected bulk_write error: {e}")
-        if (i + 1) % progress_every == 0:
-            logger.info(f"[arxiv-job] processed {i + 1} records")
-        processed += 1
-    # 남은 배치 처리
-    if ops:
-        try:
-            collection.bulk_write(ops, ordered=False)
-            logger.info(f"[arxiv-job] upserted {len(ops)} records")
-        except BulkWriteError as bwe:
-            logger.warning(f"[arxiv-job] BulkWriteError: {bwe.details}")
-            for e in bwe.details.get("writeErrors", []):
-                if failures_collection:
-                    failures_collection.insert_one({"id": e.get("op", {}).get("id")})
-        except Exception as e:
-            logger.error(f"[arxiv-job] unexpected bulk_write error: {e}")
-    return processed
+                logger.error(f"[arxiv-job] unexpected bulk_write error (마지막 배치): {e}")
+    
+    total_time = time.time() - start_time
+    avg_rate = count / total_time if total_time > 0 else 0
+    logger.info(
+        f"[arxiv-job] 데이터 삽입 완료: {count:,}건 | "
+        f"총 시간: {total_time:.1f}초 | "
+        f"평균 속도: {avg_rate:.0f}건/초"
+    )
+    
+    return count
+
+
+def create_unique_index(collection) -> None:
+    """
+    고유 인덱스 생성 (중복 방지용).
+    데이터 삽입 전에 실행하여 중복 삽입을 방지.
+    """
+    try:
+        collection.create_index("id", unique=True)
+        logger.info("[arxiv-job] 고유 인덱스 생성 완료: id")
+    except Exception as e:
+        logger.warning(f"[arxiv-job] 고유 인덱스 생성 실패 (이미 존재할 수 있음): {e}")
+
+
+def create_text_search_index(collection) -> None:
+    """
+    전문 검색 인덱스 생성.
+    title, abstract, authors 필드에 가중치를 적용한 Text Search 인덱스.
+    """
+    try:
+        collection.create_index(
+            [
+                ("title", "text"),
+                ("abstract", "text"),
+                ("authors", "text")
+            ],
+            weights={
+                "title": 10,      # 제목 우선순위 가장 높음
+                "abstract": 5,    # 초록
+                "authors": 3      # 저자
+            },
+            default_language="english",
+            background=True,  # 백그라운드 빌드 (다운타임 없음)
+            name="papers_fulltext_search"
+        )
+        logger.info("[arxiv-job] Text Search 인덱스 생성 시작 (백그라운드)")
+        logger.info("[arxiv-job] 가중치: title=10, abstract=5, authors=3")
+    except Exception as e:
+        logger.error(f"[arxiv-job] Text Search 인덱스 생성 실패: {e}")
+
+
+def create_search_indexes(collection) -> None:
+    """
+    검색용 인덱스 생성 (데이터 삽입 후 실행).
+    1. 복합 인덱스: categories + update_date (카테고리 필터 + 날짜 정렬)
+    2. Text Search 인덱스: title, abstract, authors (전문 검색)
+    """
+    try:
+        # 1. 복합 인덱스: 카테고리 필터 + 날짜 정렬
+        collection.create_index(
+            [("categories", 1), ("update_date", -1)],
+            name="categories_update_date"
+        )
+        logger.info("[arxiv-job] 복합 인덱스 생성 완료: categories + update_date")
+        
+        # 2. Text Search 인덱스
+        create_text_search_index(collection)
+        
+    except Exception as e:
+        logger.error(f"[arxiv-job] 검색 인덱스 생성 실패: {e}")
+
 
 def seed_categories_from_mongo(collection) -> None:
     """
@@ -105,9 +190,10 @@ def seed_categories_from_mongo(collection) -> None:
         except Exception as e:
             logger.error(f"[arxiv-job] category seeding failed: {e}")
 
+
 def ingest_arxiv_to_mongo() -> bool:
     """
-    arXiv 데이터를 MongoDB에 적재.
+    arXiv 데이터를 MongoDB에 적재 (최적화된 버전).
     """
     try:
         client = get_mongo_client_direct()
@@ -118,33 +204,41 @@ def ingest_arxiv_to_mongo() -> bool:
     db = client[settings.mongo_db]
     collection = db[settings.mongo_collection]
     failures_collection = db["arxiv_failures"]
+    
+    # WriteConcern 최적화 (빠른 쓰기)
+    collection = collection.with_options(
+        write_concern=WriteConcern(w=1, j=False)
+    )
+    
     logger.info(f"[arxiv-job] MongoDB collection: {collection.full_name}")
 
-    try:
-        logger.info("[arxiv-job] 인덱스 생성 시작")
-        # 기존 인덱스
-        collection.create_index("id", unique=True)
-        # 검색 성능 향상용 인덱스 추가
-        collection.create_index("title")
-        collection.create_index("abstract")
-        collection.create_index("authors")
-        collection.create_index("categories")
-        collection.create_index([("categories", 1), ("update_date", -1)])
-        logger.info("[arxiv-job] 인덱스 생성 완료")
-    except Exception as e:
-        logger.debug(f"Index create skipped (categories): {e}")
-
+    # 기존 데이터 삭제 (옵션)
     if os.getenv("ARXIV_REMOVE_OLD_DATA"):
         logger.info("[arxiv-job] removing old data")
         collection.delete_many({})
 
+    # 1. 고유 인덱스만 먼저 생성 (중복 방지용)
+    create_unique_index(collection)
+
     try:
-        logger.info("[arxiv-job] 데이터 파싱 시작")
-        ops = read_and_parse_data(DATA_FILE_PATH)
-        logger.info("[arxiv-job] 데이터 파싱 완료, 적재 시작")
-        processed = batch_insert_documents(collection, failures_collection, ops, BATCH_SIZE, PROGRESS_EVERY)
-        logger.info(f"[arxiv-job] data load complete total={processed}")
+        # 2. 데이터 스트리밍 삽입
+        logger.info("[arxiv-job] 데이터 적재 시작 (스트리밍 방식)")
+        count = stream_and_insert_data(
+            collection, 
+            failures_collection, 
+            DATA_FILE_PATH, 
+            BATCH_SIZE
+        )
+        logger.info(f"[arxiv-job] 데이터 적재 완료: {count:,}건")
+        
+        # 3. 검색용 인덱스 생성 (데이터 삽입 후)
+        logger.info("[arxiv-job] 검색 인덱스 생성 시작")
+        create_search_indexes(collection)
+        logger.info("[arxiv-job] 검색 인덱스 생성 완료")
+        
+        # 4. PostgreSQL 카테고리 시딩
         seed_categories_from_mongo(collection)
+        
         return True
     except FileNotFoundError:
         logger.error(f"[arxiv-job] file not found: {DATA_FILE_PATH}")
@@ -153,6 +247,7 @@ def ingest_arxiv_to_mongo() -> bool:
     except Exception as e:
         logger.error(f"[arxiv-job] unexpected error: {e}")
     return False
+
 
 def copy_prod_to_local_mongo() -> bool:
     """
