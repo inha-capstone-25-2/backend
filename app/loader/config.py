@@ -8,7 +8,7 @@ DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR)))
 DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json")))
 
 # 배치 및 진행률 설정
-BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "1000"))
+BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "5000"))
 PROGRESS_EVERY = int(os.getenv("ARXIV_PROGRESS_EVERY", "5000"))
 MIN_FREE_GB = int(os.getenv("ARXIV_MIN_FREE_GB", "5"))
 
