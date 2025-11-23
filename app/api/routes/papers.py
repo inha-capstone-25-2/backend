@@ -83,12 +83,13 @@ def search_papers(
     if categories:
         query["categories"] = {"$in": categories}
 
-    # Projection 설정
+    # Projection 설정: 리스트 뷰용 (성능 최적화)
+    # abstract는 크기가 크므로 제외 (상세 페이지에서만 조회)
     projection = {
         "_id": 1,
         "id": 1,
         "title": 1,
-        "abstract": 1,
+        # "abstract": 1,  # 리스트 뷰에서는 제외 (네트워크 최적화)
         "authors": 1,
         "categories": 1,
         "update_date": 1,

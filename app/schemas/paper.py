@@ -10,11 +10,26 @@ from typing import Optional, List
 from datetime import datetime
 
 
+class PaperListItem(BaseModel):
+    """
+    논문 리스트 아이템 모델 (검색 결과용).
+    
+    abstract를 제외하여 네트워크 전송량을 최소화합니다.
+    """
+    _id: str
+    id: Optional[str] = None
+    title: Optional[str] = None
+    authors: Optional[str] = None
+    categories: Optional[List[str]] = None
+    update_date: Optional[str] = None
+
+
 class Paper(BaseModel):
     """
-    논문 응답 모델.
+    논문 상세 응답 모델.
     
     MongoDB arxiv_papers 컬렉션의 문서를 표현합니다.
+    상세 조회 시 사용되며 모든 필드를 포함합니다.
     """
     _id: str
     id: Optional[str] = None
@@ -30,6 +45,7 @@ class PaperSearchResponse(BaseModel):
     논문 검색 결과 응답 모델.
     
     페이지네이션 정보와 검색 결과를 포함합니다.
+    abstract를 제외한 PaperListItem을 사용하여 응답 크기를 최소화합니다.
     """
     page: int
     page_size: int
@@ -37,7 +53,7 @@ class PaperSearchResponse(BaseModel):
     total_pages: int
     has_next: bool
     has_prev: bool
-    items: List[Paper]
+    items: List[PaperListItem]
 
 
 class SearchHistoryFilters(BaseModel):
