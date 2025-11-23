@@ -106,86 +106,72 @@ def search_papers(
     # Text Search 시 성능을 위해 상위 N개만 검사
     CANDIDATE_LIMIT = 2000
     is_approximate = False
+    items = []
+    total = 0
     
     if use_text_search:
-        # Text Search 최적화: 2단계 파이프라인 전략 (Count)
-        # 1. Text Search로 상위 N개 후보군만 먼저 확보
-        # 2. 확보된 후보군 내에서 카테고리 필터링 및 카운트
+        # Text Search 최적화: Facet & Barrier 전략
+        # 1. $limit으로 후보군 제한
+        # 2. $project로 Barrier 생성 (Optimizer Merge 방지)
+        # 3. $facet으로 Count와 Data 동시 추출 (Round Trip 감소)
         try:
             pipeline = [
                 # 1단계: Text Search & Limit
-                # 성능을 위해 $sort 제거 (전체 정렬 비용 방지)
                 {"$match": {"$text": {"$search": q}}},
                 {"$limit": CANDIDATE_LIMIT},
+                
+                # 2단계: Barrier (Optimizer가 $match를 합치지 못하게 함)
+                # 필요한 필드만 명시하여 메모리 사용량도 최적화
+                {"$project": projection},
             ]
             
-            # 2단계: 카테고리 필터링
+            # 3단계: 카테고리 필터링 (Barrier 이후에 실행됨)
             if categories:
                 pipeline.append({"$match": {"categories": {"$in": categories}}})
             
-            # 3단계: Count
-            pipeline.append({"$count": "total"})
+            # 4단계: Facet으로 Count와 Data 분리 실행
+            pipeline.append({
+                "$facet": {
+                    "metadata": [{"$count": "total"}],
+                    "data": [{"$skip": skip}, {"$limit": page_size}]
+                }
+            })
             
             result = list(coll.aggregate(pipeline))
-            total = result[0]["total"] if result else 0
             
-            # Text Search는 항상 근사치로 간주 (CANDIDATE_LIMIT 때문에)
+            # 결과 파싱
+            if result:
+                facet_result = result[0]
+                # Total Count
+                metadata = facet_result.get("metadata", [])
+                total = metadata[0]["total"] if metadata else 0
+                
+                # Data Items
+                data = facet_result.get("data", [])
+                for doc in data:
+                    serialize_object_id(doc)
+                    doc.pop("score", None)
+                    items.append(doc)
+            
+            # Text Search는 항상 근사치로 간주
             is_approximate = True
             
         except Exception as e:
-            logger.error(f"[Search] Count aggregation failed: {e}")
-            total = 0
-            is_approximate = True
-    else:
-        # 일반 쿼리: count_documents() 사용 (빠름)
-        # 일반 쿼리도 너무 많으면 느릴 수 있으므로 limit 적용
-        total = coll.count_documents(query, limit=10000)
-        if total >= 10000:
-            is_approximate = True
-    
-    total_pages = max(1, math.ceil(total / page_size)) if total else 0
-
-    # 정렬 및 페이징: Text Search 최적화
-    items = []
-    
-    if use_text_search:
-        # Text Search 최적화: 2단계 파이프라인 전략 (Find)
-        try:
-            pipeline = [
-                # 1단계: Text Search & Limit
-                # 성능을 위해 $sort 제거
-                {"$match": {"$text": {"$search": q}}},
-                {"$addFields": {"score": {"$meta": "textScore"}}},
-                # {"$sort": {"score": -1}},  # 정렬 제거
-                {"$limit": CANDIDATE_LIMIT},
-            ]
-            
-            # 2단계: 카테고리 필터링
-            if categories:
-                pipeline.append({"$match": {"categories": {"$in": categories}}})
-            
-            # 3단계: 페이지네이션 및 프로젝션
-            pipeline.extend([
-                {"$skip": skip},
-                {"$limit": page_size},
-                {"$project": projection}
-            ])
-            
-            cursor = coll.aggregate(pipeline)
-            for doc in cursor:
-                serialize_object_id(doc)
-                doc.pop("score", None)  # 내부용 score 제거
-                items.append(doc)
-        except Exception as e:
-            logger.error(f"[Search] Aggregation failed: {e}")
+            logger.error(f"[Search] Facet aggregation failed: {e}")
             raise HTTPException(status_code=500, detail="Search operation failed")
             
     else:
-        # 일반 검색: find() 사용 (인덱스 활용 최적화)
+        # 일반 쿼리: 기존 방식 유지 (인덱스 활용)
+        total = coll.count_documents(query, limit=10000)
+        if total >= 10000:
+            is_approximate = True
+            
         cursor = coll.find(query, projection).sort([("update_date", -1)]).skip(skip).limit(page_size)
         for doc in cursor:
             serialize_object_id(doc)
             items.append(doc)
+    
+    total_pages = max(1, math.ceil(total / page_size)) if total else 0
 
     # 검색 기록 저장 (검색어나 카테고리가 있을 때만)
     if q or categories:
