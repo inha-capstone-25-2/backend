@@ -142,16 +142,30 @@ def search_papers(
     items = []
     
     if use_text_search:
-        # Text Search 최적화: Aggregation Pipeline 사용
-        # $sort + $limit을 함께 사용하여 Top-k 최적화 유도
+        # Text Search 최적화: 2단계 파이프라인 전략
+        # 1. Text Search로 상위 N개(예: 2000개) 후보군만 먼저 확보 (속도 보장)
+        # 2. 확보된 후보군 내에서 카테고리 필터링 수행
+        
+        CANDIDATE_LIMIT = 2000  # 성능을 위해 검사할 최대 문서 수 제한
+        
         pipeline = [
-            {"$match": query},
+            # 1단계: Text Search (가장 먼저 실행되어야 함)
+            {"$match": {"$text": {"$search": q}}},
             {"$addFields": {"score": {"$meta": "textScore"}}},
             {"$sort": {"score": -1}},
-            {"$limit": skip + page_size},  # 필요한 만큼만 가져옴 (Top-k 최적화)
-            {"$skip": skip},
-            {"$project": projection}
+            {"$limit": CANDIDATE_LIMIT},  # 핵심: 검색 범위를 상위 N개로 제한
         ]
+        
+        # 2단계: 카테고리 필터링 (있을 경우)
+        if categories:
+            pipeline.append({"$match": {"categories": {"$in": categories}}})
+            
+        # 3단계: 페이지네이션 및 프로젝션
+        pipeline.extend([
+            {"$skip": skip},
+            {"$limit": page_size},
+            {"$project": projection}
+        ])
         
         try:
             # Aggregation 실행
