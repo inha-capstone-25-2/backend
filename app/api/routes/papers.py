@@ -67,6 +67,10 @@ def search_papers(
     current_user: User = Depends(get_current_user),  # 인증 필수
 ):
     coll = db[settings.mongo_collection]
+    
+    # 디버그: 어떤 컬렉션을 사용하는지 로깅
+    logger.info(f"[DEBUG] Using database: {db.name}, collection: {settings.mongo_collection}")
+    logger.info(f"[DEBUG] Collection full name: {coll.full_name}")
 
     query = {}
     use_text_search = False
