@@ -102,20 +102,39 @@ def search_papers(
     page_size = 10
     skip = (page - 1) * page_size
 
-    # Count 계산: $text 쿼리 사용 시 aggregation pipeline 사용
-    MAX_TOTAL = 10000
+    # Count 계산: 근사치 전략 (성능 최적화)
+    MAX_TOTAL = 10000  # 최대 표시 개수
+    is_approximate = False
+    
     if use_text_search:
-        # $text 쿼리는 count_documents()에서 지원되지 않으므로 aggregation 사용
-        pipeline = [
-            {"$match": query},
-            {"$count": "total"}
-        ]
-        result = list(coll.aggregate(pipeline))
-        total = result[0]["total"] if result else 0
-        total = min(total, MAX_TOTAL)  # 최대값 제한
+        # Text search: 정확한 count는 매우 느림 (전체 도큐먼트 스캔)
+        # 근사치 전략: $limit을 사용하여 빠른 추정
+        try:
+            pipeline = [
+                {"$match": query},
+                {"$limit": MAX_TOTAL + 1},  # +1로 초과 여부 판단
+                {"$count": "total"}
+            ]
+            result = list(coll.aggregate(pipeline))
+            exact_count = result[0]["total"] if result else 0
+            
+            if exact_count > MAX_TOTAL:
+                # 최대값 초과 시 근사치로 표시
+                total = MAX_TOTAL
+                is_approximate = True
+                logger.info(f"[Search] Text search results exceed {MAX_TOTAL}, showing approximate count")
+            else:
+                total = exact_count
+        except Exception as e:
+            logger.error(f"[Search] Count aggregation failed: {e}")
+            # 실패 시 기본값
+            total = MAX_TOTAL
+            is_approximate = True
     else:
-        # 일반 쿼리는 count_documents() 사용
+        # 일반 쿼리: count_documents() 사용 (빠름)
         total = coll.count_documents(query, limit=MAX_TOTAL)
+        if total >= MAX_TOTAL:
+            is_approximate = True
     
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
 
@@ -161,6 +180,7 @@ def search_papers(
         "total_pages": total_pages,
         "has_next": page < total_pages,
         "has_prev": page > 1,
+        "is_approximate": is_approximate,
         "items": items,
     }
 

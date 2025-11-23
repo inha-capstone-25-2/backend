@@ -53,6 +53,7 @@ class PaperSearchResponse(BaseModel):
     total_pages: int
     has_next: bool
     has_prev: bool
+    is_approximate: bool = False  # total이 근사치인지 여부
     items: List[PaperListItem]
 
 
