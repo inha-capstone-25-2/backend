@@ -171,9 +171,9 @@ def search_papers(
                 end = skip + page_size
                 items = final_items[start:end]
                 
-                # score 제거 및 ID 직렬화
+                # score 및 _id 제거 (id 필드는 doi로 유지)
                 for item in items:
-                    serialize_object_id(item)
+                    item.pop("_id", None)
                     item.pop("score", None)
             
         except Exception as e:
@@ -188,7 +188,7 @@ def search_papers(
             
         cursor = coll.find(query, projection).sort([("update_date", -1)]).skip(skip).limit(page_size)
         for doc in cursor:
-            serialize_object_id(doc)
+            doc.pop("_id", None)  # _id 제거, id 필드(doi)는 유지
             items.append(doc)
     
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
