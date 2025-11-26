@@ -7,7 +7,7 @@ from pathlib import Path
 from pymongo import UpdateOne, WriteConcern
 from pymongo.errors import BulkWriteError
 
-from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client
+from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client, init_mongo
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes
@@ -218,9 +218,15 @@ def ingest_arxiv_to_mongo() -> bool:
     """
     try:
         client = get_mongo_client_direct()
-    except RuntimeError as e:
-        logger.error(f"[arxiv-job] MongoDB not initialized: {e}")
-        return False
+    except RuntimeError:
+        # 백그라운드 작업 등에서 초기화되지 않은 경우
+        logger.info("[arxiv-job] MongoDB not initialized, initializing now...")
+        init_mongo()
+        try:
+            client = get_mongo_client_direct()
+        except RuntimeError as e:
+            logger.error(f"[arxiv-job] MongoDB initialization failed: {e}")
+            return False
 
     db = client[settings.mongo_db]
     collection = db[settings.mongo_collection]
@@ -293,11 +299,17 @@ def copy_prod_to_local_mongo() -> bool:
     # Local MongoDB 연결
     try:
         local_client = get_mongo_client_direct()
-    except RuntimeError as e:
-        logger.error(f"[arxiv-job] Local MongoDB not initialized: {e}")
-        if prod_client:
-            prod_client.close()
-        return False
+    except RuntimeError:
+        # 백그라운드 작업 등에서 초기화되지 않은 경우
+        logger.info("[arxiv-job] Local MongoDB not initialized, initializing now...")
+        init_mongo()
+        try:
+            local_client = get_mongo_client_direct()
+        except RuntimeError as e:
+            logger.error(f"[arxiv-job] Local MongoDB initialization failed: {e}")
+            if prod_client:
+                prod_client.close()
+            return False
 
     try:
         # Production 컬렉션
