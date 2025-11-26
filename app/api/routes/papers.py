@@ -63,6 +63,7 @@ def search_papers(
     q: str | None = Query(None, min_length=1, description="검색어"),
     categories: List[str] | None = Query(None, description="카테고리 코드(복수 선택 가능)"),
     page: int = Query(1, ge=1, description="페이지 (1부터)"),
+    sort_by: str = Query("relevance", description="정렬 기준: relevance(관련도, Text Search시), view_count(조회수), update_date(최신순)"),
     db: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),  # 인증 필수
 ):
@@ -93,6 +94,7 @@ def search_papers(
         "authors": 1,
         "categories": 1,
         "update_date": 1,
+        "view_count": 1,  # 정렬 및 표시를 위해 추가
     }
     
     # Text Search 사용 시 관련도 점수 추가
@@ -160,8 +162,13 @@ def search_papers(
                         doc["score"] = cand["score"]
                         final_items.append(doc)
                 
-                # 점수 내림차순 정렬 (이미 대략 정렬되어 있지만 확실하게)
-                final_items.sort(key=lambda x: x["score"], reverse=True)
+                # 정렬 수행
+                if sort_by == "view_count":
+                    final_items.sort(key=lambda x: x.get("view_count", 0), reverse=True)
+                elif sort_by == "update_date":
+                    final_items.sort(key=lambda x: x.get("update_date", ""), reverse=True)
+                else:  # relevance (기본값)
+                    final_items.sort(key=lambda x: x["score"], reverse=True)
                 
                 total = len(final_items)
                 is_approximate = True # 2000개 제한이므로 항상 근사치
@@ -186,7 +193,15 @@ def search_papers(
         if total >= 10000:
             is_approximate = True
             
-        cursor = coll.find(query, projection).sort([("update_date", -1)]).skip(skip).limit(page_size)
+        # 정렬 기준 설정
+        if sort_by == "view_count":
+            sort_field = [("view_count", -1), ("update_date", -1)]  # 조회수 내림차순, 동일 시 날짜 최신순
+        elif sort_by == "update_date":
+            sort_field = [("update_date", -1)]  # 날짜 최신순
+        else:  # relevance는 일반 검색에서는 update_date로 대체
+            sort_field = [("update_date", -1)]
+        
+        cursor = coll.find(query, projection).sort(sort_field).skip(skip).limit(page_size)
         for doc in cursor:
             doc.pop("_id", None)  # _id 제거, id 필드(doi)는 유지
             items.append(doc)
