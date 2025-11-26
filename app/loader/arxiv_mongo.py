@@ -11,6 +11,8 @@ from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes
+from app.seed.bookmarks_seed import seed_bookmarks
+from app.seed.activities_seed import seed_activities
 from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY
 from app.loader.utils import get_current_time
 
@@ -190,6 +192,26 @@ def seed_categories_from_mongo(collection) -> None:
             logger.error(f"[arxiv-job] category seeding failed: {e}")
 
 
+def run_mock_seeding(db) -> None:
+    """
+    Mock 데이터 시딩 (북마크, 활동 로그).
+    데이터 적재 완료 후 실행됩니다.
+    """
+    logger.info("[arxiv-job] Starting mock data seeding...")
+    try:
+        # 1. Bookmarks 시딩
+        logger.info("[arxiv-job] Seeding bookmarks...")
+        seed_bookmarks(db)
+        
+        # 2. Activities 시딩
+        logger.info("[arxiv-job] Seeding user activities...")
+        seed_activities(db)
+        
+        logger.info("[arxiv-job] Mock data seeding completed successfully.")
+    except Exception as e:
+        logger.error(f"[arxiv-job] Mock data seeding failed: {e}")
+
+
 def ingest_arxiv_to_mongo() -> bool:
     """
     arXiv 데이터를 MongoDB에 적재 (최적화된 버전).
@@ -238,6 +260,9 @@ def ingest_arxiv_to_mongo() -> bool:
         # 4. PostgreSQL 카테고리 시딩
         seed_categories_from_mongo(collection)
         
+        # 5. Mock 데이터 시딩 (자동 실행)
+        run_mock_seeding(db)
+        
         return True
     except FileNotFoundError:
         logger.error(f"[arxiv-job] file not found: {DATA_FILE_PATH}")
@@ -251,7 +276,7 @@ def ingest_arxiv_to_mongo() -> bool:
 def copy_prod_to_local_mongo() -> bool:
     """
     Production MongoDB에서 로컬 MongoDB로 arxiv_papers 데이터 복제.
-    복제 완료 후 카테고리 시딩을 수행.
+    복제 완료 후 카테고리 시딩 및 Mock 데이터 시딩을 수행.
     """
     logger.info("[arxiv-job] Starting data copy from production to local MongoDB")
     
@@ -326,6 +351,9 @@ def copy_prod_to_local_mongo() -> bool:
         logger.info("[arxiv-job] Starting category seeding...")
         seed_categories_from_mongo(local_coll)
         logger.info("[arxiv-job] Category seeding complete")
+        
+        # Mock 데이터 시딩 (자동 실행)
+        run_mock_seeding(local_db)
 
         return True
 
