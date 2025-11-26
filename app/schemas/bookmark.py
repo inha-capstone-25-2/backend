@@ -14,7 +14,7 @@ class BookmarkCreate(BaseModel):
     """
     북마크 생성 요청 모델.
     """
-    paper_id: str = Field(..., description="MongoDB papers._id")
+    paper_id: str = Field(..., description="논문 ID (DOI)")
     notes: Optional[str] = None
 
 
