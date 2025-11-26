@@ -11,6 +11,8 @@ from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client
 from app.core.settings import settings
 from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes
+from app.seed.bookmarks_seed import seed_bookmarks
+from app.seed.activities_seed import seed_activities
 from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY
 from app.loader.utils import get_current_time
 
@@ -43,14 +45,14 @@ def stream_and_insert_data(
             except json.JSONDecodeError:
                 continue
             
-            _id = data.get("id")
-            if not _id:
+            arxiv_id = data.get("id")
+            if not arxiv_id:
                 continue
             
             # 파싱
             codes = parse_categories(data.get("categories"))
             doc = {
-                "id": _id,
+                "_id": arxiv_id,  # arXiv ID를 PK로 사용
                 "title": data.get("title"),
                 "authors": data.get("authors"),
                 "abstract": data.get("abstract"),
@@ -58,7 +60,7 @@ def stream_and_insert_data(
                 "update_date": data.get("update_date"),
             }
             doc = {k: v for k, v in doc.items() if v is not None}
-            batch.append(UpdateOne({"id": _id}, {"$set": doc}, upsert=True))
+            batch.append(UpdateOne({"_id": arxiv_id}, {"$set": doc}, upsert=True))
             
             # 배치 크기 도달 시 즉시 삽입
             if len(batch) >= batch_size:
@@ -83,7 +85,7 @@ def stream_and_insert_data(
                     for e in bwe.details.get("writeErrors", []):
                         if failures_collection:
                             try:
-                                failures_collection.insert_one({"id": e.get("op", {}).get("id")})
+                                failures_collection.insert_one({"_id": e.get("op", {}).get("_id")})
                             except Exception:
                                 pass
                     batch.clear()
@@ -115,14 +117,13 @@ def stream_and_insert_data(
 
 def create_unique_index(collection) -> None:
     """
-    고유 인덱스 생성 (중복 방지용).
-    데이터 삽입 전에 실행하여 중복 삽입을 방지.
+    고유 인덱스 생성 함수 (deprecated).
+    
+    _id 필드는 MongoDB가 자동으로 유니크 인덱스를 생성하므로
+    별도의 인덱스 생성이 불필요합니다.
     """
-    try:
-        collection.create_index("id", unique=True)
-        logger.info("[arxiv-job] 고유 인덱스 생성 완료: id")
-    except Exception as e:
-        logger.warning(f"[arxiv-job] 고유 인덱스 생성 실패 (이미 존재할 수 있음): {e}")
+    # _id는 자동으로 유니크 인덱스가 생성되므로 skip
+    logger.info("[arxiv-job] _id는 자동 인덱스 사용 (별도 생성 불필요)")
 
 
 def create_text_search_index(collection) -> None:
@@ -191,6 +192,26 @@ def seed_categories_from_mongo(collection) -> None:
             logger.error(f"[arxiv-job] category seeding failed: {e}")
 
 
+def run_mock_seeding(db) -> None:
+    """
+    Mock 데이터 시딩 (북마크, 활동 로그).
+    데이터 적재 완료 후 실행됩니다.
+    """
+    logger.info("[arxiv-job] Starting mock data seeding...")
+    try:
+        # 1. Bookmarks 시딩
+        logger.info("[arxiv-job] Seeding bookmarks...")
+        seed_bookmarks(db)
+        
+        # 2. Activities 시딩
+        logger.info("[arxiv-job] Seeding user activities...")
+        seed_activities(db)
+        
+        logger.info("[arxiv-job] Mock data seeding completed successfully.")
+    except Exception as e:
+        logger.error(f"[arxiv-job] Mock data seeding failed: {e}")
+
+
 def ingest_arxiv_to_mongo() -> bool:
     """
     arXiv 데이터를 MongoDB에 적재 (최적화된 버전).
@@ -217,7 +238,7 @@ def ingest_arxiv_to_mongo() -> bool:
         logger.info("[arxiv-job] removing old data")
         collection.delete_many({})
 
-    # 1. 고유 인덱스만 먼저 생성 (중복 방지용)
+    # 1. 고유 인덱스만 먼저 생성 (중복 방지용) - _id는 자동이므로 skip
     create_unique_index(collection)
 
     try:
@@ -239,6 +260,9 @@ def ingest_arxiv_to_mongo() -> bool:
         # 4. PostgreSQL 카테고리 시딩
         seed_categories_from_mongo(collection)
         
+        # 5. Mock 데이터 시딩 (자동 실행)
+        run_mock_seeding(db)
+        
         return True
     except FileNotFoundError:
         logger.error(f"[arxiv-job] file not found: {DATA_FILE_PATH}")
@@ -252,7 +276,7 @@ def ingest_arxiv_to_mongo() -> bool:
 def copy_prod_to_local_mongo() -> bool:
     """
     Production MongoDB에서 로컬 MongoDB로 arxiv_papers 데이터 복제.
-    복제 완료 후 카테고리 시딩을 수행.
+    복제 완료 후 카테고리 시딩 및 Mock 데이터 시딩을 수행.
     """
     logger.info("[arxiv-job] Starting data copy from production to local MongoDB")
     
@@ -300,8 +324,11 @@ def copy_prod_to_local_mongo() -> bool:
 
         try:
             for doc in cursor:
-                # _id는 MongoDB가 자동 생성하도록 제거
+                # 기존 ObjectId인 _id 제거
                 doc.pop("_id", None)
+                # id 필드가 있으면 _id로 변환 (arXiv ID)
+                if "id" in doc:
+                    doc["_id"] = doc.pop("id")
                 batch.append(doc)
                 
                 if len(batch) >= BATCH_SIZE:
@@ -324,6 +351,9 @@ def copy_prod_to_local_mongo() -> bool:
         logger.info("[arxiv-job] Starting category seeding...")
         seed_categories_from_mongo(local_coll)
         logger.info("[arxiv-job] Category seeding complete")
+        
+        # Mock 데이터 시딩 (자동 실행)
+        run_mock_seeding(local_db)
 
         return True
 

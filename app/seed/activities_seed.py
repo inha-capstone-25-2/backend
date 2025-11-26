@@ -8,7 +8,6 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pymongo.database import Database
-from bson import ObjectId
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
@@ -27,7 +26,7 @@ def seed_activities(db: Database) -> int:
     
     - activity_type: 랜덤 ("view", "search", "bookmark", "unbookmark")
     - 랜덤 사용자 ID (1~500)
-    - 랜덤 paper_id (activity_type이 "view", "bookmark" 등일 때)
+    - 랜덤 doi (activity_type이 "view", "bookmark" 등일 때)
     - 랜덤 timestamp (최근 3개월 이내)
     
     Returns:
@@ -63,11 +62,11 @@ def seed_activities(db: Database) -> int:
         days_ago = random.randint(0, 90)
         timestamp = now - timedelta(days=days_ago, hours=random.randint(0, 23))
         
-        # paper_id (activity_type이 "view", "bookmark", "unbookmark"일 때)
-        paper_id = None
+        # doi (activity_type이 "view", "bookmark", "unbookmark"일 때)
+        doi = None
         if activity_type in ["view", "bookmark", "unbookmark"]:
             paper = random.choice(paper_ids)
-            paper_id = paper["_id"]  # ObjectId로 저장
+            doi = paper["_id"]  # _id가 arXiv ID (문자열)
         
         activity = {
             "user_id": user_id,
@@ -75,8 +74,8 @@ def seed_activities(db: Database) -> int:
             "timestamp": timestamp,
         }
         
-        if paper_id:
-            activity["paper_id"] = paper_id  # ObjectId 그대로 저장
+        if doi:
+            activity["doi"] = doi  # 문자열 그대로 저장
         
         # metadata (선택적)
         if activity_type == "search":

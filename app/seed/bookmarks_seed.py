@@ -34,7 +34,7 @@ def seed_bookmarks(db: Database) -> int:
     """
     # papers 컬렉션에서 실제 논문 DOI들 샘플링
     papers_coll = db[settings.mongo_collection]
-    paper_dois = list(papers_coll.find({}, {"id": 1}).limit(1000))
+    paper_dois = list(papers_coll.find({}, {"_id": 1}).limit(1000))
     
     if not paper_dois:
         logger.error("❌ No papers found in collection. Please load papers first.")
@@ -56,9 +56,9 @@ def seed_bookmarks(db: Database) -> int:
         # 랜덤 사용자 ID (1~500)
         user_id = random.randint(1, 500)
         
-        # 랜덤 DOI
+        # 랜덤 DOI (_id가 이제 arXiv ID)
         paper = random.choice(paper_dois)
-        doi = paper["id"]
+        doi = paper["_id"]  # _id가 arXiv ID (문자열)
         
         # 랜덤 bookmarked_at (최근 6개월)
         days_ago = random.randint(0, 180)

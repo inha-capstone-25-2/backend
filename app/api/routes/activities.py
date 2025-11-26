@@ -16,7 +16,7 @@ router = APIRouter(prefix="/activities", tags=["activities"])
 def get_activities(
     user_id: int | None = Query(None, description="사용자 ID로 필터링"),
     activity_type: str | None = Query(None, description="활동 타입으로 필터링 (view, bookmark, search 등)"),
-    paper_id: str | None = Query(None, description="논문 ID로 필터링"),
+    doi: str | None = Query(None, description="논문 DOI로 필터링"),
     limit: int = Query(100, ge=1, le=1000, description="조회할 기록 수"),
     db: Database = Depends(get_mongo_db),
 ):
@@ -29,7 +29,7 @@ def get_activities(
     Args:
         user_id: 특정 사용자의 활동만 조회
         activity_type: 특정 활동 타입만 조회 (view, bookmark, search 등)
-        paper_id: 특정 논문에 대한 활동만 조회
+        doi: 특정 논문에 대한 활동만 조회 (arXiv ID)
         limit: 조회할 기록 수 (기본 100, 최대 1000)
         db: MongoDB Database
     
@@ -39,7 +39,7 @@ def get_activities(
     Example:
         GET /activities?user_id=123&limit=20
         GET /activities?activity_type=view&limit=50
-        GET /activities?paper_id=507f1f77bcf86cd799439011
+        GET /activities?doi=0704.0775
     """
     collection = db["user_activities"]
     
@@ -48,13 +48,9 @@ def get_activities(
         query["user_id"] = user_id
     if activity_type:
         query["activity_type"] = activity_type
-    if paper_id:
-        from app.utils.mongodb import safe_object_id
-        try:
-            query["paper_id"] = safe_object_id(paper_id, "paper ID")
-        except:
-            # 유효하지 않은 paper_id면 빈 결과 반환
-            return UserActivityListResponse(total=0, items=[])
+    if doi:
+        # doi는 이제 arXiv ID 문자열이므로 직접 사용
+        query["doi"] = doi
     
     total = collection.count_documents(query)
     
@@ -64,8 +60,7 @@ def get_activities(
     for doc in cursor:
         serialize_object_id(doc)
         doc["id"] = doc.pop("_id")
-        if "paper_id" in doc:
-            doc["paper_id"] = str(doc["paper_id"])
+        # doi는 문자열이므로 변환 불필요
         
         # metadata가 없으면 None으로 설정
         if "metadata" not in doc:

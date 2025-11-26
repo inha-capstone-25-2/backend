@@ -14,7 +14,7 @@ from app.schemas.paper import (
     SearchHistoryItem,
     SearchHistoryFilters,
 )
-from app.utils.mongodb import safe_object_id, serialize_object_id
+from app.utils.mongodb import serialize_object_id
 from app.utils.activity_logger import log_activity
 from app.api.deps import get_current_user
 from app.models.user import User
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def save_search_history(
     db: Database,
-   user_id: int,
+    user_id: int,
     query: str | None,
     categories: List[str] | None,
     result_count: int
@@ -280,11 +280,12 @@ def get_viewed_papers(
     }
     
     # MongoDB aggregation을 사용하여 중복 제거 및 최신순 정렬
+    # user_activities 컬렉션의 doi 필드 사용
     pipeline = [
         {"$match": query},
         {"$sort": {"timestamp": -1}},
         {"$group": {
-            "_id": "$paper_id",
+            "_id": "$doi",  # paper_id -> doi
             "last_viewed": {"$first": "$timestamp"}
         }},
         {"$sort": {"last_viewed": -1}},
@@ -297,7 +298,7 @@ def get_viewed_papers(
     # 전체 개수 조회
     count_pipeline = [
         {"$match": query},
-        {"$group": {"_id": "$paper_id"}},
+        {"$group": {"_id": "$doi"}},  # paper_id -> doi
         {"$count": "total"}
     ]
     count_result = list(activities_coll.aggregate(count_pipeline))
@@ -352,8 +353,8 @@ def get_paper(
 ):
     coll = db[settings.mongo_collection]
 
-    oid = safe_object_id(paper_id, "paper ID")
-    doc = coll.find_one({"_id": oid})
+    # paper_id는 이제 arXiv ID (문자열)이므로 직접 사용
+    doc = coll.find_one({"_id": paper_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Paper not found")
     
@@ -361,7 +362,7 @@ def get_paper(
         db=db,
         user_id=current_user.id,
         activity_type="view",
-        paper_id=paper_id
+        doi=paper_id  # paper_id -> doi
     )
 
     return serialize_object_id(doc)
