@@ -31,13 +31,13 @@ def create_bookmark(
     doi는 논문의 id(doi) 필드를 사용합니다.
     MongoDB papers 컬렉션에서 해당 doi로 논문이 존재하는지 확인합니다.
     """
-    # doi로 논문 존재 여부 확인
+    # doi로 논문 존재 여부 확인 (_id는 이제 arXiv ID)
     papers_coll = db[settings.mongo_collection]
-    paper_doc = papers_coll.find_one({"id": payload.doi}, {"_id": 1, "id": 1})
+    paper_doc = papers_coll.find_one({"_id": payload.doi}, {"_id": 1})
     if not paper_doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Paper not found with id: {payload.doi}"
+            detail=f"Paper not found with doi: {payload.doi}"
         )
     
     # 중복 북마크 확인
@@ -64,12 +64,12 @@ def create_bookmark(
     serialize_object_id(doc, "_id")
     doc["id"] = doc.pop("_id")
     
-    # 북마크 활동 로그
+    # 북마크 활동 로그 (doi 전달)
     log_activity(
         db=db,
         user_id=current_user.id,
         activity_type="bookmark",
-        paper_id=str(paper_doc["_id"])  # activity log에는 ObjectId 사용
+        doi=payload.doi
     )
     
     return BookmarkOut(**doc)
@@ -166,17 +166,13 @@ def delete_bookmark(
     
     result = db["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
     
-    # 북마크 취소 활동 로그
+    # 북마크 취소 활동 로그 (doi 전달)
     if result.deleted_count > 0:
-        # doi로 papers 컬렉션에서 _id 조회
-        papers_coll = db[settings.mongo_collection]
-        paper_doc = papers_coll.find_one({"id": bookmark_doc["doi"]}, {"_id": 1})
-        if paper_doc:
-            log_activity(
-                db=db,
-                user_id=current_user.id,
-                activity_type="unbookmark",
-                paper_id=str(paper_doc["_id"])
-            )
+        log_activity(
+            db=db,
+            user_id=current_user.id,
+            activity_type="unbookmark",
+            doi=bookmark_doc["doi"]
+        )
     
     return

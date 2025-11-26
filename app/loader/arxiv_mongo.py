@@ -43,14 +43,14 @@ def stream_and_insert_data(
             except json.JSONDecodeError:
                 continue
             
-            _id = data.get("id")
-            if not _id:
+            arxiv_id = data.get("id")
+            if not arxiv_id:
                 continue
             
             # 파싱
             codes = parse_categories(data.get("categories"))
             doc = {
-                "id": _id,
+                "_id": arxiv_id,  # arXiv ID를 PK로 사용
                 "title": data.get("title"),
                 "authors": data.get("authors"),
                 "abstract": data.get("abstract"),
@@ -58,7 +58,7 @@ def stream_and_insert_data(
                 "update_date": data.get("update_date"),
             }
             doc = {k: v for k, v in doc.items() if v is not None}
-            batch.append(UpdateOne({"id": _id}, {"$set": doc}, upsert=True))
+            batch.append(UpdateOne({"_id": arxiv_id}, {"$set": doc}, upsert=True))
             
             # 배치 크기 도달 시 즉시 삽입
             if len(batch) >= batch_size:
@@ -83,7 +83,7 @@ def stream_and_insert_data(
                     for e in bwe.details.get("writeErrors", []):
                         if failures_collection:
                             try:
-                                failures_collection.insert_one({"id": e.get("op", {}).get("id")})
+                                failures_collection.insert_one({"_id": e.get("op", {}).get("_id")})
                             except Exception:
                                 pass
                     batch.clear()
@@ -115,14 +115,13 @@ def stream_and_insert_data(
 
 def create_unique_index(collection) -> None:
     """
-    고유 인덱스 생성 (중복 방지용).
-    데이터 삽입 전에 실행하여 중복 삽입을 방지.
+    고유 인덱스 생성 함수 (deprecated).
+    
+    _id 필드는 MongoDB가 자동으로 유니크 인덱스를 생성하므로
+    별도의 인덱스 생성이 불필요합니다.
     """
-    try:
-        collection.create_index("id", unique=True)
-        logger.info("[arxiv-job] 고유 인덱스 생성 완료: id")
-    except Exception as e:
-        logger.warning(f"[arxiv-job] 고유 인덱스 생성 실패 (이미 존재할 수 있음): {e}")
+    # _id는 자동으로 유니크 인덱스가 생성되므로 skip
+    logger.info("[arxiv-job] _id는 자동 인덱스 사용 (별도 생성 불필요)")
 
 
 def create_text_search_index(collection) -> None:
@@ -217,7 +216,7 @@ def ingest_arxiv_to_mongo() -> bool:
         logger.info("[arxiv-job] removing old data")
         collection.delete_many({})
 
-    # 1. 고유 인덱스만 먼저 생성 (중복 방지용)
+    # 1. 고유 인덱스만 먼저 생성 (중복 방지용) - _id는 자동이므로 skip
     create_unique_index(collection)
 
     try:
@@ -300,8 +299,11 @@ def copy_prod_to_local_mongo() -> bool:
 
         try:
             for doc in cursor:
-                # _id는 MongoDB가 자동 생성하도록 제거
+                # 기존 ObjectId인 _id 제거
                 doc.pop("_id", None)
+                # id 필드가 있으면 _id로 변환 (arXiv ID)
+                if "id" in doc:
+                    doc["_id"] = doc.pop("id")
                 batch.append(doc)
                 
                 if len(batch) >= BATCH_SIZE:

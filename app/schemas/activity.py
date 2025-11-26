@@ -31,7 +31,7 @@ class UserActivityOut(BaseModel):
     """활동 로그 응답"""
     id: str
     user_id: int
-    paper_id: Optional[str] = None
+    doi: Optional[str] = None  # paper_id에서 doi로 변경
     activity_type: str
     metadata: Optional[Dict[str, Any]] = None
     timestamp: datetime

@@ -6,7 +6,6 @@
 
 from pymongo.database import Database
 from datetime import datetime
-from bson import ObjectId
 import logging
 from typing import Dict, Any, Optional
 
@@ -17,7 +16,7 @@ def log_activity(
     db: Database,
     user_id: int,
     activity_type: str,
-    paper_id: Optional[str] = None,
+    doi: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
@@ -27,7 +26,7 @@ def log_activity(
         db: MongoDB Database 객체
         user_id: 사용자 ID
         activity_type: 활동 타입 (view, bookmark, search, click 등)
-        paper_id: 논문 ID (선택, search 등은 없음)
+        doi: 논문 DOI/arXiv ID (선택, search 등은 없음)
         metadata: 추가 메타데이터 (선택)
     
     Example:
@@ -35,7 +34,7 @@ def log_activity(
         ...     db=db,
         ...     user_id=123,
         ...     activity_type="view",
-        ...     paper_id="507f1f77bcf86cd799439011"
+        ...     doi="0704.0775"
         ... )
         
         >>> log_activity(
@@ -52,13 +51,9 @@ def log_activity(
         "timestamp": datetime.utcnow(),
     }
     
-    # paper_id가 있으면 ObjectId로 변환
-    if paper_id:
-        try:
-            activity_doc["paper_id"] = ObjectId(paper_id)
-        except Exception as e:
-            logger.warning(f"Invalid paper_id: {paper_id}, error: {e}")
-            # paper_id가 유효하지 않아도 나머지는 저장
+    # doi가 있으면 문자열 그대로 저장
+    if doi:
+        activity_doc["doi"] = doi
     
     try:
         db["user_activities"].insert_one(activity_doc)
