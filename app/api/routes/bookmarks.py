@@ -28,22 +28,22 @@ def create_bookmark(
     """
     북마크 생성.
     
-    paper_id는 논문의 id(doi) 필드를 사용합니다.
+    doi는 논문의 id(doi) 필드를 사용합니다.
     MongoDB papers 컬렉션에서 해당 doi로 논문이 존재하는지 확인합니다.
     """
-    # paper_id (doi)로 논문 존재 여부 확인
+    # doi로 논문 존재 여부 확인
     papers_coll = db[settings.mongo_collection]
-    paper_doc = papers_coll.find_one({"id": payload.paper_id}, {"_id": 1, "id": 1})
+    paper_doc = papers_coll.find_one({"id": payload.doi}, {"_id": 1, "id": 1})
     if not paper_doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Paper not found with id: {payload.paper_id}"
+            detail=f"Paper not found with id: {payload.doi}"
         )
     
     # 중복 북마크 확인
     existing = db["bookmarks"].find_one({
         "user_id": current_user.id,
-        "paper_id": payload.paper_id
+        "doi": payload.doi
     })
     if existing:
         raise HTTPException(
@@ -53,7 +53,7 @@ def create_bookmark(
     
     doc = {
         "user_id": current_user.id,
-        "paper_id": payload.paper_id,  # doi를 직접 저장
+        "doi": payload.doi,
         "bookmarked_at": datetime.utcnow(),
         "notes": payload.notes,
     }
@@ -78,17 +78,17 @@ def create_bookmark(
 @router.get("", response_model=BookmarkListOut)
 def list_bookmarks(
     current_user: User = Depends(get_current_user),
-    paper_id: str | None = Query(None, description="특정 논문 북마크만 조회 (doi)"),
+    doi: str | None = Query(None, description="특정 논문 북마크만 조회 (DOI)"),
     db: Database = Depends(get_mongo_db),
 ):
     """
     북마크 목록 조회.
     
-    paper_id로 필터링할 경우 논문의 id(doi)를 사용합니다.
+    doi로 필터링할 경우 논문의 id(doi)를 사용합니다.
     """
     query = {"user_id": current_user.id}
-    if paper_id:
-        query["paper_id"] = paper_id  # doi로 직접 조회
+    if doi:
+        query["doi"] = doi
     
     cursor = db["bookmarks"].find(query).sort("bookmarked_at", -1)
     items = []
@@ -98,7 +98,7 @@ def list_bookmarks(
         items.append(BookmarkOut(
             id=doc["id"],
             user_id=doc["user_id"],
-            paper_id=doc["paper_id"],  # doi
+            doi=doc["doi"],
             bookmarked_at=doc["bookmarked_at"],
             notes=doc.get("notes"),
         ))
@@ -137,7 +137,7 @@ def update_bookmark(
     return BookmarkOut(
         id=result["id"],
         user_id=result["user_id"],
-        paper_id=result["paper_id"],  # doi
+        doi=result["doi"],
         bookmarked_at=result["bookmarked_at"],
         notes=result.get("notes"),
     )
@@ -156,7 +156,7 @@ def delete_bookmark(
     """
     obj_id = safe_object_id(bookmark_id, "bookmark ID")
     
-    # 삭제 전에 paper_id 조회 (활동 로그용)
+    # 삭제 전에 doi 조회 (활동 로그용)
     bookmark_doc = db["bookmarks"].find_one({"_id": obj_id, "user_id": current_user.id})
     if not bookmark_doc:
         raise HTTPException(
@@ -168,9 +168,9 @@ def delete_bookmark(
     
     # 북마크 취소 활동 로그
     if result.deleted_count > 0:
-        # paper_id (doi)로 papers 컬렉션에서 _id 조회
+        # doi로 papers 컬렉션에서 _id 조회
         papers_coll = db[settings.mongo_collection]
-        paper_doc = papers_coll.find_one({"id": bookmark_doc["paper_id"]}, {"_id": 1})
+        paper_doc = papers_coll.find_one({"id": bookmark_doc["doi"]}, {"_id": 1})
         if paper_doc:
             log_activity(
                 db=db,

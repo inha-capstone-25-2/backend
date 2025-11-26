@@ -14,7 +14,7 @@ class BookmarkCreate(BaseModel):
     """
     북마크 생성 요청 모델.
     """
-    paper_id: str = Field(..., description="논문 ID (DOI)")
+    doi: str = Field(..., description="논문 DOI")
     notes: Optional[str] = None
 
 
@@ -24,7 +24,7 @@ class BookmarkOut(BaseModel):
     """
     id: str
     user_id: int
-    paper_id: str
+    doi: str
     bookmarked_at: datetime
     notes: Optional[str] = None
 

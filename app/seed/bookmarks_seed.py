@@ -25,23 +25,23 @@ def seed_bookmarks(db: Database) -> int:
     500개의 mock bookmarks를 생성합니다.
     
     - 랜덤 사용자 ID (1~500)
-    - 랜덤 paper_id (실제 papers 컬렉션에서 샘플링)
+    - 랜덤 doi (실제 papers 컬렉션에서 샘플링)
     - 랜덤 bookmarked_at (최근 6개월 이내)
     - 랜덤 notes (50% 확률로 null)
     
     Returns:
         생성된 bookmarks 개수
     """
-    # papers 컬렉션에서 실제 논문 ID들 샘플링
+    # papers 컬렉션에서 실제 논문 DOI들 샘플링
     papers_coll = db[settings.mongo_collection]
-    paper_ids = list(papers_coll.find({}, {"_id": 1}).limit(1000))
+    paper_dois = list(papers_coll.find({}, {"id": 1}).limit(1000))
     
-    if not paper_ids:
+    if not paper_dois:
         logger.error("❌ No papers found in collection. Please load papers first.")
         logger.info("Run: python -c \"from app.loader.arxiv_mongo import copy_prod_to_local_mongo; copy_prod_to_local_mongo()\"")
         return 0
     
-    logger.info(f"Found {len(paper_ids)} papers for bookmark references")
+    logger.info(f"Found {len(paper_dois)} papers for bookmark references")
     
     bookmarks_coll = db["bookmarks"]
     
@@ -56,9 +56,9 @@ def seed_bookmarks(db: Database) -> int:
         # 랜덤 사용자 ID (1~500)
         user_id = random.randint(1, 500)
         
-        # 랜덤 paper_id
-        paper = random.choice(paper_ids)
-        paper_id = paper["_id"]
+        # 랜덤 DOI
+        paper = random.choice(paper_dois)
+        doi = paper["id"]
         
         # 랜덤 bookmarked_at (최근 6개월)
         days_ago = random.randint(0, 180)
@@ -69,7 +69,7 @@ def seed_bookmarks(db: Database) -> int:
         
         bookmark = {
             "user_id": user_id,
-            "paper_id": paper_id,
+            "doi": doi,
             "bookmarked_at": bookmarked_at,
             "notes": notes,
         }
