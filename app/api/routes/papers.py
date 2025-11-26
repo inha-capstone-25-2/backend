@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def save_search_history(
     db: Database,
-    user_id: int,
+   user_id: int,
     query: str | None,
     categories: List[str] | None,
     result_count: int
@@ -63,6 +63,7 @@ def search_papers(
     q: str | None = Query(None, min_length=1, description="검색어"),
     categories: List[str] | None = Query(None, description="카테고리 코드(복수 선택 가능)"),
     page: int = Query(1, ge=1, description="페이지 (1부터)"),
+    sort_by: str = Query("relevance", description="정렬 기준: relevance(관련도), view_count(조회수), update_date(최신순)"),
     db: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),  # 인증 필수
 ):
@@ -89,14 +90,13 @@ def search_papers(
         "_id": 1,
         "id": 1,
         "title": 1,
-        # "abstract": 1,  # 리스트 뷰에서는 제외 (네트워크 최적화)
         "authors": 1,
         "categories": 1,
         "update_date": 1,
+        "view_count": 1,
     }
     
     # Text Search 사용 시 관련도 점수 추가
-    # Two-Step 전략에서는 1단계에서 score를 가져오므로 여기서는 제거해도 됨 (하지만 호환성을 위해 유지)
     if use_text_search:
         projection["score"] = {"$meta": "textScore"}
 
@@ -104,20 +104,15 @@ def search_papers(
     skip = (page - 1) * page_size
 
     # Count 계산: 근사치 전략 (성능 최적화)
-    # Text Search 시 성능을 위해 상위 N개만 검사
     CANDIDATE_LIMIT = 2000
     is_approximate = False
     items = []
     total = 0
     
     if use_text_search:
-        # Text Search 최적화: Two-Step 전략 (Application-Level Join)
-        # MongoDB Optimizer의 비효율적인 실행 계획(Merge)을 방지하기 위해
-        # 애플리케이션 레벨에서 2단계로 나누어 실행
-        
+        # Text Search 최적화: Two-Step 전략
         try:
-            # Step 1: Text Search로 후보군 ID와 Score만 먼저 가져옴 (Index Only Scan에 가까움 -> 매우 빠름)
-            # 정렬 없이 가져오면 MongoDB가 가장 효율적인 순서로 반환함 (보통 관련도 순)
+            # Step 1: Text Search로 후보군 ID와 Score만 먼저 가져옴
             candidates_cursor = coll.find(
                 {"$text": {"$search": q}},
                 {"score": {"$meta": "textScore"}}
@@ -134,46 +129,44 @@ def search_papers(
             else:
                 candidate_ids = [c["_id"] for c in candidates]
                 
-                # 2차 쿼리: 후보군 ID 중에서 카테고리 조건 만족하는 것 조회
                 filter_query = {"_id": {"$in": candidate_ids}}
                 if categories:
                     filter_query["categories"] = {"$in": categories}
                     
-                # 실제 데이터 조회
-                # score는 1단계에서 가져왔으므로 projection에서 제외해도 되지만, 
-                # find() 결과에는 score가 없으므로 나중에 병합해야 함
                 data_projection = projection.copy()
                 if "score" in data_projection:
                     del data_projection["score"]
                 
                 docs_cursor = coll.find(filter_query, data_projection)
-                
-                # ID를 키로 하는 딕셔너리로 변환 (빠른 조회를 위해)
                 docs_map = {doc["_id"]: doc for doc in docs_cursor}
                 
-                # Step 3: 결과 조합 및 정렬 (메모리 연산)
+                # Step 3: 결과 조합 및 정렬
                 final_items = []
                 for cand in candidates:
                     if cand["_id"] in docs_map:
                         doc = docs_map[cand["_id"]]
-                        # score 주입 (정렬 및 반환을 위해)
                         doc["score"] = cand["score"]
                         final_items.append(doc)
                 
-                # 점수 내림차순 정렬 (이미 대략 정렬되어 있지만 확실하게)
-                final_items.sort(key=lambda x: x["score"], reverse=True)
+                # 정렬 수행
+                if sort_by == "view_count":
+                    final_items.sort(key=lambda x: x.get("view_count", 0), reverse=True)
+                elif sort_by == "update_date":
+                    final_items.sort(key=lambda x: x.get("update_date", ""), reverse=True)
+                else:  # relevance
+                    final_items.sort(key=lambda x: x["score"], reverse=True)
                 
                 total = len(final_items)
-                is_approximate = True # 2000개 제한이므로 항상 근사치
+                is_approximate = True
                 
                 # Step 4: 페이징
                 start = skip
                 end = skip + page_size
                 items = final_items[start:end]
                 
-                # score 제거 및 ID 직렬화
+                # score 및 _id 제거
                 for item in items:
-                    serialize_object_id(item)
+                    item.pop("_id", None)
                     item.pop("score", None)
             
         except Exception as e:
@@ -181,19 +174,27 @@ def search_papers(
             raise HTTPException(status_code=500, detail="Search operation failed")
             
     else:
-        # 일반 쿼리: 기존 방식 유지 (인덱스 활용)
+        # 일반 쿼리
         total = coll.count_documents(query, limit=10000)
         if total >= 10000:
             is_approximate = True
             
-        cursor = coll.find(query, projection).sort([("update_date", -1)]).skip(skip).limit(page_size)
+        # 정렬 기준 설정
+        if sort_by == "view_count":
+            sort_field = [("view_count", -1), ("update_date", -1)]
+        elif sort_by == "update_date":
+            sort_field = [("update_date", -1)]
+        else:
+            sort_field = [("update_date", -1)]
+        
+        cursor = coll.find(query, projection).sort(sort_field).skip(skip).limit(page_size)
         for doc in cursor:
-            serialize_object_id(doc)
+            doc.pop("_id", None)
             items.append(doc)
     
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
 
-    # 검색 기록 저장 (검색어나 카테고리가 있을 때만)
+    # 검색 기록 저장
     if q or categories:
         save_search_history(
             db=db,
@@ -203,7 +204,6 @@ def search_papers(
             result_count=total
         )
         
-        # 검색 활동 로그
         log_activity(
             db=db,
             user_id=current_user.id,
@@ -235,17 +235,6 @@ def get_search_history(
 ):
     """
     검색 기록 조회 (인증 불필요).
-    
-    필터 옵션으로 특정 사용자의 검색 기록만 조회 가능합니다.
-    최신순으로 정렬되어 반환됩니다.
-    
-    Args:
-        user_id: 특정 사용자의 검색 기록만 조회
-        limit: 조회할 기록 수 (기본 100, 최대 1000)
-        db: MongoDB Database
-    
-    Returns:
-        SearchHistoryResponse: 검색 기록 목록
     """
     collection = db["search_history"]
     
@@ -254,29 +243,112 @@ def get_search_history(
         query["user_id"] = user_id
     
     total = collection.count_documents(query)
-    
     cursor = collection.find(query).sort("searched_at", -1).limit(limit)
     
     items = []
     for doc in cursor:
         serialize_object_id(doc)
         doc["id"] = doc.pop("_id")
-        
-        # mock 데이터 호환: 필수 필드 없으면 None 처리
         doc.setdefault("user_id", None)
         doc.setdefault("filters", None)
         doc.setdefault("result_count", None)
-        
         items.append(SearchHistoryItem(**doc))
     
     return SearchHistoryResponse(total=total, items=items)
+
+
+@router.get("/viewed", response_model=PaperSearchResponse)
+def get_viewed_papers(
+    page: int = Query(1, ge=1, description="페이지 (1부터)"),
+    limit: int = Query(10, ge=1, le=100, description="페이지당 항목 수"),
+    db: Database = Depends(get_mongo_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    현재 로그인한 사용자가 조회한 논문 목록을 반환.
+    
+    user_activities 컬렉션에서 해당 사용자의 'view' 활동을 조회하고,
+    해당 논문들의 정보를 papers 컬렉션에서 가져와 반환합니다.
+    최신 조회 순으로 정렬되며, 중복 제거됩니다.
+    """
+    activities_coll = db["user_activities"]
+    papers_coll = db[settings.mongo_collection]
+    
+    query = {
+        "user_id": current_user.id,
+        "activity_type": "view"
+    }
+    
+    # MongoDB aggregation을 사용하여 중복 제거 및 최신순 정렬
+    pipeline = [
+        {"$match": query},
+        {"$sort": {"timestamp": -1}},
+        {"$group": {
+            "_id": "$paper_id",
+            "last_viewed": {"$first": "$timestamp"}
+        }},
+        {"$sort": {"last_viewed": -1}},
+        {"$skip": (page - 1) * limit},
+        {"$limit": limit}
+    ]
+    
+    viewed_papers = list(activities_coll.aggregate(pipeline))
+    
+    # 전체 개수 조회
+    count_pipeline = [
+        {"$match": query},
+        {"$group": {"_id": "$paper_id"}},
+        {"$count": "total"}
+    ]
+    count_result = list(activities_coll.aggregate(count_pipeline))
+    total = count_result[0]["total"] if count_result else 0
+    
+    paper_ids = [item["_id"] for item in viewed_papers if item["_id"]]
+    
+    items = []
+    if paper_ids:
+        paper_docs = papers_coll.find(
+            {"_id": {"$in": paper_ids}},
+            {
+                "_id": 1,
+                "id": 1,
+                "title": 1,
+                "authors": 1,
+                "categories": 1,
+                "update_date": 1,
+                "view_count": 1,
+            }
+        )
+        
+        papers_map = {doc["_id"]: doc for doc in paper_docs}
+        
+        for viewed in viewed_papers:
+            paper_id = viewed["_id"]
+            if paper_id in papers_map:
+                doc = papers_map[paper_id]
+                doc.pop("_id", None)
+                items.append(doc)
+    
+    page_size = limit
+    total_pages = max(1, math.ceil(total / page_size)) if total else 0
+    
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_prev": page > 1,
+        "is_approximate": False,
+        "items": items,
+    }
 
 
 @router.get("/{paper_id}", response_model=Paper)
 def get_paper(
     paper_id: str,
     db: Database = Depends(get_mongo_db),
-    current_user: User = Depends(get_current_user),  # 인증 필수
+    current_user: User = Depends(get_current_user),
 ):
     coll = db[settings.mongo_collection]
 
@@ -285,7 +357,6 @@ def get_paper(
     if not doc:
         raise HTTPException(status_code=404, detail="Paper not found")
     
-    # 논문 조회 활동 로그
     log_activity(
         db=db,
         user_id=current_user.id,
