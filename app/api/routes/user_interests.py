@@ -1,17 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.postgres import get_db
 from app.models.user import User
-from app.models.category import Category
-from app.models.user_interest import UserInterest
 from app.schemas.user_interest import (
     InterestAddPayload,
-    InterestItem,
     InterestList,
     InterestRemovalResult,
 )
+from app.services.user_interest_service import UserInterestService
 
 router = APIRouter(prefix="/user-interests", tags=["user-interests"])
 
@@ -22,38 +20,9 @@ def add_interests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    codes = list(dict.fromkeys(payload.category_codes))
-    if not codes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="empty category_codes"
-        )
-
-    categories = db.query(Category).filter(Category.code.in_(codes)).all()
-    found_codes = {c.code for c in categories}
-    missing = [c for c in codes if c not in found_codes]
-    if missing:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"categories not found: {missing}",
-        )
-
-    existing = (
-        db.query(UserInterest)
-        .filter(
-            UserInterest.user_id == current_user.id,
-            UserInterest.category_id.in_([c.id for c in categories]),
-        )
-        .all()
-    )
-    existing_ids = {e.category_id for e in existing}
-
-    for c in categories:
-        if c.id in existing_ids:
-            continue
-        db.add(UserInterest(user_id=current_user.id, category_id=c.id))
-
-    db.commit()
-    return {"added": len(categories) - len(existing_ids), "skipped": len(existing_ids)}
+    """사용자 관심사 추가."""
+    service = UserInterestService(db)
+    return service.add_interests(current_user, payload.category_codes)
 
 
 @router.get("", response_model=InterestList)
@@ -61,21 +30,9 @@ def list_interests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = (
-        db.query(Category)
-        .join(UserInterest, UserInterest.category_id == Category.id)
-        .filter(UserInterest.user_id == current_user.id)
-        .order_by(Category.code.asc())
-    )
-    categories = q.all()
-
-    items: list[InterestItem] = []
-    for c in categories:
-        name_ko = next((n.name for n in c.names if n.locale == "ko"), None)
-        name_en = next((n.name for n in c.names if n.locale == "en"), None)
-        items.append(InterestItem(code=c.code, name_ko=name_ko, name_en=name_en))
-
-    return InterestList(items=items)
+    """사용자 관심사 목록 조회."""
+    service = UserInterestService(db)
+    return service.list_interests(current_user)
 
 
 @router.delete("", response_model=InterestRemovalResult)
@@ -86,47 +43,6 @@ def remove_interests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    target_codes = list(dict.fromkeys(codes))
-    if not target_codes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="empty codes"
-        )
-
-    categories = db.query(Category).filter(Category.code.in_(target_codes)).all()
-    found_map = {c.code: c for c in categories}
-    missing = [c for c in target_codes if c not in found_map]
-
-    to_delete = (
-        db.query(UserInterest)
-        .filter(
-            UserInterest.user_id == current_user.id,
-            UserInterest.category_id.in_([found_map[c].id for c in found_map]),
-        )
-        .all()
-    )
-    delete_ids = {ui.category_id for ui in to_delete}
-
-    for ui in to_delete:
-        db.delete(ui)
-    db.commit()
-
-    q = (
-        db.query(Category)
-        .join(UserInterest, UserInterest.category_id == Category.id)
-        .filter(UserInterest.user_id == current_user.id)
-        .order_by(Category.code.asc())
-    )
-    remaining_categories = q.all()
-    remaining_items = []
-    for c in remaining_categories:
-        name_ko = next((n.name for n in c.names if n.locale == "ko"), None)
-        name_en = next((n.name for n in c.names if n.locale == "en"), None)
-        remaining_items.append(
-            InterestItem(code=c.code, name_ko=name_ko, name_en=name_en)
-        )
-
-    return InterestRemovalResult(
-        removed=len(delete_ids),
-        not_found=missing,
-        remaining=InterestList(items=remaining_items),
-    )
+    """사용자 관심사 삭제."""
+    service = UserInterestService(db)
+    return service.remove_interests(current_user, codes)
