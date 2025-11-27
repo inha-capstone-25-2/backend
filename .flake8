@@ -7,7 +7,12 @@ exclude =
     .venv,
     migrations,
     .pytest_cache
+# E203: whitespace before ':'
+# W503: line break before binary operator  
+# E501: line too long (handled by black)
+# F821: undefined name (false positive for SQLAlchemy forward references)
 ignore = 
-    E203,  # whitespace before ':'
-    W503,  # line break before binary operator
-    E501   # line too long (handled by black)
+    E203,
+    W503,
+    E501,
+    F821

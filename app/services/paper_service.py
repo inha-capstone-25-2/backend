@@ -7,6 +7,7 @@ from app.repositories.paper_repository import PaperRepository
 from app.utils.activity_logger import log_activity
 from app.models.user import User
 from app.core.constants import DEFAULT_PAGE_SIZE
+from app.core.exceptions import ResourceNotFoundException
 
 logger = logging.getLogger(__name__)
 
@@ -64,14 +65,14 @@ class PaperService:
         """내가 본 논문 조회"""
         return self.repo.get_viewed_papers(user_id=user.id, page=page, limit=limit)
 
-    def get_paper_detail(self, user: User, paper_id: str) -> Dict[str, Any] | None:
+    def get_paper_detail(self, user: User, paper_id: str) -> Dict[str, Any]:
         """논문 상세 조회 및 활동 로그"""
         
         # 1. 논문 조회 및 조회수 증가
         doc = self.repo.get_paper_and_increment_view(paper_id)
         
         if not doc:
-            return None
+            raise ResourceNotFoundException("Paper", paper_id)
             
         # 2. 활동 로그 기록
         log_activity(

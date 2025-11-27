@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, Query, Depends
 from typing import List
 import logging
 from pymongo.database import Database
@@ -68,9 +68,5 @@ def get_paper(
     """논문 상세 정보 조회."""
     service = PaperService(db)
     
-    doc = service.get_paper_detail(user=current_user, paper_id=paper_id)
-    
-    if not doc:
-        raise HTTPException(status_code=404, detail="Paper not found")
-    
-    return doc
+    # Service raises ResourceNotFoundException if not found
+    return service.get_paper_detail(user=current_user, paper_id=paper_id)

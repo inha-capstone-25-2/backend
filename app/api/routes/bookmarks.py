@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query
 from typing import List
 from pymongo.database import Database
 
@@ -26,24 +26,12 @@ def create_bookmark(
     """북마크 생성."""
     service = BookmarkService(db)
     
-    try:
-        doc = service.create_bookmark(
-            user=current_user,
-            doi=payload.doi,
-            notes=payload.notes
-        )
-        return BookmarkOut(**doc)
-    except ValueError as e:
-        if "not found" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(e)
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
+    doc = service.create_bookmark(
+        user=current_user,
+        doi=payload.doi,
+        notes=payload.notes
+    )
+    return BookmarkOut(**doc)
 
 
 @router.get("", response_model=BookmarkListOut)
@@ -81,24 +69,18 @@ def update_bookmark(
     obj_id = safe_object_id(bookmark_id, "bookmark ID")
     service = BookmarkService(db)
     
-    try:
-        result = service.update_bookmark(
-            user=current_user,
-            bookmark_id=obj_id,
-            notes=payload.notes
-        )
-        return BookmarkOut(
-            id=result["id"],
-            user_id=result["user_id"],
-            doi=result["doi"],
-            bookmarked_at=result["bookmarked_at"],
-            notes=result.get("notes"),
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Bookmark not found"
-        )
+    result = service.update_bookmark(
+        user=current_user,
+        bookmark_id=obj_id,
+        notes=payload.notes
+    )
+    return BookmarkOut(
+        id=result["id"],
+        user_id=result["user_id"],
+        doi=result["doi"],
+        bookmarked_at=result["bookmarked_at"],
+        notes=result.get("notes"),
+    )
 
 
 @router.delete("/{bookmark_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -111,12 +93,6 @@ def delete_bookmark(
     obj_id = safe_object_id(bookmark_id, "bookmark ID")
     service = BookmarkService(db)
     
-    try:
-        service.delete_bookmark(user=current_user, bookmark_id=obj_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Bookmark not found"
-        )
+    service.delete_bookmark(user=current_user, bookmark_id=obj_id)
     
     return

@@ -10,6 +10,8 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
+from app.core.exceptions import ResourceNotFoundException, DuplicateResourceException
+
 class BookmarkService:
     def __init__(self, db: Database):
         self.db = db
@@ -25,12 +27,12 @@ class BookmarkService:
         
         # 1. 논문 존재 확인
         if not self.repo.paper_exists(doi):
-            raise ValueError(f"Paper not found with doi: {doi}")
+            raise ResourceNotFoundException("Paper", doi)
         
         # 2. 중복 확인
         existing = self.repo.find_by_user_and_doi(user.id, doi)
         if existing:
-            raise ValueError("Bookmark already exists for this paper")
+            raise DuplicateResourceException("Bookmark")
         
         # 3. 북마크 생성
         doc = self.repo.create_bookmark(user.id, doi, notes)
@@ -63,7 +65,7 @@ class BookmarkService:
         result = self.repo.update_bookmark(bookmark_id, user.id, notes)
         
         if not result:
-            raise ValueError("Bookmark not found")
+            raise ResourceNotFoundException("Bookmark", str(bookmark_id))
         
         return result
 
@@ -78,7 +80,7 @@ class BookmarkService:
         doc = self.repo.delete_bookmark(bookmark_id, user.id)
         
         if not doc:
-            raise ValueError("Bookmark not found")
+            raise ResourceNotFoundException("Bookmark", str(bookmark_id))
         
         # 2. 활동 로그
         log_activity(
