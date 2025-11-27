@@ -351,13 +351,26 @@ def get_paper(
     db: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),
 ):
+    """
+    논문 상세 정보 조회.
+    
+    조회 시 해당 논문의 view_count를 자동으로 1 증가시킵니다.
+    사용자 활동 로그도 함께 기록됩니다.
+    """
     coll = db[settings.mongo_collection]
 
     # paper_id는 이제 arXiv ID (문자열)이므로 직접 사용
-    doc = coll.find_one({"_id": paper_id})
+    # view_count 증가 + 문서 조회 (원자적 연산)
+    doc = coll.find_one_and_update(
+        {"_id": paper_id},
+        {"$inc": {"view_count": 1}},
+        return_document=True  # 업데이트 후 문서 반환
+    )
+    
     if not doc:
         raise HTTPException(status_code=404, detail="Paper not found")
     
+    # 사용자 활동 로그 기록
     log_activity(
         db=db,
         user_id=current_user.id,
