@@ -13,6 +13,8 @@ from app.loader.arxiv_category import parse_categories
 from app.seed.categories_seed import seed_categories_from_codes
 from app.seed.bookmarks_seed import seed_bookmarks
 from app.seed.activities_seed import seed_activities
+from app.seed.papers_enrichment_seed import enrich_papers
+from app.seed.search_history_seed import seed_search_history
 from app.loader.config import DATA_FILE_PATH, BATCH_SIZE, PROGRESS_EVERY
 from app.loader.utils import get_current_time
 
@@ -194,18 +196,26 @@ def seed_categories_from_mongo(collection) -> None:
 
 def run_mock_seeding(db) -> None:
     """
-    Mock 데이터 시딩 (북마크, 활동 로그).
+    Mock 데이터 시딩 (Enrichment, Bookmarks, Activities, SearchHistory).
     데이터 적재 완료 후 실행됩니다.
     """
     logger.info("[arxiv-job] Starting mock data seeding...")
     try:
-        # 1. Bookmarks 시딩
+        # 1. Papers Enrichment (필수: view_count 등이 있어야 정렬 가능)
+        logger.info("[arxiv-job] Enriching papers (view_count, embeddings)...")
+        enrich_papers(db)
+
+        # 2. Bookmarks 시딩
         logger.info("[arxiv-job] Seeding bookmarks...")
         seed_bookmarks(db)
         
-        # 2. Activities 시딩
+        # 3. Activities 시딩
         logger.info("[arxiv-job] Seeding user activities...")
         seed_activities(db)
+        
+        # 4. Search History 시딩
+        logger.info("[arxiv-job] Seeding search history...")
+        seed_search_history(db)
         
         logger.info("[arxiv-job] Mock data seeding completed successfully.")
     except Exception as e:
