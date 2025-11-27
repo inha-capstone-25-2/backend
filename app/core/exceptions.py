@@ -1,72 +1,81 @@
 """
-커스텀 예외 클래스 정의.
+커스텀 예외 클래스.
 
-이 모듈은 애플리케이션 전체에서 사용할 예외 클래스들을 정의합니다.
-예외 계층 구조를 통해 타입별 에러 처리가 가능합니다.
+애플리케이션 전반에서 사용되는 예외 클래스를 정의합니다.
 """
 
 
 class AppException(Exception):
-    """
-    애플리케이션 기본 예외.
+    """애플리케이션 기본 예외 클래스."""
     
-    모든 커스텀 예외의 기본 클래스입니다.
-    일반적인 애플리케이션 에러에 사용됩니다.
-    """
-    pass
+    def __init__(self, message: str = "Application error occurred"):
+        self.message = message
+        super().__init__(self.message)
 
 
 class DatabaseException(AppException):
-    """
-    데이터베이스 관련 예외.
+    """데이터베이스 관련 예외."""
     
-    PostgreSQL, MongoDB 등 모든 데이터베이스 작업 중 발생하는
-    일반적인 에러에 사용됩니다.
-    """
-    pass
+    def __init__(self, message: str = "Database operation failed"):
+        super().__init__(message)
 
 
 class MongoDBException(DatabaseException):
-    """
-    MongoDB 관련 예외.
+    """MongoDB 관련 예외."""
     
-    MongoDB 연결 실패, 쿼리 실패 등에 사용됩니다.
-    """
-    pass
+    def __init__(self, message: str = "MongoDB operation failed"):
+        super().__init__(message)
 
 
 class PostgreSQLException(DatabaseException):
-    """
-    PostgreSQL 관련 예외.
+    """PostgreSQL 관련 예외."""
     
-    PostgreSQL 연결 실패, 쿼리 실패 등에 사용됩니다.
-    """
-    pass
-
-
-class BusinessLogicException(AppException):
-    """
-    비즈니스 로직 예외.
-    
-    비즈니스 규칙 위반, 잘못된 상태 전환 등
-    도메인 로직과 관련된 에러에 사용됩니다.
-    """
-    pass
+    def __init__(self, message: str = "PostgreSQL operation failed"):
+        super().__init__(message)
 
 
 class ResourceNotFoundException(AppException):
-    """
-    리소스를 찾을 수 없음.
+    """리소스를 찾을 수 없음."""
     
-    요청한 리소스(논문, 북마크 등)가 존재하지 않을 때 사용됩니다.
-    """
-    pass
+    def __init__(self, resource: str = "Resource", identifier: str = ""):
+        message = f"{resource} not found"
+        if identifier:
+            message += f": {identifier}"
+        super().__init__(message)
 
 
 class ValidationException(AppException):
-    """
-    입력값 검증 실패.
+    """입력값 검증 실패."""
     
-    요청 데이터의 형식이나 값이 유효하지 않을 때 사용됩니다.
-    """
-    pass
+    def __init__(self, message: str = "Validation failed", field: str | None = None):
+        if field:
+            message = f"Validation failed for field '{field}': {message}"
+        super().__init__(message)
+
+
+class BusinessLogicException(AppException):
+    """비즈니스 로직 위반."""
+    
+    def __init__(self, message: str = "Business logic error"):
+        super().__init__(message)
+
+
+class DuplicateResourceException(BusinessLogicException):
+    """중복된 리소스."""
+    
+    def __init__(self, resource: str = "Resource"):
+        super().__init__(f"{resource} already exists")
+
+
+class UnauthorizedException(AppException):
+    """인증 실패."""
+    
+    def __init__(self, message: str = "Unauthorized"):
+        super().__init__(message)
+
+
+class ForbiddenException(AppException):
+    """권한 없음."""
+    
+    def __init__(self, message: str = "Forbidden"):
+        super().__init__(message)

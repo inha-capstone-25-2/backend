@@ -7,23 +7,15 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import ConflictingIdError
 import os
 
-# 3. 앱 시작 시 로깅 설정 적용
-from app.core.logging_config import setup_logging  # 추가
-setup_logging()  # 가장 먼저 호출
+# 앱 시작 시 로깅 설정 적용
+from app.core.logging_config import setup_logging
+setup_logging()
 
-# Settings를 초기화하여 .env 계층을 로드
+# Settings
 from app.core.settings import settings
-from app.core.exceptions import (
-    AppException,
-    DatabaseException,
-    MongoDBException,
-    PostgreSQLException,
-    BusinessLogicException,
-    ResourceNotFoundException,
-    ValidationException,
-)
+from app.core.exceptions import AppException
 
-# 추가: Auth 라우터 & DB 초기화
+# 라우터
 from app.api.routes.auth import router as auth_router
 from app.api.routes.jobs import router as jobs_router
 from app.api.routes.papers import router as papers_router
@@ -32,9 +24,8 @@ from app.api.routes.user_interests import router as user_interests_router
 from app.api.routes.bookmarks import router as bookmarks_router
 from app.api.routes.activities import router as activities_router
 from app.api.routes.recommendations import router as recommendations_router
-from app.db.postgres import init_db, get_db
+from app.db.postgres import init_db
 from app.loader.arxiv_loader import load_arxiv_data_to_mongodb
-from app.seed.categories_seed import seed_categories  # 추가
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +50,7 @@ def _ensure_daily_job():
         return
     try:
         scheduler.add_job(
-            _run_scheduled_arxiv_job,   # 래퍼로 교체
+            _run_scheduled_arxiv_job,
             trigger="cron",
             id=JOB_ID,
             hour=4,
@@ -77,12 +68,10 @@ def _ensure_daily_job():
 async def lifespan(app: FastAPI):
     # Startup
     try:
-        # PostgreSQL 테이블 준비
         init_db()
     except Exception as e:
         logger.error(f"init_db failed: {e}")
 
-    # MongoDB 연결 초기화
     try:
         from app.db.mongodb import init_mongo
         init_mongo()
@@ -99,7 +88,6 @@ async def lifespan(app: FastAPI):
     if scheduler.running:
         scheduler.shutdown(wait=False)
     
-    # MongoDB 연결 종료
     try:
         from app.db.mongodb import close_mongo
         close_mongo()
@@ -110,77 +98,33 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# Exception handlers
-@app.exception_handler(DatabaseException)
-async def database_exception_handler(request: Request, exc: DatabaseException):
-    """데이터베이스 관련 예외 처리"""
-    logger.error(f"Database error at {request.url.path}: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "Database operation failed",
-            "type": "database_error",
-            "path": str(request.url.path),
-        }
-    )
-
-
-@app.exception_handler(ResourceNotFoundException)
-async def resource_not_found_handler(request: Request, exc: ResourceNotFoundException):
-    """리소스를 찾을 수 없음 예외 처리"""
-    logger.warning(f"Resource not found at {request.url.path}: {exc}")
-    return JSONResponse(
-        status_code=404,
-        content={
-            "detail": str(exc),
-            "type": "resource_not_found",
-            "path": str(request.url.path),
-        }
-    )
-
-
-@app.exception_handler(ValidationException)
-async def validation_exception_handler(request: Request, exc: ValidationException):
-    """입력값 검증 실패 예외 처리"""
-    logger.warning(f"Validation error at {request.url.path}: {exc}")
-    return JSONResponse(
-        status_code=400,
-        content={
-            "detail": str(exc),
-            "type": "validation_error",
-            "path": str(request.url.path),
-        }
-    )
-
-
-@app.exception_handler(BusinessLogicException)
-async def business_logic_exception_handler(request: Request, exc: BusinessLogicException):
-    """비즈니스 로직 예외 처리"""
-    logger.warning(f"Business logic error at {request.url.path}: {exc}")
-    return JSONResponse(
-        status_code=400,
-        content={
-            "detail": str(exc),
-            "type": "business_logic_error",
-            "path": str(request.url.path),
-        }
-    )
+# Exception handlers - 중앙화된 유틸리티 사용
+from app.core.exception_handlers import create_error_response, get_exception_config
 
 
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
-    """일반 애플리케이션 예외 처리"""
-    logger.warning(f"Application error at {request.url.path}: {exc}")
+    """모든 커스텀 예외 처리 (계층 구조 활용)"""
+    status_code, error_type, log_level = get_exception_config(exc)
+    return create_error_response(request, exc, status_code, error_type, log_level)
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """처리되지 않은 예외 처리"""
+    logger.error(f"Unhandled exception at {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
-        status_code=400,
+        status_code=500,
         content={
-            "detail": str(exc),
-            "type": "application_error",
+            "success": False,
+            "error": "Internal server error",
+            "error_type": "internal_server_error",
             "path": str(request.url.path),
         }
     )
 
 
+# CORS
 cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001")
 allowed_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
 
@@ -193,7 +137,7 @@ app.add_middleware(
     expose_headers=["Authorization"],
 )
 
-# Auth 라우터 등록
+# 라우터 등록
 app.include_router(auth_router)
 app.include_router(jobs_router)
 app.include_router(papers_router)
@@ -206,5 +150,4 @@ app.include_router(recommendations_router)
 
 @app.get("/")
 def root():
-    # set은 JSON 직렬화 불가 -> dict로 반환
     return {"message": "Hello World!"}
