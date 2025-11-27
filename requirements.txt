@@ -17,3 +17,17 @@ boto3
 requests
 cachetools
 numpy
+
+# Testing dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+mongomock>=4.1.0
+httpx>=0.24.0  # For testing FastAPI
+
+# Linting dependencies
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.12.0
+
