@@ -9,10 +9,9 @@ from app.schemas.paper import (
     PaperSearchResponse,
     SearchHistoryResponse,
 )
-from app.utils.activity_logger import log_activity
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.repositories.paper_repository import PaperRepository
+from app.services.paper_service import PaperService
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 logger = logging.getLogger(__name__)
@@ -27,38 +26,14 @@ def search_papers(
     db: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),
 ):
-    repo = PaperRepository(db)
-    
-    # 검색 수행
-    result = repo.search_papers(
+    service = PaperService(db)
+    return service.search_papers(
+        user=current_user,
         q=q,
         categories=categories,
         page=page,
-        page_size=10,
         sort_by=sort_by
     )
-
-    # 검색 기록 저장 및 활동 로그
-    if q or categories:
-        repo.save_search_history(
-            user_id=current_user.id,
-            query=q,
-            categories=categories,
-            result_count=result["total"]
-        )
-        
-        log_activity(
-            db=db,
-            user_id=current_user.id,
-            activity_type="search",
-            metadata={
-                "search_query": q,
-                "categories": categories,
-                "result_count": result["total"]
-            }
-        )
-
-    return result
 
 
 @router.get("/search-history", response_model=SearchHistoryResponse)
@@ -68,8 +43,8 @@ def get_search_history(
     db: Database = Depends(get_mongo_db),
 ):
     """검색 기록 조회 (인증 불필요)."""
-    repo = PaperRepository(db)
-    return repo.get_search_history(user_id=user_id, limit=limit)
+    service = PaperService(db)
+    return service.get_search_history(user_id=user_id, limit=limit)
 
 
 @router.get("/viewed", response_model=PaperSearchResponse)
@@ -80,8 +55,8 @@ def get_viewed_papers(
     current_user: User = Depends(get_current_user),
 ):
     """현재 로그인한 사용자가 조회한 논문 목록을 반환."""
-    repo = PaperRepository(db)
-    return repo.get_viewed_papers(user_id=current_user.id, page=page, limit=limit)
+    service = PaperService(db)
+    return service.get_viewed_papers(user=current_user, page=page, limit=limit)
 
 
 @router.get("/{paper_id}", response_model=Paper)
@@ -91,19 +66,11 @@ def get_paper(
     current_user: User = Depends(get_current_user),
 ):
     """논문 상세 정보 조회."""
-    repo = PaperRepository(db)
+    service = PaperService(db)
     
-    doc = repo.get_paper_and_increment_view(paper_id)
+    doc = service.get_paper_detail(user=current_user, paper_id=paper_id)
     
     if not doc:
         raise HTTPException(status_code=404, detail="Paper not found")
     
-    # 사용자 활동 로그 기록
-    log_activity(
-        db=db,
-        user_id=current_user.id,
-        activity_type="view",
-        doi=paper_id
-    )
-
     return doc
