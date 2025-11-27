@@ -7,6 +7,8 @@ from pymongo.database import Database
 from datetime import datetime
 import logging
 from typing import List
+from app.core.constants import COLLECTION_PAPER_RECOMMENDATIONS
+
 
 from app.db.postgres import get_db
 from app.db.mongodb import get_mongo_db
@@ -35,7 +37,7 @@ def _log_recommendation(
         recommendations: 추천 결과 리스트
         recommendation_type: 추천 타입
     """
-    collection = db["paper_recommendations"]
+    collection = db[COLLECTION_PAPER_RECOMMENDATIONS]
     
     for rec in recommendations:
         paper_id = rec.get("paper_id")
@@ -108,6 +110,7 @@ def get_recommendations(
     for rec in recommendations:
         paper = rec["paper"]
         serialize_object_id(paper)
+        paper["id"] = paper.pop("_id")
         
         item = RecommendationItem(
             paper_id=rec["paper_id"],

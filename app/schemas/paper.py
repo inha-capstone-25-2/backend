@@ -15,29 +15,31 @@ class PaperListItem(BaseModel):
     논문 리스트 아이템 모델 (검색 결과용).
     
     abstract를 제외하여 네트워크 전송량을 최소화합니다.
+    MongoDB _id는 id 필드로 변환되어 반환됩니다.
     """
-    _id: str
-    id: Optional[str] = None
+    id: str
     title: Optional[str] = None
     authors: Optional[str] = None
     categories: Optional[List[str]] = None
     update_date: Optional[str] = None
+    view_count: Optional[int] = 0
 
 
 class Paper(BaseModel):
     """
     논문 상세 응답 모델.
     
-    MongoDB arxiv_papers 컬렉션의 문서를 표현합니다.
+    MongoDB papers 컬렉션의 문서를 표현합니다.
     상세 조회 시 사용되며 모든 필드를 포함합니다.
+    MongoDB _id는 id 필드로 변환되어 반환됩니다.
     """
-    _id: str
-    id: Optional[str] = None
+    id: str
     title: Optional[str] = None
     abstract: Optional[str] = None
     authors: Optional[str] = None
     categories: Optional[List[str]] = None
     update_date: Optional[str] = None
+    view_count: Optional[int] = 0
 
 
 class PaperSearchResponse(BaseModel):

@@ -9,6 +9,8 @@ from datetime import datetime
 import logging
 from pymongo.database import Database
 from sqlalchemy.orm import Session
+from app.core.constants import COLLECTION_USER_ACTIVITIES
+
 
 from app.utils.rule_based_scorer import RuleBasedScorer
 from app.core.settings import settings
@@ -149,18 +151,18 @@ class RuleBasedRecommender:
         Returns:
             (viewed_paper_ids, activity_categories)
         """
-        activities = db["user_activities"].find(
+        activities = db[COLLECTION_USER_ACTIVITIES].find(
             {"user_id": user_id, "activity_type": "view"},
-            {"paper_id": 1, "metadata": 1}
+            {"doi": 1, "metadata": 1}
         ).sort("timestamp", -1).limit(50)  # 최근 50개만
         
         viewed_paper_ids = []
         activity_categories = []
         
         for activity in activities:
-            paper_id = activity.get("paper_id")
-            if paper_id:
-                viewed_paper_ids.append(str(paper_id))
+            doi = activity.get("doi")
+            if doi:
+                viewed_paper_ids.append(str(doi))
             
             # metadata에 카테고리 정보가 있을 수 있음
             metadata = activity.get("metadata", {})

@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from pymongo import UpdateOne, WriteConcern
 from pymongo.errors import BulkWriteError
+from app.core.constants import COLLECTION_ARXIV_FAILURES
+
 
 from app.db.mongodb import get_mongo_client_direct, get_prod_mongo_client, init_mongo
 from app.core.settings import settings
@@ -240,7 +242,7 @@ def ingest_arxiv_to_mongo() -> bool:
 
     db = client[settings.mongo_db]
     collection = db[settings.mongo_collection]
-    failures_collection = db["arxiv_failures"]
+    failures_collection = db[COLLECTION_ARXIV_FAILURES]
     
     # WriteConcern 최적화 (빠른 쓰기)
     collection = collection.with_options(

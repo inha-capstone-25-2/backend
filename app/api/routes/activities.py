@@ -4,6 +4,8 @@
 
 from fastapi import APIRouter, Query, Depends
 from pymongo.database import Database
+from app.core.constants import COLLECTION_USER_ACTIVITIES
+
 
 from app.db.mongodb import get_mongo_db
 from app.schemas.activity import UserActivityListResponse, UserActivityOut
@@ -41,7 +43,7 @@ def get_activities(
         GET /activities?activity_type=view&limit=50
         GET /activities?doi=0704.0775
     """
-    collection = db["user_activities"]
+    collection = db[COLLECTION_USER_ACTIVITIES]
     
     query = {}
     if user_id is not None:

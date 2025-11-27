@@ -8,6 +8,8 @@ from pymongo.database import Database
 from datetime import datetime
 import logging
 from typing import Dict, Any, Optional
+from app.core.constants import COLLECTION_USER_ACTIVITIES
+
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ def log_activity(
         activity_doc["doi"] = doi
     
     try:
-        db["user_activities"].insert_one(activity_doc)
+        db[COLLECTION_USER_ACTIVITIES].insert_one(activity_doc)
         logger.debug(f"Activity logged: {activity_type} for user {user_id}")
     except Exception as e:
         logger.error(f"Failed to log activity: {e}")

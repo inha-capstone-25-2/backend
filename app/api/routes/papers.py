@@ -4,6 +4,8 @@ import math
 import logging
 from datetime import datetime
 from pymongo.database import Database
+from app.core.constants import COLLECTION_SEARCH_HISTORY, COLLECTION_USER_ACTIVITIES
+
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
@@ -51,7 +53,7 @@ def save_search_history(
     }
     
     try:
-        db["search_history"].insert_one(history_doc)
+        db[COLLECTION_SEARCH_HISTORY].insert_one(history_doc)
         logger.debug(f"Search history saved for user {user_id}")
     except Exception as e:
         logger.error(f"Failed to save search history: {e}")
@@ -164,9 +166,10 @@ def search_papers(
                 end = skip + page_size
                 items = final_items[start:end]
                 
-                # score 및 _id 제거
+                # score 제거 및 _id를 id로 변환
                 for item in items:
-                    item.pop("_id", None)
+                    if "_id" in item:
+                        item["id"] = str(item.pop("_id"))
                     item.pop("score", None)
             
         except Exception as e:
@@ -189,7 +192,8 @@ def search_papers(
         
         cursor = coll.find(query, projection).sort(sort_field).skip(skip).limit(page_size)
         for doc in cursor:
-            doc.pop("_id", None)
+            if "_id" in doc:
+                doc["id"] = str(doc.pop("_id"))
             items.append(doc)
     
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
@@ -236,7 +240,7 @@ def get_search_history(
     """
     검색 기록 조회 (인증 불필요).
     """
-    collection = db["search_history"]
+    collection = db[COLLECTION_SEARCH_HISTORY]
     
     query = {}
     if user_id is not None:
@@ -271,7 +275,7 @@ def get_viewed_papers(
     해당 논문들의 정보를 papers 컬렉션에서 가져와 반환합니다.
     최신 조회 순으로 정렬되며, 중복 제거됩니다.
     """
-    activities_coll = db["user_activities"]
+    activities_coll = db[COLLECTION_USER_ACTIVITIES]
     papers_coll = db[settings.mongo_collection]
     
     query = {
@@ -327,7 +331,8 @@ def get_viewed_papers(
             paper_id = viewed["_id"]
             if paper_id in papers_map:
                 doc = papers_map[paper_id]
-                doc.pop("_id", None)
+                if "_id" in doc:
+                    doc["id"] = str(doc.pop("_id"))
                 items.append(doc)
     
     page_size = limit
@@ -351,13 +356,26 @@ def get_paper(
     db: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),
 ):
+    """
+    논문 상세 정보 조회.
+    
+    조회 시 해당 논문의 view_count를 자동으로 1 증가시킵니다.
+    사용자 활동 로그도 함께 기록됩니다.
+    """
     coll = db[settings.mongo_collection]
 
     # paper_id는 이제 arXiv ID (문자열)이므로 직접 사용
-    doc = coll.find_one({"_id": paper_id})
+    # view_count 증가 + 문서 조회 (원자적 연산)
+    doc = coll.find_one_and_update(
+        {"_id": paper_id},
+        {"$inc": {"view_count": 1}},
+        return_document=True  # 업데이트 후 문서 반환
+    )
+    
     if not doc:
         raise HTTPException(status_code=404, detail="Paper not found")
     
+    # 사용자 활동 로그 기록
     log_activity(
         db=db,
         user_id=current_user.id,
@@ -365,4 +383,7 @@ def get_paper(
         doi=paper_id  # paper_id -> doi
     )
 
-    return serialize_object_id(doc)
+    # _id를 id로 변환
+    serialize_object_id(doc)
+    doc["id"] = doc.pop("_id")
+    return doc

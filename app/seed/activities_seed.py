@@ -8,6 +8,8 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pymongo.database import Database
+from app.core.constants import COLLECTION_USER_ACTIVITIES
+
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
@@ -42,7 +44,7 @@ def seed_activities(db: Database) -> int:
     
     logger.info(f"Found {len(paper_ids)} papers for activity references")
     
-    activities_coll = db["user_activities"]
+    activities_coll = db[COLLECTION_USER_ACTIVITIES]
     
     # 기존 activities 개수 확인
     existing_count = activities_coll.count_documents({})

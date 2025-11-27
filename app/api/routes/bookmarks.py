@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import List
 from datetime import datetime
 from pymongo.database import Database
+from app.core.constants import COLLECTION_BOOKMARKS
+
 
 from app.db.mongodb import get_mongo_db
 from app.api.deps import get_current_user
@@ -41,7 +43,7 @@ def create_bookmark(
         )
     
     # 중복 북마크 확인
-    existing = db["bookmarks"].find_one({
+    existing = db[COLLECTION_BOOKMARKS].find_one({
         "user_id": current_user.id,
         "doi": payload.doi
     })
@@ -57,7 +59,7 @@ def create_bookmark(
         "bookmarked_at": datetime.utcnow(),
         "notes": payload.notes,
     }
-    result = db["bookmarks"].insert_one(doc)
+    result = db[COLLECTION_BOOKMARKS].insert_one(doc)
     doc["_id"] = result.inserted_id
     
     # _id를 문자열로 변환하고 id로 변경
@@ -90,7 +92,7 @@ def list_bookmarks(
     if doi:
         query["doi"] = doi
     
-    cursor = db["bookmarks"].find(query).sort("bookmarked_at", -1)
+    cursor = db[COLLECTION_BOOKMARKS].find(query).sort("bookmarked_at", -1)
     items = []
     for doc in cursor:
         serialize_object_id(doc, "_id")
@@ -120,7 +122,7 @@ def update_bookmark(
     obj_id = safe_object_id(bookmark_id, "bookmark ID")
     
     # 본인 북마크만 수정 가능
-    result = db["bookmarks"].find_one_and_update(
+    result = db[COLLECTION_BOOKMARKS].find_one_and_update(
         {"_id": obj_id, "user_id": current_user.id},
         {"$set": {"notes": payload.notes, "bookmarked_at": datetime.utcnow()}},
         return_document=True,
@@ -157,14 +159,14 @@ def delete_bookmark(
     obj_id = safe_object_id(bookmark_id, "bookmark ID")
     
     # 삭제 전에 doi 조회 (활동 로그용)
-    bookmark_doc = db["bookmarks"].find_one({"_id": obj_id, "user_id": current_user.id})
+    bookmark_doc = db[COLLECTION_BOOKMARKS].find_one({"_id": obj_id, "user_id": current_user.id})
     if not bookmark_doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Bookmark not found"
         )
     
-    result = db["bookmarks"].delete_one({"_id": obj_id, "user_id": current_user.id})
+    result = db[COLLECTION_BOOKMARKS].delete_one({"_id": obj_id, "user_id": current_user.id})
     
     # 북마크 취소 활동 로그 (doi 전달)
     if result.deleted_count > 0:

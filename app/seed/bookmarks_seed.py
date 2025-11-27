@@ -9,6 +9,8 @@ import random
 from datetime import datetime, timedelta
 from pymongo.database import Database
 from faker import Faker
+from app.core.constants import COLLECTION_BOOKMARKS
+
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
@@ -43,7 +45,7 @@ def seed_bookmarks(db: Database) -> int:
     
     logger.info(f"Found {len(paper_dois)} papers for bookmark references")
     
-    bookmarks_coll = db["bookmarks"]
+    bookmarks_coll = db[COLLECTION_BOOKMARKS]
     
     # 기존 bookmarks 개수 확인
     existing_count = bookmarks_coll.count_documents({})
