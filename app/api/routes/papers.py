@@ -164,9 +164,10 @@ def search_papers(
                 end = skip + page_size
                 items = final_items[start:end]
                 
-                # score 및 _id 제거
+                # score 제거 및 _id를 id로 변환
                 for item in items:
-                    item.pop("_id", None)
+                    if "_id" in item:
+                        item["id"] = str(item.pop("_id"))
                     item.pop("score", None)
             
         except Exception as e:
@@ -189,7 +190,8 @@ def search_papers(
         
         cursor = coll.find(query, projection).sort(sort_field).skip(skip).limit(page_size)
         for doc in cursor:
-            doc.pop("_id", None)
+            if "_id" in doc:
+                doc["id"] = str(doc.pop("_id"))
             items.append(doc)
     
     total_pages = max(1, math.ceil(total / page_size)) if total else 0
@@ -327,7 +329,8 @@ def get_viewed_papers(
             paper_id = viewed["_id"]
             if paper_id in papers_map:
                 doc = papers_map[paper_id]
-                doc.pop("_id", None)
+                if "_id" in doc:
+                    doc["id"] = str(doc.pop("_id"))
                 items.append(doc)
     
     page_size = limit
@@ -378,4 +381,7 @@ def get_paper(
         doi=paper_id  # paper_id -> doi
     )
 
-    return serialize_object_id(doc)
+    # _id를 id로 변환
+    serialize_object_id(doc)
+    doc["id"] = doc.pop("_id")
+    return doc

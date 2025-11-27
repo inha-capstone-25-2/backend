@@ -108,6 +108,7 @@ def get_recommendations(
     for rec in recommendations:
         paper = rec["paper"]
         serialize_object_id(paper)
+        paper["id"] = paper.pop("_id")
         
         item = RecommendationItem(
             paper_id=rec["paper_id"],
