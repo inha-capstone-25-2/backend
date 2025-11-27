@@ -7,11 +7,16 @@ from app.seed.categories_seed import seed_categories
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
+
 @router.post("/seed")
 def seed(force: bool = False, db: Session = Depends(get_db)):
     existing = db.query(Category).count()
     if existing > 0 and not force:
-        return {"seeded": False, "reason": "categories already present", "count": existing}
+        return {
+            "seeded": False,
+            "reason": "categories already present",
+            "count": existing,
+        }
     try:
         seed_categories(db)
     except Exception as e:

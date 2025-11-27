@@ -11,6 +11,7 @@ from app.core.exceptions import ResourceNotFoundException
 
 logger = logging.getLogger(__name__)
 
+
 class PaperService:
     def __init__(self, db: Database):
         self.db = db
@@ -22,28 +23,28 @@ class PaperService:
         q: str | None,
         categories: List[str] | None,
         page: int,
-        sort_by: str
+        sort_by: str,
     ) -> Dict[str, Any]:
         """논문 검색 및 기록 저장"""
-        
+
         # 1. 검색 수행
         result = self.repo.search_papers(
             q=q,
             categories=categories,
             page=page,
             page_size=DEFAULT_PAGE_SIZE,
-            sort_by=sort_by
+            sort_by=sort_by,
         )
-        
+
         # 2. 검색 기록 및 활동 로그 저장 (검색어 또는 카테고리가 있을 경우)
         if q or categories:
             self.repo.save_search_history(
                 user_id=user.id,
                 query=q,
                 categories=categories,
-                result_count=result["total"]
+                result_count=result["total"],
             )
-            
+
             log_activity(
                 db=self.db,
                 user_id=user.id,
@@ -51,10 +52,10 @@ class PaperService:
                 metadata={
                     "search_query": q,
                     "categories": categories,
-                    "result_count": result["total"]
-                }
+                    "result_count": result["total"],
+                },
             )
-            
+
         return result
 
     def get_search_history(self, user_id: int | None, limit: int) -> Dict[str, Any]:
@@ -67,19 +68,14 @@ class PaperService:
 
     def get_paper_detail(self, user: User, paper_id: str) -> Dict[str, Any]:
         """논문 상세 조회 및 활동 로그"""
-        
+
         # 1. 논문 조회 및 조회수 증가
         doc = self.repo.get_paper_and_increment_view(paper_id)
-        
+
         if not doc:
             raise ResourceNotFoundException("Paper", paper_id)
-            
+
         # 2. 활동 로그 기록
-        log_activity(
-            db=self.db,
-            user_id=user.id,
-            activity_type="view",
-            doi=paper_id
-        )
-        
+        log_activity(db=self.db, user_id=user.id, activity_type="view", doi=paper_id)
+
         return doc

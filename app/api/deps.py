@@ -14,6 +14,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 # Key: (username, token_version)
 user_cache = TTLCache(maxsize=1024, ttl=300)
 
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -24,9 +25,11 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-        username: str | None = payload.get("sub")   # sub은 username
-        token_ver = payload.get("ver", 0)           # 토큰 버전(없으면 0으로 간주)
+        payload = jwt.decode(
+            token, settings.secret_key, algorithms=[settings.jwt_algorithm]
+        )
+        username: str | None = payload.get("sub")  # sub은 username
+        token_ver = payload.get("ver", 0)  # 토큰 버전(없으면 0으로 간주)
         if username is None:
             raise credentials_error
     except JWTError:

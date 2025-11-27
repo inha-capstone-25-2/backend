@@ -9,6 +9,7 @@ import os
 
 # 앱 시작 시 로깅 설정 적용
 from app.core.logging_config import setup_logging
+
 setup_logging()
 
 # Settings
@@ -74,6 +75,7 @@ async def lifespan(app: FastAPI):
 
     try:
         from app.db.mongodb import init_mongo
+
         init_mongo()
     except Exception as e:
         logger.error(f"init_mongo failed: {e}")
@@ -81,15 +83,16 @@ async def lifespan(app: FastAPI):
     _ensure_daily_job()
     if not scheduler.running:
         scheduler.start()
-    
+
     yield
-    
+
     # Shutdown
     if scheduler.running:
         scheduler.shutdown(wait=False)
-    
+
     try:
         from app.db.mongodb import close_mongo
+
         close_mongo()
     except Exception as e:
         logger.error(f"close_mongo failed: {e}")
@@ -120,7 +123,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             "error": "Internal server error",
             "error_type": "internal_server_error",
             "path": str(request.url.path),
-        }
+        },
     )
 
 

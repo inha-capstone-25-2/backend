@@ -3,6 +3,7 @@ Dev 환경용 Mock 사용자 관심사 데이터 생성 스크립트.
 
 각 사용자에게 2~5개의 랜덤 카테고리를 관심사로 할당합니다.
 """
+
 from __future__ import annotations
 import logging
 import random
@@ -17,15 +18,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def seed_user_interests(db: Session, min_interests: int = 2, max_interests: int = 5) -> int:
+def seed_user_interests(
+    db: Session, min_interests: int = 2, max_interests: int = 5
+) -> int:
     """
     모든 사용자에게 랜덤 카테고리를 관심사로 할당합니다.
-    
+
     Args:
         db: SQLAlchemy Session
         min_interests: 최소 관심사 개수
         max_interests: 최대 관심사 개수
-    
+
     Returns:
         생성된 UserInterest 개수
     """
@@ -42,8 +45,7 @@ def seed_user_interests(db: Session, min_interests: int = 2, max_interests: int 
 
     # 기존 관심사 조회 (중복 방지)
     existing_interests = {
-        (ui.user_id, ui.category_id)
-        for ui in db.query(UserInterest).all()
+        (ui.user_id, ui.category_id) for ui in db.query(UserInterest).all()
     }
 
     created_count = 0
@@ -56,9 +58,11 @@ def seed_user_interests(db: Session, min_interests: int = 2, max_interests: int 
 
         # 랜덤 개수 결정
         num_interests = random.randint(min_interests, max_interests)
-        
+
         # 랜덤 카테고리 선택
-        selected_categories = random.sample(categories, min(num_interests, len(categories)))
+        selected_categories = random.sample(
+            categories, min(num_interests, len(categories))
+        )
 
         for category in selected_categories:
             user_interest = UserInterest(

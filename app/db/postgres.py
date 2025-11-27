@@ -12,6 +12,7 @@ _SessionLocal = None
 
 logger = logging.getLogger(__name__)
 
+
 def _postgres_url() -> str:
     host = settings.db_host
     port = settings.db_port
@@ -19,6 +20,7 @@ def _postgres_url() -> str:
     password = quote_plus(settings.db_password or "")
     db = settings.db_name
     return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
+
 
 def get_engine():
     global _engine
@@ -31,11 +33,15 @@ def get_engine():
         _engine = create_engine(url, pool_pre_ping=True, future=True)
     return _engine
 
+
 def _get_sessionmaker():
     global _SessionLocal
     if _SessionLocal is None:
-        _SessionLocal = sessionmaker(bind=get_engine(), autocommit=False, autoflush=False, future=True)
+        _SessionLocal = sessionmaker(
+            bind=get_engine(), autocommit=False, autoflush=False, future=True
+        )
     return _SessionLocal
+
 
 def get_db() -> Session:
     db = _get_sessionmaker()()
@@ -43,6 +49,7 @@ def get_db() -> Session:
         yield db
     finally:
         db.close()
+
 
 def init_db():
     Base.metadata.create_all(bind=get_engine())

@@ -9,7 +9,14 @@ from botocore.exceptions import BotoCoreError, NoCredentialsError, ClientError
 import requests
 
 from app.core.settings import settings
-from app.loader.config import DATA_DIR, DATA_FILE_PATH, MIN_FREE_GB, S3_BUCKET, S3_KEY, ARXIV_URL
+from app.loader.config import (
+    DATA_DIR,
+    DATA_FILE_PATH,
+    MIN_FREE_GB,
+    S3_BUCKET,
+    S3_KEY,
+    ARXIV_URL,
+)
 from app.loader.utils import _fmt_bytes, _fmt_eta, get_current_time  # 추가
 
 logger = logging.getLogger(__name__)
@@ -18,7 +25,9 @@ logger = logging.getLogger(__name__)
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = BACKEND_ROOT / "data"
 DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR)))
-DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json")))
+DATA_FILE_PATH = Path(
+    os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json"))
+)
 
 BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "1000"))
 PROGRESS_EVERY = int(os.getenv("ARXIV_PROGRESS_EVERY", "5000"))
@@ -29,13 +38,17 @@ S3_BUCKET = os.getenv("S3_BUCKET", "inha-capstone-02-arxiv")
 S3_KEY = os.getenv("S3_KEY", "arxiv-metadata-oai-snapshot.json")
 ARXIV_URL = os.getenv("ARXIV_URL")
 
+
 def _has_enough_space(path: Path, need_gb: int) -> bool:
     total, used, free = shutil.disk_usage(path)
     free_gb = free // (1024**3)
     if free_gb < need_gb:
-        logger.error(f"Not enough disk space at {path}: free={free_gb}GB need>={need_gb}GB")
+        logger.error(
+            f"Not enough disk space at {path}: free={free_gb}GB need>={need_gb}GB"
+        )
         return False
     return True
+
 
 def download_arxiv_from_presigned_url() -> bool:
     if not ARXIV_URL:
@@ -71,14 +84,18 @@ def download_arxiv_from_presigned_url() -> bool:
                             last_log = now
                             speed = downloaded / max(now - start_t, 1e-3)
                             eta = _fmt_eta(downloaded, total, now - start_t)
-                            logger.info(f"[arxiv-job] url downloading {pct:.1f}% "
-                                        f"({_fmt_bytes(downloaded)}/{_fmt_bytes(total)}) "
-                                        f"at {_fmt_bytes(speed)}/s ETA {eta}")
+                            logger.info(
+                                f"[arxiv-job] url downloading {pct:.1f}% "
+                                f"({_fmt_bytes(downloaded)}/{_fmt_bytes(total)}) "
+                                f"at {_fmt_bytes(speed)}/s ETA {eta}"
+                            )
                             while next_pct is not None and pct >= next_pct:
                                 next_pct += 5.0
         tmp_path.replace(DATA_FILE_PATH)
         took = get_current_time() - start_t
-        logger.info(f"[arxiv-job] URL download complete in {took:.1f}s size={_fmt_bytes(DATA_FILE_PATH.stat().st_size)}")
+        logger.info(
+            f"[arxiv-job] URL download complete in {took:.1f}s size={_fmt_bytes(DATA_FILE_PATH.stat().st_size)}"
+        )
         return True
     except Exception as e:
         logger.error(f"[arxiv-job] URL download failed: {e}")
@@ -88,6 +105,7 @@ def download_arxiv_from_presigned_url() -> bool:
         except Exception:
             pass
         return False
+
 
 def ensure_arxiv_file() -> bool:
     if DATA_FILE_PATH.exists():

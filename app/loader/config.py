@@ -5,7 +5,9 @@ import os
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = BACKEND_ROOT / "data"
 DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR)))
-DATA_FILE_PATH = Path(os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json")))
+DATA_FILE_PATH = Path(
+    os.getenv("ARXIV_FILE", str(DATA_DIR / "arxiv-metadata-oai-snapshot.json"))
+)
 
 # 배치 및 진행률 설정
 BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "5000"))

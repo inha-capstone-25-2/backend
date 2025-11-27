@@ -25,11 +25,9 @@ def create_bookmark(
 ):
     """북마크 생성."""
     service = BookmarkService(db)
-    
+
     doc = service.create_bookmark(
-        user=current_user,
-        doi=payload.doi,
-        notes=payload.notes
+        user=current_user, doi=payload.doi, notes=payload.notes
     )
     return BookmarkOut(**doc)
 
@@ -43,7 +41,7 @@ def list_bookmarks(
     """북마크 목록 조회."""
     service = BookmarkService(db)
     items = service.list_bookmarks(user=current_user, doi=doi)
-    
+
     bookmark_items = [
         BookmarkOut(
             id=doc["id"],
@@ -54,7 +52,7 @@ def list_bookmarks(
         )
         for doc in items
     ]
-    
+
     return BookmarkListOut(items=bookmark_items)
 
 
@@ -68,11 +66,9 @@ def update_bookmark(
     """북마크 수정 (notes 필드만 수정 가능)."""
     obj_id = safe_object_id(bookmark_id, "bookmark ID")
     service = BookmarkService(db)
-    
+
     result = service.update_bookmark(
-        user=current_user,
-        bookmark_id=obj_id,
-        notes=payload.notes
+        user=current_user, bookmark_id=obj_id, notes=payload.notes
     )
     return BookmarkOut(
         id=result["id"],
@@ -92,7 +88,7 @@ def delete_bookmark(
     """북마크 삭제."""
     obj_id = safe_object_id(bookmark_id, "bookmark ID")
     service = BookmarkService(db)
-    
+
     service.delete_bookmark(user=current_user, bookmark_id=obj_id)
-    
+
     return

@@ -3,6 +3,7 @@
 
 공통 exception handler 로직을 제공합니다.
 """
+
 import logging
 from typing import Tuple
 from fastapi import Request
@@ -27,31 +28,33 @@ def create_error_response(
     exc: Exception,
     status_code: int,
     error_type: str,
-    log_level: str = "warning"
+    log_level: str = "warning",
 ) -> JSONResponse:
     """
     표준화된 에러 응답을 생성합니다.
-    
+
     Args:
         request: FastAPI Request 객체
         exc: 발생한 예외
         status_code: HTTP 상태 코드
         error_type: 에러 타입
         log_level: 로그 레벨 ("info", "warning", "error")
-    
+
     Returns:
         JSONResponse: 표준화된 에러 응답
     """
     error_message = str(exc)
-    
+
     # 로깅
     if log_level == "error":
-        logger.error(f"{error_type} at {request.url.path}: {error_message}", exc_info=True)
+        logger.error(
+            f"{error_type} at {request.url.path}: {error_message}", exc_info=True
+        )
     elif log_level == "warning":
         logger.warning(f"{error_type} at {request.url.path}: {error_message}")
     else:
         logger.info(f"{error_type} at {request.url.path}: {error_message}")
-    
+
     return JSONResponse(
         status_code=status_code,
         content={
@@ -59,7 +62,7 @@ def create_error_response(
             "error": error_message,
             "error_type": error_type,
             "path": str(request.url.path),
-        }
+        },
     )
 
 
@@ -79,13 +82,13 @@ EXCEPTION_CONFIG = {
 def get_exception_config(exc: Exception) -> Tuple[int, str, str]:
     """
     예외 타입에 따른 설정을 반환합니다.
-    
+
     Returns:
         Tuple[int, str, str]: (status_code, error_type, log_level)
     """
     for exc_class, config in EXCEPTION_CONFIG.items():
         if isinstance(exc, exc_class):
             return config
-    
+
     # 기본값
     return (500, "internal_server_error", "error")

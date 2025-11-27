@@ -14,6 +14,7 @@ PostgreSQL과 MongoDB 테이블에 mock 데이터를 삽입합니다.
     python run_seed.py --postgres-only  # PostgreSQL만
     python run_seed.py --force  # dev 환경 체크 무시
 """
+
 from __future__ import annotations
 import argparse
 import logging
@@ -37,8 +38,7 @@ from app.db.postgres import get_db
 from app.db.mongodb import get_mongo_db, init_mongo
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def check_environment(force: bool = False) -> None:
     dev 환경인지 확인합니다.
     """
     app_env = settings.app_env.lower()
-    
+
     if app_env != "dev" and not force:
         logger.error(
             f"❌ Current environment is '{app_env}'. "
@@ -56,7 +56,7 @@ def check_environment(force: bool = False) -> None:
         )
         logger.info("If you want to run anyway, use --force flag.")
         sys.exit(1)
-    
+
     if force and app_env != "dev":
         logger.warning(f"⚠️ Force mode enabled. Seeding in '{app_env}' environment...")
     else:
@@ -105,9 +105,9 @@ def seed_mongo_all() -> None:
 
     # MongoDB 초기화
     init_mongo()
-    
+
     db = next(get_mongo_db())
-    
+
     try:
         # 1. Bookmarks
         logger.info("\n[1/4] Seeding Bookmarks (500 bookmarks)...")
@@ -120,7 +120,7 @@ def seed_mongo_all() -> None:
         # 3. Search History
         logger.info("\n[3/4] Seeding Search History (300 searches)...")
         seed_search_history(db)
-        
+
         # 4. Papers Enrichment
         logger.info("\n[4/4] Enriching Papers collection...")
         enrich_papers(db)
@@ -207,12 +207,19 @@ def enrich_papers_only() -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Dev 환경용 Mock 데이터 생성 CLI"
-    )
+    parser = argparse.ArgumentParser(description="Dev 환경용 Mock 데이터 생성 CLI")
     parser.add_argument(
         "--only",
-        choices=["categories", "users", "interests", "bookmarks", "activities", "searches", "papers", "all"],
+        choices=[
+            "categories",
+            "users",
+            "interests",
+            "bookmarks",
+            "activities",
+            "searches",
+            "papers",
+            "all",
+        ],
         default="all",
         help="특정 테이블/컬렉션만 시딩 (기본값: all)",
     )

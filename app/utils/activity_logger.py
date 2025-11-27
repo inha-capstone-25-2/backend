@@ -23,14 +23,14 @@ def log_activity(
 ) -> None:
     """
     사용자 활동을 MongoDB user_activities 컬렉션에 기록.
-    
+
     Args:
         db: MongoDB Database 객체
         user_id: 사용자 ID
         activity_type: 활동 타입 (view, bookmark, search, click 등)
         doi: 논문 DOI/arXiv ID (선택, search 등은 없음)
         metadata: 추가 메타데이터 (선택)
-    
+
     Example:
         >>> log_activity(
         ...     db=db,
@@ -38,7 +38,7 @@ def log_activity(
         ...     activity_type="view",
         ...     doi="0704.0775"
         ... )
-        
+
         >>> log_activity(
         ...     db=db,
         ...     user_id=123,
@@ -52,11 +52,11 @@ def log_activity(
         "metadata": metadata or {},
         "timestamp": datetime.utcnow(),
     }
-    
+
     # doi가 있으면 문자열 그대로 저장
     if doi:
         activity_doc["doi"] = doi
-    
+
     try:
         db[COLLECTION_USER_ACTIVITIES].insert_one(activity_doc)
         logger.debug(f"Activity logged: {activity_type} for user {user_id}")

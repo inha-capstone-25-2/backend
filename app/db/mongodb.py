@@ -8,7 +8,7 @@ from app.core.constants import (
     COLLECTION_SEARCH_HISTORY,
     COLLECTION_USER_ACTIVITIES,
     TTL_SEARCH_HISTORY_SECONDS,
-    TTL_USER_ACTIVITIES_SECONDS
+    TTL_USER_ACTIVITIES_SECONDS,
 )
 
 
@@ -19,6 +19,7 @@ class MongoDBManager:
     """
     MongoDB 연결을 관리하는 싱글톤 스타일 클래스.
     """
+
     def __init__(self):
         self.client: Optional[MongoClient] = None
         self.db: Optional[Database] = None
@@ -37,7 +38,9 @@ class MongoDBManager:
             return
 
         if user and password:
-            mongo_uri = f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
+            mongo_uri = (
+                f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
+            )
         else:
             mongo_uri = f"mongodb://{host}:{port}/"
 
@@ -54,9 +57,9 @@ class MongoDBManager:
                 f"MongoDB initialized: host={host}:{port} db={db_name} "
                 f"user={user or 'none'}"
             )
-            
+
             self._create_indexes()
-            
+
         except PyMongoError as e:
             logger.error(f"MongoDB initialization failed: {e}")
             self.client = None
@@ -72,15 +75,15 @@ class MongoDBManager:
             self.db[COLLECTION_SEARCH_HISTORY].create_index(
                 "searched_at",
                 expireAfterSeconds=TTL_SEARCH_HISTORY_SECONDS,
-                name="ttl_searched_at"
+                name="ttl_searched_at",
             )
             logger.info("TTL index created for search_history (30 days)")
-            
+
             # user_activities: 90일 후 자동 삭제
             self.db[COLLECTION_USER_ACTIVITIES].create_index(
                 "timestamp",
                 expireAfterSeconds=TTL_USER_ACTIVITIES_SECONDS,
-                name="ttl_timestamp"
+                name="ttl_timestamp",
             )
             logger.info("TTL index created for user_activities (90 days)")
         except Exception as e:
@@ -153,7 +156,9 @@ def get_prod_mongo_client() -> MongoClient:
         )
 
     if user and password:
-        mongo_uri = f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
+        mongo_uri = (
+            f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
+        )
     else:
         mongo_uri = f"mongodb://{host}:{port}/"
 

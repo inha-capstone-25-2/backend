@@ -4,6 +4,7 @@ from sqlalchemy import Integer, DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.postgres import Base
 
+
 class UserInterest(Base):
     __tablename__ = "user_interests"
     __table_args__ = (

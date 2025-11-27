@@ -14,6 +14,7 @@ class BookmarkCreate(BaseModel):
     """
     북마크 생성 요청 모델.
     """
+
     doi: str = Field(..., description="논문 DOI")
     notes: Optional[str] = None
 
@@ -22,6 +23,7 @@ class BookmarkOut(BaseModel):
     """
     북마크 응답 모델.
     """
+
     id: str
     user_id: int
     doi: str
@@ -33,6 +35,7 @@ class BookmarkUpdate(BaseModel):
     """
     북마크 수정 요청 모델.
     """
+
     notes: Optional[str] = None
 
 
@@ -40,4 +43,5 @@ class BookmarkListOut(BaseModel):
     """
     북마크 목록 응답 모델.
     """
+
     items: List[BookmarkOut]

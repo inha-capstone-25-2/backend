@@ -20,19 +20,20 @@ logger = logging.getLogger(__name__)
 @router.get("/search", response_model=PaperSearchResponse)
 def search_papers(
     q: str | None = Query(None, min_length=1, description="검색어"),
-    categories: List[str] | None = Query(None, description="카테고리 코드(복수 선택 가능)"),
+    categories: List[str] | None = Query(
+        None, description="카테고리 코드(복수 선택 가능)"
+    ),
     page: int = Query(1, ge=1, description="페이지 (1부터)"),
-    sort_by: str = Query("relevance", description="정렬 기준: relevance(관련도), view_count(조회수), update_date(최신순)"),
+    sort_by: str = Query(
+        "relevance",
+        description="정렬 기준: relevance(관련도), view_count(조회수), update_date(최신순)",
+    ),
     db: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),
 ):
     service = PaperService(db)
     return service.search_papers(
-        user=current_user,
-        q=q,
-        categories=categories,
-        page=page,
-        sort_by=sort_by
+        user=current_user, q=q, categories=categories, page=page, sort_by=sort_by
     )
 
 
@@ -67,6 +68,6 @@ def get_paper(
 ):
     """논문 상세 정보 조회."""
     service = PaperService(db)
-    
+
     # Service raises ResourceNotFoundException if not found
     return service.get_paper_detail(user=current_user, paper_id=paper_id)

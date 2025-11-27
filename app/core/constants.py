@@ -19,4 +19,3 @@ DEFAULT_PAGE_SIZE = 10  # 기본 페이지 크기
 # TTL (Time To Live) 상수 (초 단위)
 TTL_SEARCH_HISTORY_SECONDS = 30 * 24 * 60 * 60  # 30일
 TTL_USER_ACTIVITIES_SECONDS = 90 * 24 * 60 * 60  # 90일
-

@@ -1,6 +1,7 @@
 """
 pytest fixtures and configuration.
 """
+
 import pytest
 from mongomock import MongoClient as MockMongoClient
 from unittest.mock import MagicMock
@@ -42,7 +43,7 @@ def sample_paper_doc():
         "categories": ["cs.AI", "cs.LG"],
         "update_date": "2023-01-01",
         "view_count": 10,
-        "keywords": ["machine learning", "AI"]
+        "keywords": ["machine learning", "AI"],
     }
 
 
@@ -50,6 +51,7 @@ def sample_paper_doc():
 def mock_settings():
     """Mock settings with correct collection name."""
     from unittest.mock import MagicMock
+
     mock = MagicMock()
     mock.mongo_collection = "papers"
     return mock

@@ -6,6 +6,7 @@ from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
+
 def load_arxiv_data_to_mongodb() -> bool:
     """
     arXiv 데이터 로드 메인 함수.

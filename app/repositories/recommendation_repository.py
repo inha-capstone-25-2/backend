@@ -9,10 +9,13 @@ from app.core.constants import COLLECTION_PAPER_RECOMMENDATIONS
 
 logger = logging.getLogger(__name__)
 
+
 class RecommendationRepository:
     def __init__(self, db: Database):
         self.db = db
-        self.recommendations_collection: Collection = db[COLLECTION_PAPER_RECOMMENDATIONS]
+        self.recommendations_collection: Collection = db[
+            COLLECTION_PAPER_RECOMMENDATIONS
+        ]
 
     def log_recommendation(
         self,
@@ -21,7 +24,7 @@ class RecommendationRepository:
         recommendation_type: str,
         score: float,
         breakdown: Dict[str, float],
-        reasons: List[str]
+        reasons: List[str],
     ) -> None:
         """추천 결과를 MongoDB에 로깅"""
         log_doc = {
@@ -33,15 +36,13 @@ class RecommendationRepository:
                 "interest_score": breakdown.get("interest_score", 0.0),
                 "popularity_score": breakdown.get("popularity_score", 0.0),
                 "recency_score": breakdown.get("recency_score", 0.0),
-                "personalization_score": breakdown.get("personalization_score", 0.0)
+                "personalization_score": breakdown.get("personalization_score", 0.0),
             },
-            "context": {
-                "reasons": reasons
-            },
+            "context": {"reasons": reasons},
             "was_clicked": False,
-            "recommended_at": datetime.utcnow()
+            "recommended_at": datetime.utcnow(),
         }
-        
+
         try:
             self.recommendations_collection.insert_one(log_doc)
         except Exception as e:

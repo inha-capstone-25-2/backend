@@ -20,7 +20,9 @@ class Category(Base):
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False, index=True
+    )
     parent_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("categories.id", ondelete="SET NULL"),

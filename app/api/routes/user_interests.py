@@ -25,8 +25,7 @@ def add_interests(
     codes = list(dict.fromkeys(payload.category_codes))
     if not codes:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="empty category_codes"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="empty category_codes"
         )
 
     categories = db.query(Category).filter(Category.code.in_(codes)).all()
@@ -35,13 +34,17 @@ def add_interests(
     if missing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"categories not found: {missing}"
+            detail=f"categories not found: {missing}",
         )
 
-    existing = db.query(UserInterest).filter(
-        UserInterest.user_id == current_user.id,
-        UserInterest.category_id.in_([c.id for c in categories])
-    ).all()
+    existing = (
+        db.query(UserInterest)
+        .filter(
+            UserInterest.user_id == current_user.id,
+            UserInterest.category_id.in_([c.id for c in categories]),
+        )
+        .all()
+    )
     existing_ids = {e.category_id for e in existing}
 
     for c in categories:
@@ -77,15 +80,16 @@ def list_interests(
 
 @router.delete("", response_model=InterestRemovalResult)
 def remove_interests(
-    codes: list[str] = Query(..., alias="codes", min_length=1, description="삭제할 카테고리 코드(복수 가능)"),
+    codes: list[str] = Query(
+        ..., alias="codes", min_length=1, description="삭제할 카테고리 코드(복수 가능)"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     target_codes = list(dict.fromkeys(codes))
     if not target_codes:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="empty codes"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="empty codes"
         )
 
     categories = db.query(Category).filter(Category.code.in_(target_codes)).all()
@@ -96,7 +100,7 @@ def remove_interests(
         db.query(UserInterest)
         .filter(
             UserInterest.user_id == current_user.id,
-            UserInterest.category_id.in_([found_map[c].id for c in found_map])
+            UserInterest.category_id.in_([found_map[c].id for c in found_map]),
         )
         .all()
     )
@@ -117,7 +121,9 @@ def remove_interests(
     for c in remaining_categories:
         name_ko = next((n.name for n in c.names if n.locale == "ko"), None)
         name_en = next((n.name for n in c.names if n.locale == "en"), None)
-        remaining_items.append(InterestItem(code=c.code, name_ko=name_ko, name_en=name_en))
+        remaining_items.append(
+            InterestItem(code=c.code, name_ko=name_ko, name_en=name_en)
+        )
 
     return InterestRemovalResult(
         removed=len(delete_ids),

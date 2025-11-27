@@ -3,18 +3,32 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from app.db.postgres import Base
 
+
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)  # 아이디
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
+    username: Mapped[str] = mapped_column(
+        String(50), unique=True, index=True, nullable=False
+    )  # 아이디
     name: Mapped[str] = mapped_column(String(100), nullable=False)  # 이름
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 추가: 토큰 버전
+    token_version: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )  # 추가: 토큰 버전
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
     # 관심 카테고리 N:M (association 객체 UserInterest)
     interests: Mapped[list["UserInterest"]] = relationship(

@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+
 def load_env() -> None:
     """
     APP_ENV(local/prod/...)에 따라 env/<APP_ENV>/.env 로드.
