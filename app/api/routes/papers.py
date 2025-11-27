@@ -4,6 +4,8 @@ import math
 import logging
 from datetime import datetime
 from pymongo.database import Database
+from app.core.constants import COLLECTION_SEARCH_HISTORY, COLLECTION_USER_ACTIVITIES
+
 
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
@@ -51,7 +53,7 @@ def save_search_history(
     }
     
     try:
-        db["search_history"].insert_one(history_doc)
+        db[COLLECTION_SEARCH_HISTORY].insert_one(history_doc)
         logger.debug(f"Search history saved for user {user_id}")
     except Exception as e:
         logger.error(f"Failed to save search history: {e}")
@@ -238,7 +240,7 @@ def get_search_history(
     """
     검색 기록 조회 (인증 불필요).
     """
-    collection = db["search_history"]
+    collection = db[COLLECTION_SEARCH_HISTORY]
     
     query = {}
     if user_id is not None:
@@ -273,7 +275,7 @@ def get_viewed_papers(
     해당 논문들의 정보를 papers 컬렉션에서 가져와 반환합니다.
     최신 조회 순으로 정렬되며, 중복 제거됩니다.
     """
-    activities_coll = db["user_activities"]
+    activities_coll = db[COLLECTION_USER_ACTIVITIES]
     papers_coll = db[settings.mongo_collection]
     
     query = {

@@ -9,6 +9,8 @@ import random
 from datetime import datetime, timedelta
 from pymongo.database import Database
 from faker import Faker
+from app.core.constants import COLLECTION_SEARCH_HISTORY
+
 
 from app.db.mongodb import get_mongo_db
 
@@ -54,7 +56,7 @@ def seed_search_history(db: Database) -> int:
     Returns:
         생성된 search_history 개수
     """
-    search_history_coll = db["search_history"]
+    search_history_coll = db[COLLECTION_SEARCH_HISTORY]
     
     # 기존 search_history 개수 확인
     existing_count = search_history_coll.count_documents({})

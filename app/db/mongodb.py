@@ -4,6 +4,8 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
 from app.core.settings import settings
+from app.core.constants import COLLECTION_SEARCH_HISTORY, COLLECTION_USER_ACTIVITIES
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ def init_mongo() -> None:
         # TTL 인덱스 생성
         try:
             # search_history: 30일 후 자동 삭제
-            _mongo_db["search_history"].create_index(
+            _mongo_db[COLLECTION_SEARCH_HISTORY].create_index(
                 "searched_at",
                 expireAfterSeconds=30 * 24 * 60 * 60,  # 30일
                 name="ttl_searched_at"
@@ -60,7 +62,7 @@ def init_mongo() -> None:
             logger.info("TTL index created for search_history (30 days)")
             
             # user_activities: 90일 후 자동 삭제
-            _mongo_db["user_activities"].create_index(
+            _mongo_db[COLLECTION_USER_ACTIVITIES].create_index(
                 "timestamp",
                 expireAfterSeconds=90 * 24 * 60 * 60,  # 90일
                 name="ttl_timestamp"
