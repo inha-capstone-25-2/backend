@@ -8,7 +8,11 @@ from pymongo.collection import Collection
 from fastapi import HTTPException
 
 from app.core.settings import settings
-from app.core.constants import COLLECTION_SEARCH_HISTORY, COLLECTION_USER_ACTIVITIES
+from app.core.constants import (
+    COLLECTION_SEARCH_HISTORY,
+    COLLECTION_USER_ACTIVITIES,
+    SEARCH_CANDIDATE_LIMIT
+)
 from app.utils.mongodb import serialize_object_id, transform_id_field
 from app.schemas.paper import SearchHistoryItem
 
@@ -89,13 +93,11 @@ class PaperRepository:
         if use_text_search:
             # Text Search 최적화: Two-Step 전략
             try:
-                CANDIDATE_LIMIT = 2000
-                
                 # Step 1: 후보군 조회
                 candidates_cursor = self.papers_collection.find(
                     {"$text": {"$search": q}},
                     {"score": {"$meta": "textScore"}}
-                ).limit(CANDIDATE_LIMIT)
+                ).limit(SEARCH_CANDIDATE_LIMIT)
                 
                 candidates = []
                 for doc in candidates_cursor:

@@ -11,3 +11,12 @@ COLLECTION_BOOKMARKS = "bookmarks"
 COLLECTION_SEARCH_HISTORY = "search_history"
 COLLECTION_PAPER_RECOMMENDATIONS = "paper_recommendations"
 COLLECTION_ARXIV_FAILURES = "arxiv_failures"
+
+# 검색 관련 상수
+SEARCH_CANDIDATE_LIMIT = 2000  # Text Search 후보 제한
+DEFAULT_PAGE_SIZE = 10  # 기본 페이지 크기
+
+# TTL (Time To Live) 상수 (초 단위)
+TTL_SEARCH_HISTORY_SECONDS = 30 * 24 * 60 * 60  # 30일
+TTL_USER_ACTIVITIES_SECONDS = 90 * 24 * 60 * 60  # 90일
+

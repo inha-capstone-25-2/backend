@@ -6,6 +6,7 @@ from pymongo.database import Database
 from app.repositories.paper_repository import PaperRepository
 from app.utils.activity_logger import log_activity
 from app.models.user import User
+from app.core.constants import DEFAULT_PAGE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class PaperService:
             q=q,
             categories=categories,
             page=page,
-            page_size=10,
+            page_size=DEFAULT_PAGE_SIZE,
             sort_by=sort_by
         )
         
