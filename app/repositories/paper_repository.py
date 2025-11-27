@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 from app.core.settings import settings
 from app.core.constants import COLLECTION_SEARCH_HISTORY, COLLECTION_USER_ACTIVITIES
-from app.utils.mongodb import serialize_object_id
+from app.utils.mongodb import serialize_object_id, transform_id_field
 from app.schemas.paper import SearchHistoryItem
 
 logger = logging.getLogger(__name__)
@@ -136,8 +136,7 @@ class PaperRepository:
                 
                 # 후처리
                 for item in items:
-                    if "_id" in item:
-                        item["id"] = str(item.pop("_id"))
+                    transform_id_field(item)
                     item.pop("score", None)
                     
             except Exception as e:
@@ -154,8 +153,7 @@ class PaperRepository:
             
             cursor = self.papers_collection.find(query, projection).sort(sort_field).skip(skip).limit(page_size)
             for doc in cursor:
-                if "_id" in doc:
-                    doc["id"] = str(doc.pop("_id"))
+                transform_id_field(doc)
                 items.append(doc)
 
         return self._build_search_response(page, page_size, total, items, is_approximate)
@@ -171,8 +169,7 @@ class PaperRepository:
         
         items = []
         for doc in cursor:
-            serialize_object_id(doc)
-            doc["id"] = doc.pop("_id")
+            transform_id_field(doc)
             # Pydantic 모델 호환성을 위한 기본값 처리
             doc.setdefault("user_id", None)
             doc.setdefault("filters", None)
@@ -230,8 +227,7 @@ class PaperRepository:
                 paper_id = viewed["_id"]
                 if paper_id in papers_map:
                     doc = papers_map[paper_id]
-                    if "_id" in doc:
-                        doc["id"] = str(doc.pop("_id"))
+                    transform_id_field(doc)
                     items.append(doc)
                     
         return self._build_search_response(page, limit, total, items, False)
@@ -245,8 +241,7 @@ class PaperRepository:
         )
         
         if doc:
-            serialize_object_id(doc)
-            doc["id"] = doc.pop("_id")
+            transform_id_field(doc)
             
         return doc
 

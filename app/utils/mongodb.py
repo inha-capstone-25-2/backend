@@ -72,6 +72,34 @@ def serialize_object_id(doc: Dict[str, Any], *fields: str) -> Dict[str, Any]:
     return doc
 
 
+def transform_id_field(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    MongoDB 문서의 _id 필드를 id로 변환.
+    
+    _id 필드를 문자열로 변환하고 id로 이름을 변경합니다.
+    원본 문서를 수정하며, 체이닝을 위해 문서를 반환합니다.
+    
+    Args:
+        doc: MongoDB 문서 (딕셔너리)
+    
+    Returns:
+        Dict[str, Any]: 변환된 문서 (원본 수정됨)
+    
+    Example:
+        >>> doc = {"_id": ObjectId(...), "title": "..."}
+        >>> transform_id_field(doc)
+        {"id": "507f...", "title": "..."}
+        
+        >>> doc = {"_id": "arxiv_id_123", "title": "..."}
+        >>> transform_id_field(doc)
+        {"id": "arxiv_id_123", "title": "..."}
+    """
+    if "_id" in doc:
+        doc["id"] = str(doc.pop("_id"))
+    
+    return doc
+
+
 def serialize_doc_for_api(doc: Dict[str, Any]) -> Dict[str, Any]:
     """
     MongoDB 문서를 API 응답용으로 직렬화.
