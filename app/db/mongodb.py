@@ -1,146 +1,145 @@
 import logging
-from typing import Generator
+from typing import Generator, Optional
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
 from app.core.settings import settings
-from app.core.constants import COLLECTION_SEARCH_HISTORY, COLLECTION_USER_ACTIVITIES
+from app.core.constants import (
+    COLLECTION_SEARCH_HISTORY,
+    COLLECTION_USER_ACTIVITIES,
+    TTL_SEARCH_HISTORY_SECONDS,
+    TTL_USER_ACTIVITIES_SECONDS
+)
 
 
 logger = logging.getLogger(__name__)
 
-# 글로벌 MongoDB 클라이언트 인스턴스
-_mongo_client: MongoClient | None = None
-_mongo_db: Database | None = None
 
-
-def init_mongo() -> None:
+class MongoDBManager:
     """
-    애플리케이션 시작 시 MongoDB 클라이언트 초기화.
-    FastAPI lifespan에서 호출됨.
+    MongoDB 연결을 관리하는 싱글톤 스타일 클래스.
     """
-    global _mongo_client, _mongo_db
-    
-    host = settings.mongo_host
-    port = settings.mongo_port
-    user = settings.mongo_user
-    password = settings.mongo_password
-    auth_source = settings.mongo_auth_source
-    db_name = settings.mongo_db
+    def __init__(self):
+        self.client: Optional[MongoClient] = None
+        self.db: Optional[Database] = None
 
-    if not host:
-        logger.error("MONGO_HOST is not set. MongoDB will not be initialized.")
-        return
+    def connect(self) -> None:
+        """MongoDB 연결 초기화"""
+        host = settings.mongo_host
+        port = settings.mongo_port
+        user = settings.mongo_user
+        password = settings.mongo_password
+        auth_source = settings.mongo_auth_source
+        db_name = settings.mongo_db
 
-    if user and password:
-        mongo_uri = f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
-    else:
-        mongo_uri = f"mongodb://{host}:{port}/"
+        if not host:
+            logger.error("MONGO_HOST is not set. MongoDB will not be initialized.")
+            return
 
-    try:
-        _mongo_client = MongoClient(
-            mongo_uri,
-            serverSelectionTimeoutMS=5000,
-            maxPoolSize=100,  # 연결 풀 크기 명시
-        )
-        # 연결 테스트
-        _mongo_client.admin.command("ping")
-        _mongo_db = _mongo_client[db_name]
-        logger.info(
-            f"MongoDB initialized: host={host}:{port} db={db_name} "
-            f"user={user or 'none'}"
-        )
-        
-        # TTL 인덱스 생성
+        if user and password:
+            mongo_uri = f"mongodb://{user}:{password}@{host}:{port}/?authSource={auth_source}"
+        else:
+            mongo_uri = f"mongodb://{host}:{port}/"
+
+        try:
+            self.client = MongoClient(
+                mongo_uri,
+                serverSelectionTimeoutMS=5000,
+                maxPoolSize=100,
+            )
+            # 연결 테스트
+            self.client.admin.command("ping")
+            self.db = self.client[db_name]
+            logger.info(
+                f"MongoDB initialized: host={host}:{port} db={db_name} "
+                f"user={user or 'none'}"
+            )
+            
+            self._create_indexes()
+            
+        except PyMongoError as e:
+            logger.error(f"MongoDB initialization failed: {e}")
+            self.client = None
+            self.db = None
+
+    def _create_indexes(self) -> None:
+        """TTL 인덱스 등 필요한 인덱스 생성"""
+        if not self.db:
+            return
+
         try:
             # search_history: 30일 후 자동 삭제
-            _mongo_db[COLLECTION_SEARCH_HISTORY].create_index(
+            self.db[COLLECTION_SEARCH_HISTORY].create_index(
                 "searched_at",
-                expireAfterSeconds=30 * 24 * 60 * 60,  # 30일
+                expireAfterSeconds=TTL_SEARCH_HISTORY_SECONDS,
                 name="ttl_searched_at"
             )
             logger.info("TTL index created for search_history (30 days)")
             
             # user_activities: 90일 후 자동 삭제
-            _mongo_db[COLLECTION_USER_ACTIVITIES].create_index(
+            self.db[COLLECTION_USER_ACTIVITIES].create_index(
                 "timestamp",
-                expireAfterSeconds=90 * 24 * 60 * 60,  # 90일
+                expireAfterSeconds=TTL_USER_ACTIVITIES_SECONDS,
                 name="ttl_timestamp"
             )
             logger.info("TTL index created for user_activities (90 days)")
         except Exception as e:
             logger.warning(f"TTL index creation failed (may already exist): {e}")
-    except PyMongoError as e:
-        logger.error(f"MongoDB initialization failed: {e}")
-        _mongo_client = None
-        _mongo_db = None
+
+    def close(self) -> None:
+        """MongoDB 연결 종료"""
+        if self.client:
+            try:
+                self.client.close()
+                logger.info("MongoDB connection closed")
+            except Exception as e:
+                logger.error(f"Error closing MongoDB connection: {e}")
+            finally:
+                self.client = None
+                self.db = None
+
+    def get_db(self) -> Database:
+        """Database 인스턴스 반환"""
+        if self.db is None:
+            raise RuntimeError("MongoDB is not initialized. Call connect() first.")
+        return self.db
+
+    def get_client(self) -> MongoClient:
+        """MongoClient 인스턴스 반환"""
+        if self.client is None:
+            raise RuntimeError("MongoDB is not initialized. Call connect() first.")
+        return self.client
+
+
+# 전역 인스턴스 생성
+db_manager = MongoDBManager()
+
+
+def init_mongo() -> None:
+    """애플리케이션 시작 시 호출"""
+    db_manager.connect()
 
 
 def close_mongo() -> None:
-    """
-    애플리케이션 종료 시 MongoDB 클라이언트 종료.
-    FastAPI lifespan에서 호출됨.
-    """
-    global _mongo_client, _mongo_db
-    
-    if _mongo_client:
-        try:
-            _mongo_client.close()
-            logger.info("MongoDB connection closed")
-        except Exception as e:
-            logger.error(f"Error closing MongoDB connection: {e}")
-        finally:
-            _mongo_client = None
-            _mongo_db = None
+    """애플리케이션 종료 시 호출"""
+    db_manager.close()
 
 
 def get_mongo_db() -> Generator[Database, None, None]:
-    """
-    FastAPI Dependency Injection용 MongoDB 데이터베이스 제공.
-    PostgreSQL의 get_db()와 동일한 패턴.
-    
-    Usage:
-        @router.get("/endpoint")
-        def endpoint(db: Database = Depends(get_mongo_db)):
-            collection = db["collection_name"]
-            ...
-    """
-    if _mongo_db is None:
-        raise RuntimeError(
-            "MongoDB is not initialized. Call init_mongo() first."
-        )
-    
-    # PyMongo는 자체적으로 연결 풀을 관리하므로
-    # 단순히 db 인스턴스를 yield하면 됨
-    yield _mongo_db
+    """FastAPI Dependency Injection용"""
+    yield db_manager.get_db()
 
 
 def get_mongo_client_direct() -> MongoClient:
-    """
-    배치 작업 등 Dependency Injection을 사용할 수 없는 곳에서
-    MongoDB 클라이언트에 직접 접근하기 위한 헬퍼 함수.
-    
-    Warning: 이 함수는 FastAPI 라우터가 아닌 곳에서만 사용하세요.
-    라우터에서는 get_mongo_db() Dependency를 사용하세요.
-    """
-    if _mongo_client is None:
-        raise RuntimeError(
-            "MongoDB is not initialized. Call init_mongo() first."
-        )
-    return _mongo_client
+    """직접 접근용 헬퍼"""
+    return db_manager.get_client()
 
 
 def get_prod_mongo_client() -> MongoClient:
     """
     Production MongoDB 클라이언트를 생성하여 반환.
     로컬 환경에서 데이터 복제 시에만 사용.
-    
-    Warning: 
-    - 이 함수는 새로운 연결을 생성하므로 사용 후 반드시 close() 해야 함.
-    - 글로벌 클라이언트가 아닌 임시 연결임.
-    
-    Raises:
-        RuntimeError: PROD_MONGO_HOST가 설정되지 않은 경우
+    (이 함수는 별도의 연결을 생성하므로 Manager와 무관하게 유지)
     """
     host = settings.prod_mongo_host
     port = settings.prod_mongo_port
@@ -161,10 +160,9 @@ def get_prod_mongo_client() -> MongoClient:
     try:
         client = MongoClient(
             mongo_uri,
-            serverSelectionTimeoutMS=10000,  # prod는 외부 네트워크이므로 타임아웃 길게
-            maxPoolSize=10,  # 임시 연결이므로 작은 풀 사용
+            serverSelectionTimeoutMS=10000,
+            maxPoolSize=10,
         )
-        # 연결 테스트
         client.admin.command("ping")
         logger.info(
             f"Production MongoDB client created: host={host}:{port} "
