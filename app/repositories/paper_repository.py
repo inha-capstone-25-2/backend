@@ -61,6 +61,17 @@ class PaperRepository:
         query = {}
         use_text_search = False
 
+        # Projection 설정
+        projection = {
+            "_id": 1,
+            "id": 1,
+            "title": 1,
+            "authors": 1,
+            "categories": 1,
+            "update_date": 1,
+            "view_count": 1,
+        }
+
         if q:
             # Text Search 최적화: Two-Step 전략
             # 1. Text Search + Category Filter로 후보군 조회 (Step 1)
