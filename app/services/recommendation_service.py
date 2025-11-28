@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
@@ -19,13 +20,15 @@ class RecommendationService:
         self.repo = RecommendationRepository(db_mongo)
 
     def get_recommendations(
-        self, user: User, db_postgres: Session, top_k: int, candidate_limit: int = 100
+        self, user: User, db_postgres: Session, top_k: int, candidate_limit: int = 50  # 100 -> 50으로 축소
     ) -> Dict[str, Any]:
         """사용자 맞춤 논문 추천 및 로깅"""
-
+        
+        start_time = time.time()
         logger.info(f"Generating recommendations for user {user.id}")
 
         # 1. 추천 생성
+        step_start = time.time()
         recommender = RuleBasedRecommender()
         recommendations = recommender.recommend(
             user=user,
@@ -34,8 +37,10 @@ class RecommendationService:
             top_k=top_k,
             candidate_limit=candidate_limit,
         )
+        logger.info(f"[PERF] Recommender.recommend took {time.time() - step_start:.3f}s")
 
         # 2. 추천 로깅 (배치 처리)
+        step_start = time.time()
         log_docs = []
         for rec in recommendations:
             log_doc = {
@@ -57,8 +62,10 @@ class RecommendationService:
         
         # 배치로 한 번에 로깅
         self.repo.log_recommendations_batch(log_docs)
+        logger.info(f"[PERF] Batch logging took {time.time() - step_start:.3f}s")
 
         # 3. 응답 생성
+        step_start = time.time()
         recommendation_items = []
         for rec in recommendations:
             paper = rec["paper"]
@@ -81,6 +88,9 @@ class RecommendationService:
                 reasons=rec["reasons"],
             )
             recommendation_items.append(item)
+        
+        logger.info(f"[PERF] Response generation took {time.time() - step_start:.3f}s")
+        logger.info(f"[PERF] Total service time: {time.time() - start_time:.3f}s")
 
         return {
             "user_id": user.id,

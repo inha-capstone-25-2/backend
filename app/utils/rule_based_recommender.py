@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Dict, Any
 from datetime import datetime
 import logging
+import time
 from pymongo.database import Database
 from sqlalchemy.orm import Session
 from app.core.constants import COLLECTION_USER_ACTIVITIES
@@ -40,7 +41,7 @@ class RuleBasedRecommender:
         db_postgres: Session,
         db_mongo: Database,
         top_k: int = 10,
-        candidate_limit: int = 100,
+        candidate_limit: int = 50,  # 100 -> 50으로 축소
     ) -> List[Dict[str, Any]]:
         """
         룰 베이스 추천 실행.
@@ -55,26 +56,35 @@ class RuleBasedRecommender:
         Returns:
             추천 결과 리스트 (각 항목은 paper, scores, reasons 포함)
         """
+        start_time = time.time()
+        
         # 1. 사용자 관심 카테고리 가져오기
+        step_start = time.time()
         user_interests = self._get_user_interests(user, db_postgres)
+        logger.info(f"[PERF] Get user interests took {time.time() - step_start:.3f}s")
         if not user_interests:
             logger.info(f"User {user.id} has no interests. Using popular papers.")
 
         # 2. 사용자 활동 이력 가져오기
+        step_start = time.time()
         viewed_paper_ids, activity_categories = self._get_user_activity(
             user.id, db_mongo
         )
+        logger.info(f"[PERF] Get user activity took {time.time() - step_start:.3f}s")
 
         # 3. 후보 논문 가져오기
+        step_start = time.time()
         candidate_papers = self._get_candidate_papers(
             db_mongo, user_interests, viewed_paper_ids, candidate_limit
         )
+        logger.info(f"[PERF] Get candidate papers ({len(candidate_papers)} papers) took {time.time() - step_start:.3f}s")
 
         if not candidate_papers:
             logger.warning(f"No candidate papers found for user {user.id}")
             return []
 
         # 4. 각 논문에 대해 점수 계산
+        step_start = time.time()
         recommendations = []
 
         for paper in candidate_papers:
@@ -120,10 +130,17 @@ class RuleBasedRecommender:
                     "reasons": reasons,
                 }
             )
+        
+        logger.info(f"[PERF] Score calculation took {time.time() - step_start:.3f}s")
 
         # 5. 점수 기준 정렬 및 상위 k개 선택
+        step_start = time.time()
         recommendations.sort(key=lambda x: x["total_score"], reverse=True)
-        return recommendations[:top_k]
+        results = recommendations[:top_k]
+        logger.info(f"[PERF] Sorting and filtering took {time.time() - step_start:.3f}s")
+        
+        logger.info(f"[PERF] Total recommendation time: {time.time() - start_time:.3f}s")
+        return results
 
     def _get_user_interests(self, user: User, db: Session) -> List[str]:
         """사용자 관심 카테고리 코드 리스트 반환"""
