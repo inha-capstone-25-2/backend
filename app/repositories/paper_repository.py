@@ -5,9 +5,9 @@ from typing import List, Dict, Any, Optional
 
 from pymongo.database import Database
 from pymongo.collection import Collection
-from fastapi import HTTPException
 
 from app.core.settings import settings
+from app.core.exceptions import DatabaseException
 from app.core.constants import (
     COLLECTION_SEARCH_HISTORY,
     COLLECTION_USER_ACTIVITIES,
@@ -134,7 +134,7 @@ class PaperRepository:
 
             except Exception as e:
                 logger.error(f"[Search] Two-step search failed: {e}")
-                raise HTTPException(status_code=500, detail="Search operation failed")
+                raise DatabaseException("Search operation failed")
 
         else:
             # 일반 쿼리 (카테고리만 있거나 전체 조회)
