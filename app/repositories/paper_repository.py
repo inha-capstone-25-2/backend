@@ -114,10 +114,15 @@ class PaperRepository:
             # 정렬 필드
             sort_field = self._get_sort_field(sort_by)
             
+            # Regex 검색용 Projection (score 제거)
+            regex_projection = projection.copy()
+            if "score" in regex_projection:
+                del regex_projection["score"]
+            
             # 쿼리 실행
             total = self.papers_collection.count_documents(regex_query)
             cursor = (
-                self.papers_collection.find(regex_query, projection)
+                self.papers_collection.find(regex_query, regex_projection)
                 .sort(sort_field)
                 .skip(skip)
                 .limit(page_size)
