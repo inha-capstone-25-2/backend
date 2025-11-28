@@ -92,7 +92,7 @@ class PaperRepository:
         if use_text_search:
             # Text Search 최적화: Two-Step 전략
             try:
-                # Step 1: 후보군 조회
+                # Step 1: 후보군 조회 (Text Search Score)
                 candidates_cursor = self.papers_collection.find(
                     {"$text": {"$search": q}}, {"score": {"$meta": "textScore"}}
                 ).limit(SEARCH_CANDIDATE_LIMIT)
@@ -104,7 +104,7 @@ class PaperRepository:
                 if not candidates:
                     return self._build_search_response(page, page_size, 0, [], False)
 
-                # Step 2: 필터링 및 데이터 조회
+                # Step 2: 필터링 및 데이터 조회 (MongoDB에서 정렬!)
                 candidate_ids = [c["_id"] for c in candidates]
                 filter_query = {"_id": {"$in": candidate_ids}}
                 if categories:
@@ -114,19 +114,18 @@ class PaperRepository:
                 if "score" in data_projection:
                     del data_projection["score"]
 
-                docs_cursor = self.papers_collection.find(filter_query, data_projection)
-                docs_map = {doc["_id"]: doc for doc in docs_cursor}
-
-                # Step 3: 결과 조합
+                # MongoDB에서 정렬 (인덱스 활용!)
+                sort_field = self._get_sort_field(sort_by)
+                docs_cursor = self.papers_collection.find(filter_query, data_projection).sort(sort_field)
+                
+                # Step 3: 결과 조합 (정렬은 이미 MongoDB에서 완료)
                 final_items = []
-                for cand in candidates:
-                    if cand["_id"] in docs_map:
-                        doc = docs_map[cand["_id"]]
-                        doc["score"] = cand["score"]
-                        final_items.append(doc)
-
-                # 정렬
-                self._sort_items(final_items, sort_by)
+                score_map = {c["_id"]: c["score"] for c in candidates}
+                
+                for doc in docs_cursor:
+                    if doc["_id"] in score_map:
+                        doc["score"] = score_map[doc["_id"]]
+                    final_items.append(doc)
 
                 total = len(final_items)
                 is_approximate = True

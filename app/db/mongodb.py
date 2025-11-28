@@ -87,7 +87,7 @@ class MongoDBManager:
             )
             logger.info("TTL index created for user_activities (90 days)")
 
-            # papers 컬렉션: 추천 시스템용 인덱스
+            # papers 컬렉션: 추천 시스템용 및 검색 API용 인덱스
             papers_collection = self.db[settings.mongo_collection]
             
             # categories 인덱스 (관심사 기반 필터링)
@@ -105,6 +105,22 @@ class MongoDBManager:
                 background=True
             )
             logger.info("Index created for papers: view_count + bookmark_count (popularity)")
+
+            # categories + view_count 복합 인덱스 (검색 API용)
+            papers_collection.create_index(
+                [("categories", 1), ("view_count", -1)],
+                name="categories_view_count",
+                background=True
+            )
+            logger.info("Index created for papers: categories + view_count (search API)")
+
+            # categories + bookmark_count 복합 인덱스 (검색 API용)
+            papers_collection.create_index(
+                [("categories", 1), ("bookmark_count", -1)],
+                name="categories_bookmark_count",
+                background=True
+            )
+            logger.info("Index created for papers: categories + bookmark_count (search API)")
 
         except Exception as e:
             logger.warning(f"Index creation failed (may already exist): {e}")

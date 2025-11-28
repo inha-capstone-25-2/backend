@@ -162,6 +162,7 @@ def create_search_indexes(collection) -> None:
     1. 복합 인덱스: categories + update_date (카테고리 필터 + 날짜 정렬)
     2. Text Search 인덱스: title, abstract, authors (전문 검색)
     3. 추천 시스템용 인덱스: categories, view_count/bookmark_count
+    4. 검색 API용 복합 인덱스: categories + view_count, categories + bookmark_count
     """
     try:
         # 1. 복합 인덱스: 카테고리 필터 + 날짜 정렬
@@ -189,6 +190,23 @@ def create_search_indexes(collection) -> None:
             background=True
         )
         logger.info("[arxiv-job] 인덱스 생성 완료: view_count + bookmark_count (인기도 정렬)")
+
+        # 4. 검색 API용 복합 인덱스
+        # 4-1. categories + view_count (카테고리 필터 + 조회수 정렬)
+        collection.create_index(
+            [("categories", 1), ("view_count", -1)],
+            name="categories_view_count",
+            background=True
+        )
+        logger.info("[arxiv-job] 인덱스 생성 완료: categories + view_count (검색 API용)")
+
+        # 4-2. categories + bookmark_count (카테고리 필터 + 북마크 정렬)
+        collection.create_index(
+            [("categories", 1), ("bookmark_count", -1)],
+            name="categories_bookmark_count",
+            background=True
+        )
+        logger.info("[arxiv-job] 인덱스 생성 완료: categories + bookmark_count (검색 API용)")
 
     except Exception as e:
         logger.error(f"[arxiv-job] 검색 인덱스 생성 실패: {e}")
