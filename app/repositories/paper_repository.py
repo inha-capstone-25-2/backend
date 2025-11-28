@@ -55,6 +55,179 @@ class PaperRepository:
         page: int,
         page_size: int,
         sort_by: str,
+    ) -> Dict[str, Any]:
+        """논문 검색 로직 (Regex + Text Search 전략 포함)"""
+
+        query = {}
+        use_text_search = False
+
+        if q:
+            query["$text"] = {"$search": q}
+            use_text_search = True
+
+        if categories:
+            query["categories"] = {"$in": categories}
+
+        # Projection 설정
+        projection = {
+            "_id": 1,
+            "id": 1,
+            "title": 1,
+            "authors": 1,
+            "categories": 1,
+            "update_date": 1,
+            "view_count": 1,
+        }
+
+        if use_text_search:
+            projection["score"] = {"$meta": "textScore"}
+
+        skip = (page - 1) * page_size
+
+        # 결과 초기화
+        items = []
+        total = 0
+        is_approximate = False
+
+        # 검색 전략 결정
+        # 1. 카테고리 + 검색어: Regex 검색 (categories 인덱스 활용 -> 빠름)
+        # 2. 검색어만: Text Search (전체 스캔 -> 느리지만 어쩔 수 없음)
+        # 3. 카테고리만: 일반 필터링 (categories 인덱스 -> 빠름)
+        # 4. 전체: 일반 조회
+
+        if q and categories:
+            # 전략 1: Regex 검색 (성능 최적화)
+            # categories 인덱스를 먼저 타고, 그 결과 내에서 Regex 매칭
+            import time
+            start_time = time.time()
+            
+            # Regex 쿼리 구성
+            regex_query = {
+                "categories": {"$in": categories},
+                "$or": [
+                    {"title": {"$regex": q, "$options": "i"}},
+                    {"abstract": {"$regex": q, "$options": "i"}},
+                    {"authors": {"$regex": q, "$options": "i"}}
+                ]
+            }
+            
+            # 정렬 필드
+            sort_field = self._get_sort_field(sort_by)
+            
+            # 쿼리 실행
+            total = self.papers_collection.count_documents(regex_query)
+            cursor = (
+                self.papers_collection.find(regex_query, projection)
+                .sort(sort_field)
+                .skip(skip)
+                .limit(page_size)
+            )
+            
+            for doc in cursor:
+                transform_id_field(doc)
+                items.append(doc)
+                
+            logger.info(f"[PERF] Regex Search (with Category): {time.time() - start_time:.4f}s")
+            
+            return self._build_search_response(
+                page, page_size, total, items, False
+            )
+
+        elif q:
+            # 전략 2: Text Search (기존 Two-Step 전략)
+            # 카테고리가 없는 경우 전체 텍스트 검색 수행
+            try:
+                import time
+                start_time = time.time()
+
+                # Step 1: 후보군 조회 (Text Search Score)
+                candidates_cursor = self.papers_collection.find(
+                    {"$text": {"$search": q}}, {"score": {"$meta": "textScore"}}
+                ).limit(SEARCH_CANDIDATE_LIMIT)
+
+                candidates = []
+                for doc in candidates_cursor:
+                    candidates.append({"_id": doc["_id"], "score": doc.get("score", 0)})
+                
+                step1_time = time.time() - start_time
+                logger.info(f"[PERF] Search Step 1 (Text Search): {step1_time:.4f}s, Candidates: {len(candidates)}")
+
+                if not candidates:
+                    return self._build_search_response(page, page_size, 0, [], False)
+
+                # Step 2: 필터링 및 데이터 조회
+                step2_start = time.time()
+                candidate_ids = [c["_id"] for c in candidates]
+                filter_query = {"_id": {"$in": candidate_ids}}
+                
+                data_projection = projection.copy()
+                if "score" in data_projection:
+                    del data_projection["score"]
+
+                # MongoDB에서 정렬
+                sort_field = self._get_sort_field(sort_by)
+                docs_cursor = self.papers_collection.find(filter_query, data_projection).sort(sort_field)
+                
+                # Step 3: 결과 조합
+                final_items = []
+                score_map = {c["_id"]: c["score"] for c in candidates}
+                
+                for doc in docs_cursor:
+                    if doc["_id"] in score_map:
+                        doc["score"] = score_map[doc["_id"]]
+                    final_items.append(doc)
+                
+                step2_time = time.time() - step2_start
+                logger.info(f"[PERF] Search Step 2 & 3 (Filter & Fetch): {step2_time:.4f}s, Final Items: {len(final_items)}")
+
+                total = len(final_items)
+                is_approximate = True
+
+                # Step 4: 페이징
+                items = final_items[skip : skip + page_size]
+
+                # 후처리
+                for item in items:
+                    transform_id_field(item)
+                    item.pop("score", None)
+                
+                total_time = time.time() - start_time
+                logger.info(f"[PERF] Total Search Time: {total_time:.4f}s")
+
+            except Exception as e:
+                logger.error(f"[Search] Two-step search failed: {e}")
+                raise HTTPException(status_code=500, detail="Search operation failed")
+
+        else:
+            # 전략 3 & 4: 일반 쿼리 (카테고리만 있거나 전체 조회)
+            if categories:
+                query["categories"] = {"$in": categories}
+            
+            total = self.papers_collection.count_documents(query, limit=10000)
+            if total >= 10000:
+                is_approximate = True
+
+            sort_field = self._get_sort_field(sort_by)
+
+            cursor = (
+                self.papers_collection.find(query, projection)
+                .sort(sort_field)
+                .skip(skip)
+                .limit(page_size)
+            )
+            for doc in cursor:
+                transform_id_field(doc)
+                items.append(doc)
+
+        return self._build_search_response(
+            page, page_size, total, items, is_approximate
+        )
+
+    def get_search_history(self, user_id: int | None, limit: int) -> Dict[str, Any]:
+        """검색 기록 조회"""
+        query = {}
+        if user_id is not None:
+            query["user_id"] = user_id
 
         total = self.history_collection.count_documents(query)
         cursor = (
