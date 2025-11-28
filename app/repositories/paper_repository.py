@@ -92,6 +92,9 @@ class PaperRepository:
         if use_text_search:
             # Text Search 최적화: Two-Step 전략
             try:
+                import time
+                start_time = time.time()
+
                 # Step 1: 후보군 조회 (Text Search Score)
                 candidates_cursor = self.papers_collection.find(
                     {"$text": {"$search": q}}, {"score": {"$meta": "textScore"}}
@@ -100,11 +103,15 @@ class PaperRepository:
                 candidates = []
                 for doc in candidates_cursor:
                     candidates.append({"_id": doc["_id"], "score": doc.get("score", 0)})
+                
+                step1_time = time.time() - start_time
+                logger.info(f"[PERF] Search Step 1 (Text Search): {step1_time:.4f}s, Candidates: {len(candidates)}")
 
                 if not candidates:
                     return self._build_search_response(page, page_size, 0, [], False)
 
                 # Step 2: 필터링 및 데이터 조회 (MongoDB에서 정렬!)
+                step2_start = time.time()
                 candidate_ids = [c["_id"] for c in candidates]
                 filter_query = {"_id": {"$in": candidate_ids}}
                 if categories:
@@ -126,6 +133,9 @@ class PaperRepository:
                     if doc["_id"] in score_map:
                         doc["score"] = score_map[doc["_id"]]
                     final_items.append(doc)
+                
+                step2_time = time.time() - step2_start
+                logger.info(f"[PERF] Search Step 2 & 3 (Filter & Fetch): {step2_time:.4f}s, Final Items: {len(final_items)}")
 
                 total = len(final_items)
                 is_approximate = True
@@ -137,6 +147,9 @@ class PaperRepository:
                 for item in items:
                     transform_id_field(item)
                     item.pop("score", None)
+                
+                total_time = time.time() - start_time
+                logger.info(f"[PERF] Total Search Time: {total_time:.4f}s")
 
             except Exception as e:
                 logger.error(f"[Search] Two-step search failed: {e}")
