@@ -89,12 +89,73 @@ class PaperRepository:
         total = 0
         is_approximate = False
 
-        if q:
-            # Text Search 최적화: Two-Step 전략
-            # 카테고리가 있든 없든 Text Search를 먼저 수행하여 후보군을 확보
-            # 이유: Regex 검색은 인덱스를 타더라도 대량 데이터에서 매우 느림 (400초+)
-            # 해결: Text Search로 관련성 높은 후보를 먼저 추리고(Step 1), 그 중에서 카테고리 필터링(Step 2) 수행
+        if q and categories:
+            # 전략 1: Regex + Index Sort (최종 최적화)
+            # Text Search는 전체 스캔으로 느리고, 단순 Regex는 count 때문에 느림.
+            # 해결: categories + sort 인덱스를 타고 내려오면서 Regex 매칭되는 것만 수집.
+            # 핵심: 전체 개수(count) 계산을 포기하고, 상위 N개만 빠르게 반환.
             
+            import time
+            start_time = time.time()
+            
+            # 1. 쿼리 구성 (abstract 제외)
+            regex_query = {
+                "categories": {"$in": categories},
+                "$or": [
+                    {"title": {"$regex": q, "$options": "i"}},
+                    {"authors": {"$regex": q, "$options": "i"}}
+                ]
+            }
+            
+            # 2. 정렬 필드 (인덱스 활용)
+            sort_field = self._get_sort_field(sort_by)
+            
+            # 3. Projection (score 없음)
+            regex_projection = projection.copy()
+            if "score" in regex_projection:
+                del regex_projection["score"]
+            
+            # 4. 실행 (Count 생략!)
+            # 전체 개수를 세지 않고, 요청한 페이지보다 조금 더 가져와서 has_next 판단
+            fetch_limit = (page * page_size) + 1  # 다음 페이지 존재 여부 확인용
+            
+            cursor = (
+                self.papers_collection.find(regex_query, regex_projection)
+                .sort(sort_field)
+                .limit(fetch_limit) # 전체 스캔 방지
+            )
+            
+            all_items = []
+            for doc in cursor:
+                transform_id_field(doc)
+                all_items.append(doc)
+            
+            # 페이징 처리
+            start = (page - 1) * page_size
+            items = all_items[start : start + page_size]
+            
+            # Total은 정확히 알 수 없으므로 추정치 또는 충분히 큰 값 반환
+            # UI에서 페이지네이션 처리를 위해 has_next가 중요
+            has_next = len(all_items) > (page * page_size)
+            total = 10000 if has_next else len(all_items) # 근사치
+            is_approximate = True
+            
+            logger.info(f"[PERF] Optimized Regex Search: {time.time() - start_time:.4f}s, Items: {len(items)}")
+            
+            return {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "total_pages": -1, # 알 수 없음
+                "has_next": has_next,
+                "has_prev": page > 1,
+                "is_approximate": True,
+                "items": items,
+            }
+
+        elif q:
+            # 전략 2: Text Search (기존 Two-Step 전략)
+            # 카테고리가 없는 경우 전체 텍스트 검색 수행
             try:
                 import time
                 start_time = time.time()
@@ -128,7 +189,7 @@ class PaperRepository:
                 if "score" in data_projection:
                     del data_projection["score"]
 
-                # MongoDB에서 정렬 (인덱스 활용!)
+                # MongoDB에서 정렬
                 sort_field = self._get_sort_field(sort_by)
                 docs_cursor = self.papers_collection.find(filter_query, data_projection).sort(sort_field)
                 
