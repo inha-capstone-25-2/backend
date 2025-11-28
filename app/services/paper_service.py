@@ -8,6 +8,10 @@ from app.utils.activity_logger import log_activity
 from app.models.user import User
 from app.core.constants import DEFAULT_PAGE_SIZE
 from app.core.exceptions import ResourceNotFoundException
+from app.core.cache import (
+    get_cached_search_result,
+    cache_search_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +29,26 @@ class PaperService:
         page: int,
         sort_by: str,
     ) -> Dict[str, Any]:
-        """논문 검색 및 기록 저장"""
+        """논문 검색 및 기록 저장 (캐싱 적용)"""
 
-        # 1. 검색 수행
-        result = self.repo.search_papers(
-            q=q,
-            categories=categories,
-            page=page,
-            page_size=DEFAULT_PAGE_SIZE,
-            sort_by=sort_by,
-        )
+        # 1. 캐시 확인
+        cached_result = get_cached_search_result(q, categories, page, sort_by)
+        if cached_result is not None:
+            result = cached_result
+        else:
+            # 2. 캐시 미스 - 검색 수행
+            result = self.repo.search_papers(
+                q=q,
+                categories=categories,
+                page=page,
+                page_size=DEFAULT_PAGE_SIZE,
+                sort_by=sort_by,
+            )
 
-        # 2. 검색 기록 및 활동 로그 저장 (검색어 또는 카테고리가 있을 경우)
+            # 3. 결과 캐싱
+            cache_search_result(q, categories, page, sort_by, result)
+
+        # 4. 검색 기록 및 활동 로그 저장 (캐시와 무관하게 항상 저장)
         if q or categories:
             self.repo.save_search_history(
                 user_id=user.id,
