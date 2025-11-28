@@ -224,40 +224,31 @@ class RuleBasedRecommender:
             # abstract는 크기가 크므로 제외 (응답 시 필요하지 않음)
         }
 
-        candidates = []
-
-        # 1. 관심사 관련 논문 (limit의 70%)
+        # 최적화된 쿼리: 하나의 쿼리로 통합
+        # 관심사가 있으면 관심사 기반, 없으면 인기 논문만
         if user_interests:
-            interest_papers = list(
+            # 관심사 카테고리에 해당하는 논문을 인기도 순으로 정렬
+            # 인덱스 활용: categories 인덱스 + view_count/bookmark_count 복합 인덱스
+            candidates = list(
                 collection.find(
                     {"categories": {"$in": user_interests}},
                     projection,
-                    limit=int(limit * 0.7),
                 )
+                .sort([("view_count", -1), ("bookmark_count", -1)])
+                .limit(limit)
             )
-            candidates.extend(interest_papers)
-
-        # 2. 인기 논문 (limit의 30%)
-        popular_papers = list(
-            collection.find(
-                {},
-                projection,
-                sort=[("view_count", -1), ("bookmark_count", -1)],
-                limit=int(limit * 0.3),
+        else:
+            # 관심사가 없으면 전체에서 인기 논문만
+            candidates = list(
+                collection.find(
+                    {},
+                    projection,
+                )
+                .sort([("view_count", -1), ("bookmark_count", -1)])
+                .limit(limit)
             )
-        )
-        candidates.extend(popular_papers)
 
-        # 3. 중복 제거 (_id 기준)
-        seen_ids = set()
-        unique_candidates = []
-        for paper in candidates:
-            paper_id = paper.get("_id")
-            if paper_id not in seen_ids:
-                seen_ids.add(paper_id)
-                unique_candidates.append(paper)
-
-        return unique_candidates[:limit]
+        return candidates
 
     def _analyze_recommendation_reasons(
         self,

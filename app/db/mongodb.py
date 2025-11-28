@@ -86,8 +86,29 @@ class MongoDBManager:
                 name="ttl_timestamp",
             )
             logger.info("TTL index created for user_activities (90 days)")
+
+            # papers 컬렉션: 추천 시스템용 인덱스
+            papers_collection = self.db[settings.mongo_collection]
+            
+            # categories 인덱스 (관심사 기반 필터링)
+            papers_collection.create_index(
+                [("categories", 1)],
+                name="categories_only",
+                background=True
+            )
+            logger.info("Index created for papers: categories (recommendation)")
+
+            # view_count, bookmark_count 복합 인덱스 (인기도 정렬)
+            papers_collection.create_index(
+                [("view_count", -1), ("bookmark_count", -1)],
+                name="popularity_sort",
+                background=True
+            )
+            logger.info("Index created for papers: view_count + bookmark_count (popularity)")
+
         except Exception as e:
-            logger.warning(f"TTL index creation failed (may already exist): {e}")
+            logger.warning(f"Index creation failed (may already exist): {e}")
+
 
     def close(self) -> None:
         """MongoDB 연결 종료"""

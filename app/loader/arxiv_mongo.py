@@ -161,6 +161,7 @@ def create_search_indexes(collection) -> None:
     검색용 인덱스 생성 (데이터 삽입 후 실행).
     1. 복합 인덱스: categories + update_date (카테고리 필터 + 날짜 정렬)
     2. Text Search 인덱스: title, abstract, authors (전문 검색)
+    3. 추천 시스템용 인덱스: categories, view_count/bookmark_count
     """
     try:
         # 1. 복합 인덱스: 카테고리 필터 + 날짜 정렬
@@ -172,8 +173,26 @@ def create_search_indexes(collection) -> None:
         # 2. Text Search 인덱스
         create_text_search_index(collection)
 
+        # 3. 추천 시스템용 인덱스
+        # 3-1. categories 단일 인덱스 (관심사 기반 필터링)
+        collection.create_index(
+            [("categories", 1)], 
+            name="categories_only",
+            background=True
+        )
+        logger.info("[arxiv-job] 인덱스 생성 완료: categories (추천 시스템용)")
+
+        # 3-2. view_count, bookmark_count 복합 인덱스 (인기도 정렬)
+        collection.create_index(
+            [("view_count", -1), ("bookmark_count", -1)],
+            name="popularity_sort",
+            background=True
+        )
+        logger.info("[arxiv-job] 인덱스 생성 완료: view_count + bookmark_count (인기도 정렬)")
+
     except Exception as e:
         logger.error(f"[arxiv-job] 검색 인덱스 생성 실패: {e}")
+
 
 
 def seed_categories_from_mongo(collection) -> None:
