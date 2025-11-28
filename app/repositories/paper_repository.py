@@ -102,11 +102,13 @@ class PaperRepository:
             start_time = time.time()
             
             # Regex 쿼리 구성
+            # 성능 최적화: abstract는 너무 길어서 Regex 검색 시 매우 느림 (400초 소요)
+            # 따라서 카테고리 필터가 있을 때는 title과 authors만 검색하도록 제한
             regex_query = {
                 "categories": {"$in": categories},
                 "$or": [
                     {"title": {"$regex": q, "$options": "i"}},
-                    {"abstract": {"$regex": q, "$options": "i"}},
+                    # {"abstract": {"$regex": q, "$options": "i"}}, # 성능 문제로 제외
                     {"authors": {"$regex": q, "$options": "i"}}
                 ]
             }
