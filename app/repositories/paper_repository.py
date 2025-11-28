@@ -56,10 +56,13 @@ class PaperRepository:
         page_size: int,
         sort_by: str,
     ) -> Dict[str, Any]:
-        """논문 검색 로직 (Regex + Text Search 전략 포함)"""
+        """논문 검색 로직 (Text Search 최적화)"""
 
-        query = {}
-        use_text_search = False
+        # 공통 변수 초기화
+        skip = (page - 1) * page_size
+        items = []
+        total = 0
+        is_approximate = False
 
         # Projection 설정
         projection = {
@@ -105,23 +108,16 @@ class PaperRepository:
                 step2_start = time.time()
                 candidate_ids = [c["_id"] for c in candidates]
                 filter_query = {"_id": {"$in": candidate_ids}}
-                
-                data_projection = projection.copy()
-                if "score" in data_projection:
-                    del data_projection["score"]
 
                 # MongoDB에서 정렬 (인덱스 활용!)
                 sort_field = self._get_sort_field(sort_by)
-                docs_cursor = self.papers_collection.find(filter_query, data_projection).sort(sort_field)
+                docs_cursor = self.papers_collection.find(filter_query, projection).sort(sort_field)
                 
                 # Step 3: 결과 조합
                 final_items = []
-                score_map = {c["_id"]: c["score"] for c in candidates}
                 
-                # 정렬된 결과 순서대로 score 매핑
                 for doc in docs_cursor:
-                    if doc["_id"] in score_map:
-                        doc["score"] = score_map[doc["_id"]]
+                    transform_id_field(doc)
                     final_items.append(doc)
                 
                 step2_time = time.time() - step2_start
@@ -132,11 +128,6 @@ class PaperRepository:
 
                 # Step 4: 페이징
                 items = final_items[skip : skip + page_size]
-
-                # 후처리
-                for item in items:
-                    transform_id_field(item)
-                    item.pop("score", None)
                 
                 total_time = time.time() - start_time
                 logger.info(f"[PERF] Total Search Time: {total_time:.4f}s")
@@ -146,7 +137,8 @@ class PaperRepository:
                 raise HTTPException(status_code=500, detail="Search operation failed")
 
         else:
-            # 전략 3 & 4: 일반 쿼리 (카테고리만 있거나 전체 조회)
+            # 일반 쿼리 (카테고리만 있거나 전체 조회)
+            query = {}
             if categories:
                 query["categories"] = {"$in": categories}
             
