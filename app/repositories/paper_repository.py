@@ -62,27 +62,58 @@ class PaperRepository:
         use_text_search = False
 
         if q:
-            query["$text"] = {"$search": q}
-            use_text_search = True
+            # Text Search 최적화: Two-Step 전략
+            # 1. Text Search + Category Filter로 후보군 조회 (Step 1)
+            # 2. 후보군에 대해 정렬 및 상세 정보 조회 (Step 2)
+            
+            try:
+                import time
+                start_time = time.time()
 
-        if categories:
-            query["categories"] = {"$in": categories}
+                # Step 1: 후보군 조회 (Text Search Score)
+                # 쿼리에 categories를 포함시켜 MongoDB가 검색 범위를 좁히도록 유도
+                text_query = {"$text": {"$search": q}}
+                if categories:
+                    text_query["categories"] = {"$in": categories}
 
-        # Projection 설정
-        projection = {
-            "_id": 1,
-            "id": 1,
-            "title": 1,
-            "authors": 1,
-            "categories": 1,
-            "update_date": 1,
-            "view_count": 1,
-        }
+                candidates_cursor = self.papers_collection.find(
+                    text_query, {"score": {"$meta": "textScore"}}
+                ).limit(SEARCH_CANDIDATE_LIMIT)
 
-        if use_text_search:
-            projection["score"] = {"$meta": "textScore"}
+                candidates = []
+                for doc in candidates_cursor:
+                    candidates.append({"_id": doc["_id"], "score": doc.get("score", 0)})
+                
+                step1_time = time.time() - start_time
+                logger.info(f"[PERF] Search Step 1 (Text Search): {step1_time:.4f}s, Candidates: {len(candidates)}")
 
-        skip = (page - 1) * page_size
+                if not candidates:
+                    return self._build_search_response(page, page_size, 0, [], False)
+
+                # Step 2: 데이터 조회 및 정렬
+                step2_start = time.time()
+                candidate_ids = [c["_id"] for c in candidates]
+                filter_query = {"_id": {"$in": candidate_ids}}
+                
+                data_projection = projection.copy()
+                if "score" in data_projection:
+                    del data_projection["score"]
+
+                # MongoDB에서 정렬 (인덱스 활용!)
+                sort_field = self._get_sort_field(sort_by)
+                docs_cursor = self.papers_collection.find(filter_query, data_projection).sort(sort_field)
+                
+                # Step 3: 결과 조합
+                final_items = []
+                score_map = {c["_id"]: c["score"] for c in candidates}
+                
+                # 정렬된 결과 순서대로 score 매핑
+                for doc in docs_cursor:
+                    if doc["_id"] in score_map:
+                        doc["score"] = score_map[doc["_id"]]
+                    final_items.append(doc)
+                
+                step2_time = time.time() - step2_start
                 logger.info(f"[PERF] Search Step 2 & 3 (Filter & Fetch): {step2_time:.4f}s, Final Items: {len(final_items)}")
 
                 total = len(final_items)
