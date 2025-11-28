@@ -89,65 +89,18 @@ class PaperRepository:
         total = 0
         is_approximate = False
 
-        # 검색 전략 결정
-        # 1. 카테고리 + 검색어: Regex 검색 (categories 인덱스 활용 -> 빠름)
-        # 2. 검색어만: Text Search (전체 스캔 -> 느리지만 어쩔 수 없음)
-        # 3. 카테고리만: 일반 필터링 (categories 인덱스 -> 빠름)
-        # 4. 전체: 일반 조회
-
-        if q and categories:
-            # 전략 1: Regex 검색 (성능 최적화)
-            # categories 인덱스를 먼저 타고, 그 결과 내에서 Regex 매칭
-            import time
-            start_time = time.time()
+        if q:
+            # Text Search 최적화: Two-Step 전략
+            # 카테고리가 있든 없든 Text Search를 먼저 수행하여 후보군을 확보
+            # 이유: Regex 검색은 인덱스를 타더라도 대량 데이터에서 매우 느림 (400초+)
+            # 해결: Text Search로 관련성 높은 후보를 먼저 추리고(Step 1), 그 중에서 카테고리 필터링(Step 2) 수행
             
-            # Regex 쿼리 구성
-            # 성능 최적화: abstract는 너무 길어서 Regex 검색 시 매우 느림 (400초 소요)
-            # 따라서 카테고리 필터가 있을 때는 title과 authors만 검색하도록 제한
-            regex_query = {
-                "categories": {"$in": categories},
-                "$or": [
-                    {"title": {"$regex": q, "$options": "i"}},
-                    # {"abstract": {"$regex": q, "$options": "i"}}, # 성능 문제로 제외
-                    {"authors": {"$regex": q, "$options": "i"}}
-                ]
-            }
-            
-            # 정렬 필드
-            sort_field = self._get_sort_field(sort_by)
-            
-            # Regex 검색용 Projection (score 제거)
-            regex_projection = projection.copy()
-            if "score" in regex_projection:
-                del regex_projection["score"]
-            
-            # 쿼리 실행
-            total = self.papers_collection.count_documents(regex_query)
-            cursor = (
-                self.papers_collection.find(regex_query, regex_projection)
-                .sort(sort_field)
-                .skip(skip)
-                .limit(page_size)
-            )
-            
-            for doc in cursor:
-                transform_id_field(doc)
-                items.append(doc)
-                
-            logger.info(f"[PERF] Regex Search (with Category): {time.time() - start_time:.4f}s")
-            
-            return self._build_search_response(
-                page, page_size, total, items, False
-            )
-
-        elif q:
-            # 전략 2: Text Search (기존 Two-Step 전략)
-            # 카테고리가 없는 경우 전체 텍스트 검색 수행
             try:
                 import time
                 start_time = time.time()
 
                 # Step 1: 후보군 조회 (Text Search Score)
+                # SEARCH_CANDIDATE_LIMIT(2000) 만큼만 가져옴 -> 속도 보장
                 candidates_cursor = self.papers_collection.find(
                     {"$text": {"$search": q}}, {"score": {"$meta": "textScore"}}
                 ).limit(SEARCH_CANDIDATE_LIMIT)
@@ -167,11 +120,15 @@ class PaperRepository:
                 candidate_ids = [c["_id"] for c in candidates]
                 filter_query = {"_id": {"$in": candidate_ids}}
                 
+                # 카테고리 필터 적용
+                if categories:
+                    filter_query["categories"] = {"$in": categories}
+
                 data_projection = projection.copy()
                 if "score" in data_projection:
                     del data_projection["score"]
 
-                # MongoDB에서 정렬
+                # MongoDB에서 정렬 (인덱스 활용!)
                 sort_field = self._get_sort_field(sort_by)
                 docs_cursor = self.papers_collection.find(filter_query, data_projection).sort(sort_field)
                 
