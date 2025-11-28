@@ -153,10 +153,12 @@ class RuleBasedRecommender:
         Returns:
             (viewed_paper_ids, activity_categories)
         """
+        # Projection: 필요한 필드만 선택
         activities = (
             db[COLLECTION_USER_ACTIVITIES]
             .find(
-                {"user_id": user_id, "activity_type": "view"}, {"doi": 1, "metadata": 1}
+                {"user_id": user_id, "activity_type": "view"},
+                {"doi": 1, "metadata.categories": 1},  # 필요한 필드만
             )
             .sort("timestamp", -1)
             .limit(50)
@@ -191,13 +193,29 @@ class RuleBasedRecommender:
         """
         collection = db[settings.mongo_collection]
 
+        # Projection: 필요한 필드만 선택 (abstract 제외하여 성능 개선)
+        projection = {
+            "_id": 1,
+            "title": 1,
+            "categories": 1,
+            "keywords": 1,
+            "view_count": 1,
+            "bookmark_count": 1,
+            "update_date": 1,
+            "difficulty_level": 1,
+            "authors": 1,
+            # abstract는 크기가 크므로 제외 (응답 시 필요하지 않음)
+        }
+
         candidates = []
 
         # 1. 관심사 관련 논문 (limit의 70%)
         if user_interests:
             interest_papers = list(
                 collection.find(
-                    {"categories": {"$in": user_interests}}, limit=int(limit * 0.7)
+                    {"categories": {"$in": user_interests}},
+                    projection,
+                    limit=int(limit * 0.7),
                 )
             )
             candidates.extend(interest_papers)
@@ -206,6 +224,7 @@ class RuleBasedRecommender:
         popular_papers = list(
             collection.find(
                 {},
+                projection,
                 sort=[("view_count", -1), ("bookmark_count", -1)],
                 limit=int(limit * 0.3),
             )

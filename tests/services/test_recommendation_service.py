@@ -52,8 +52,8 @@ class TestRecommendationService:
         # Verify recommender was called
         assert mock_recommender.recommend.called
 
-        # Verify repository logged the recommendations
-        assert mock_repo.log_recommendation.called
+        # Verify repository logged the recommendations (배치로 변경)
+        assert mock_repo.log_recommendations_batch.called
 
         # Verify result structure
         assert result["user_id"] == sample_user.id

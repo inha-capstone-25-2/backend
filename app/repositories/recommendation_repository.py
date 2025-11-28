@@ -47,3 +47,15 @@ class RecommendationRepository:
             self.recommendations_collection.insert_one(log_doc)
         except Exception as e:
             logger.error(f"Failed to log recommendation: {e}")
+
+    def log_recommendations_batch(self, log_docs: List[Dict[str, Any]]) -> None:
+        """추천 결과를 배치로 MongoDB에 로깅"""
+        if not log_docs:
+            return
+
+        try:
+            self.recommendations_collection.insert_many(log_docs, ordered=False)
+            logger.info(f"Logged {len(log_docs)} recommendations in batch")
+        except Exception as e:
+            logger.error(f"Failed to log recommendations batch: {e}")
+

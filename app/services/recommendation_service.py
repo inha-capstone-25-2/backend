@@ -35,16 +35,28 @@ class RecommendationService:
             candidate_limit=candidate_limit,
         )
 
-        # 2. 추천 로깅
+        # 2. 추천 로깅 (배치 처리)
+        log_docs = []
         for rec in recommendations:
-            self.repo.log_recommendation(
-                user_id=user.id,
-                paper_id=rec.get("paper_id"),
-                recommendation_type="rule_based",
-                score=rec.get("total_score", 0.0),
-                breakdown=rec.get("breakdown", {}),
-                reasons=rec.get("reasons", []),
-            )
+            log_doc = {
+                "user_id": user.id,
+                "paper_id": rec.get("paper_id"),
+                "recommendation_type": "rule_based",
+                "score": rec.get("total_score", 0.0),
+                "features": {
+                    "interest_score": rec.get("breakdown", {}).get("interest_score", 0.0),
+                    "popularity_score": rec.get("breakdown", {}).get("popularity_score", 0.0),
+                    "recency_score": rec.get("breakdown", {}).get("recency_score", 0.0),
+                    "personalization_score": rec.get("breakdown", {}).get("personalization_score", 0.0),
+                },
+                "context": {"reasons": rec.get("reasons", [])},
+                "was_clicked": False,
+                "recommended_at": datetime.utcnow(),
+            }
+            log_docs.append(log_doc)
+        
+        # 배치로 한 번에 로깅
+        self.repo.log_recommendations_batch(log_docs)
 
         # 3. 응답 생성
         recommendation_items = []
@@ -56,7 +68,7 @@ class RecommendationService:
             item = RecommendationItem(
                 paper_id=rec["paper_id"],
                 title=paper.get("title", ""),
-                abstract=paper.get("abstract"),
+                abstract=None,  # projection에서 제외했으므로 None
                 authors=paper.get("authors"),
                 categories=paper.get("categories", []),
                 keywords=paper.get("keywords", []),
