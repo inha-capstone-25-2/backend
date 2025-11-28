@@ -140,10 +140,9 @@ def create_text_search_index(collection) -> None:
     """
     try:
         collection.create_index(
-            [("title", "text"), ("abstract", "text"), ("authors", "text")],
+            [("title", "text"), ("authors", "text")],
             weights={
                 "title": 10,  # 제목 우선순위 가장 높음
-                "abstract": 5,  # 초록
                 "authors": 3,  # 저자
             },
             default_language="english",
