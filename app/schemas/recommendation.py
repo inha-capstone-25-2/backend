@@ -46,3 +46,26 @@ class RecommendationResponse(BaseModel):
     )
     total_count: int = Field(..., description="추천된 논문 수")
     timestamp: str = Field(..., description="추천 생성 시각 (ISO format)")
+
+
+class RecommendationLog(BaseModel):
+    """추천 로그 항목 (MongoDB paper_recommendations 컬렉션)"""
+
+    id: str = Field(..., description="로그 ID")
+    user_id: int = Field(..., description="사용자 ID")
+    paper_id: str = Field(..., description="논문 ID")
+    recommendation_type: str = Field(..., description="추천 타입")
+    score: float = Field(..., description="추천 점수")
+    features: Dict[str, float] = Field(..., description="점수 분해 정보")
+    context: Dict[str, Any] = Field(..., description="추가 컨텍스트")
+    was_clicked: bool = Field(..., description="클릭 여부")
+    recommended_at: str = Field(..., description="추천된 시각 (ISO format)")
+
+
+class RecommendationLogListResponse(BaseModel):
+    """추천 로그 목록 조회 응답"""
+
+    total: int = Field(..., description="전체 로그 개수")
+    page: int = Field(..., description="현재 페이지")
+    page_size: int = Field(..., description="페이지 크기")
+    items: List[RecommendationLog] = Field(..., description="추천 로그 목록")

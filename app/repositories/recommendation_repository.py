@@ -59,3 +59,52 @@ class RecommendationRepository:
         except Exception as e:
             logger.error(f"Failed to log recommendations batch: {e}")
 
+    def get_all_recommendations(
+        self, page: int = 1, page_size: int = 20
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """전체 추천 로그 조회 (페이지네이션)"""
+        try:
+            # 전체 개수 조회
+            total = self.recommendations_collection.count_documents({})
+
+            # 페이지네이션 조회 (최신순 정렬)
+            skip = (page - 1) * page_size
+            cursor = (
+                self.recommendations_collection.find({})
+                .sort("recommended_at", -1)
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            items = list(cursor)
+            return total, items
+
+        except Exception as e:
+            logger.error(f"Failed to get all recommendations: {e}")
+            return 0, []
+
+    def get_recommendations_by_user(
+        self, user_id: int, page: int = 1, page_size: int = 20
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """특정 사용자의 추천 로그 조회 (페이지네이션)"""
+        try:
+            # 사용자별 개수 조회
+            query = {"user_id": user_id}
+            total = self.recommendations_collection.count_documents(query)
+
+            # 페이지네이션 조회 (최신순 정렬)
+            skip = (page - 1) * page_size
+            cursor = (
+                self.recommendations_collection.find(query)
+                .sort("recommended_at", -1)
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            items = list(cursor)
+            return total, items
+
+        except Exception as e:
+            logger.error(f"Failed to get recommendations by user {user_id}: {e}")
+            return 0, []
+

@@ -99,3 +99,62 @@ class RecommendationService:
             "total_count": len(recommendation_items),
             "timestamp": datetime.utcnow().isoformat(),
         }
+
+    def get_all_recommendation_logs(
+        self, page: int = 1, page_size: int = 20
+    ) -> Dict[str, Any]:
+        """전체 추천 로그 조회"""
+        logger.info(f"Getting all recommendation logs (page={page}, page_size={page_size})")
+
+        # Repository에서 데이터 조회
+        total, items = self.repo.get_all_recommendations(page, page_size)
+
+        # MongoDB _id를 문자열로 변환 및 recommended_at 포맷팅
+        formatted_items = []
+        for item in items:
+            serialize_object_id(item)
+            item["id"] = item.pop("_id")
+            
+            # recommended_at을 ISO 형식 문자열로 변환
+            if "recommended_at" in item and hasattr(item["recommended_at"], "isoformat"):
+                item["recommended_at"] = item["recommended_at"].isoformat()
+            
+            formatted_items.append(item)
+
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "items": formatted_items,
+        }
+
+    def get_user_recommendation_logs(
+        self, user_id: int, page: int = 1, page_size: int = 20
+    ) -> Dict[str, Any]:
+        """특정 사용자의 추천 로그 조회"""
+        logger.info(
+            f"Getting recommendation logs for user {user_id} (page={page}, page_size={page_size})"
+        )
+
+        # Repository에서 데이터 조회
+        total, items = self.repo.get_recommendations_by_user(user_id, page, page_size)
+
+        # MongoDB _id를 문자열로 변환 및 recommended_at 포맷팅
+        formatted_items = []
+        for item in items:
+            serialize_object_id(item)
+            item["id"] = item.pop("_id")
+            
+            # recommended_at을 ISO 형식 문자열로 변환
+            if "recommended_at" in item and hasattr(item["recommended_at"], "isoformat"):
+                item["recommended_at"] = item["recommended_at"].isoformat()
+            
+            formatted_items.append(item)
+
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "items": formatted_items,
+        }
+

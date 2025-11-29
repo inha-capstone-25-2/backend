@@ -10,7 +10,7 @@ from app.db.postgres import get_db
 from app.db.mongodb import get_mongo_db
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.schemas.recommendation import RecommendationResponse
+from app.schemas.recommendation import RecommendationResponse, RecommendationLogListResponse
 from app.services.recommendation_service import RecommendationService
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
@@ -40,3 +40,41 @@ def get_recommendations(
     )
 
     return RecommendationResponse(**result)
+
+
+@router.get("/logs", response_model=RecommendationLogListResponse)
+def get_all_recommendation_logs(
+    page: int = Query(1, ge=1, description="페이지 번호"),
+    page_size: int = Query(20, ge=1, le=100, description="페이지 크기"),
+    db_mongo: Database = Depends(get_mongo_db),
+):
+    """
+    전체 추천 로그 조회 (관리자용).
+
+    모든 사용자의 추천 이력을 페이지네이션하여 조회합니다.
+    최신 추천 순으로 정렬됩니다.
+    """
+    service = RecommendationService(db_mongo)
+    result = service.get_all_recommendation_logs(page=page, page_size=page_size)
+    return RecommendationLogListResponse(**result)
+
+
+@router.get("/logs/users/{user_id}", response_model=RecommendationLogListResponse)
+def get_user_recommendation_logs(
+    user_id: int,
+    page: int = Query(1, ge=1, description="페이지 번호"),
+    page_size: int = Query(20, ge=1, le=100, description="페이지 크기"),
+    db_mongo: Database = Depends(get_mongo_db),
+):
+    """
+    특정 사용자의 추천 로그 조회.
+
+    특정 사용자 ID로 필터링된 추천 이력을 페이지네이션하여 조회합니다.
+    최신 추천 순으로 정렬됩니다.
+    """
+    service = RecommendationService(db_mongo)
+    result = service.get_user_recommendation_logs(
+        user_id=user_id, page=page, page_size=page_size
+    )
+    return RecommendationLogListResponse(**result)
+
