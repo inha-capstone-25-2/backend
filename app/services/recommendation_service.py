@@ -99,3 +99,93 @@ class RecommendationService:
             "total_count": len(recommendation_items),
             "timestamp": datetime.utcnow().isoformat(),
         }
+
+    def get_all_recommendation_logs(
+        self, page: int = 1, page_size: int = 20
+    ) -> Dict[str, Any]:
+        """전체 추천 로그 조회"""
+        logger.info(f"Getting all recommendation logs (page={page}, page_size={page_size})")
+
+        # Repository에서 데이터 조회
+        total, items = self.repo.get_all_recommendations(page, page_size)
+
+        # MongoDB _id를 문자열로 변환 및 recommended_at 포맷팅
+        formatted_items = []
+        for item in items:
+            serialize_object_id(item)
+            item["id"] = item.pop("_id")
+            
+            # recommended_at을 ISO 형식 문자열로 변환
+            if "recommended_at" in item and hasattr(item["recommended_at"], "isoformat"):
+                item["recommended_at"] = item["recommended_at"].isoformat()
+            
+            formatted_items.append(item)
+
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "items": formatted_items,
+        }
+
+    def get_user_recommendation_logs(
+        self, user_id: int, page: int = 1, page_size: int = 20
+    ) -> Dict[str, Any]:
+        """특정 사용자의 추천 로그 조회"""
+        logger.info(
+            f"Getting recommendation logs for user {user_id} (page={page}, page_size={page_size})"
+        )
+
+        # Repository에서 데이터 조회
+        total, items = self.repo.get_recommendations_by_user(user_id, page, page_size)
+
+        # MongoDB _id를 문자열로 변환 및 recommended_at 포맷팅
+        formatted_items = []
+        for item in items:
+            serialize_object_id(item)
+            item["id"] = item.pop("_id")
+            
+            # recommended_at을 ISO 형식 문자열로 변환
+            if "recommended_at" in item and hasattr(item["recommended_at"], "isoformat"):
+                item["recommended_at"] = item["recommended_at"].isoformat()
+            
+            formatted_items.append(item)
+
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "items": formatted_items,
+        }
+
+    def record_click(self, recommendation_id: str, user_id: int) -> Dict[str, Any]:
+        """클릭 기록"""
+        success = self.repo.mark_as_clicked(recommendation_id)
+        if success:
+            logger.info(f"Marked recommendation {recommendation_id} as clicked by user {user_id}")
+        return {
+            "success": success,
+            "clicked_at": datetime.utcnow().isoformat() if success else None,
+        }
+
+    def record_interaction(
+        self, recommendation_id: str, user_id: int, paper_id: str, interaction_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """상호작용 데이터 기록"""
+        saved_doc = self.repo.save_interaction(
+            recommendation_id, user_id, paper_id, interaction_data
+        )
+        
+        if saved_doc:
+            serialize_object_id(saved_doc)
+            saved_doc["id"] = saved_doc.pop("_id")
+            
+            # datetime을 ISO 문자열로 변환
+            for field in ["created_at", "updated_at"]:
+                if field in saved_doc and hasattr(saved_doc[field], "isoformat"):
+                    saved_doc[field] = saved_doc[field].isoformat()
+            
+            logger.info(f"Saved interaction for recommendation {recommendation_id}")
+        
+        return saved_doc
+

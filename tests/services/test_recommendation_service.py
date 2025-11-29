@@ -122,3 +122,97 @@ class TestRecommendationService:
 
         assert result["total_count"] == 0
         assert len(result["recommendations"]) == 0
+
+    @patch("app.services.recommendation_service.RecommendationRepository")
+    def test_get_all_recommendation_logs(self, mock_repo_class, mock_mongo_db):
+        """Test getting all recommendation logs."""
+        from datetime import datetime
+
+        # Setup mock repository
+        mock_repo = MagicMock()
+        mock_repo.get_all_recommendations.return_value = (
+            2,  # total
+            [
+                {
+                    "_id": "507f1f77bcf86cd799439011",
+                    "user_id": 1,
+                    "paper_id": "2301.00001",
+                    "recommendation_type": "rule_based",
+                    "score": 0.8,
+                    "features": {"interest_score": 0.8},
+                    "context": {"reasons": []},
+                    "was_clicked": False,
+                    "recommended_at": datetime(2024, 1, 1, 12, 0, 0),
+                },
+                {
+                    "_id": "507f1f77bcf86cd799439012",
+                    "user_id": 2,
+                    "paper_id": "2301.00002",
+                    "recommendation_type": "rule_based",
+                    "score": 0.7,
+                    "features": {"interest_score": 0.7},
+                    "context": {"reasons": []},
+                    "was_clicked": False,
+                    "recommended_at": datetime(2024, 1, 2, 12, 0, 0),
+                },
+            ],
+        )
+        mock_repo_class.return_value = mock_repo
+
+        service = RecommendationService(mock_mongo_db)
+        service.repo = mock_repo
+
+        result = service.get_all_recommendation_logs(page=1, page_size=20)
+
+        # Verify repository was called
+        assert mock_repo.get_all_recommendations.called
+
+        # Verify result structure
+        assert result["total"] == 2
+        assert result["page"] == 1
+        assert result["page_size"] == 20
+        assert len(result["items"]) == 2
+        assert result["items"][0]["id"] == "507f1f77bcf86cd799439011"
+        assert result["items"][0]["user_id"] == 1
+
+    @patch("app.services.recommendation_service.RecommendationRepository")
+    def test_get_user_recommendation_logs(self, mock_repo_class, mock_mongo_db):
+        """Test getting user recommendation logs."""
+        from datetime import datetime
+
+        # Setup mock repository
+        mock_repo = MagicMock()
+        mock_repo.get_recommendations_by_user.return_value = (
+            1,  # total
+            [
+                {
+                    "_id": "507f1f77bcf86cd799439011",
+                    "user_id": 1,
+                    "paper_id": "2301.00001",
+                    "recommendation_type": "rule_based",
+                    "score": 0.8,
+                    "features": {"interest_score": 0.8},
+                    "context": {"reasons": []},
+                    "was_clicked": False,
+                    "recommended_at": datetime(2024, 1, 1, 12, 0, 0),
+                },
+            ],
+        )
+        mock_repo_class.return_value = mock_repo
+
+        service = RecommendationService(mock_mongo_db)
+        service.repo = mock_repo
+
+        result = service.get_user_recommendation_logs(user_id=1, page=1, page_size=20)
+
+        # Verify repository was called with correct user_id
+        mock_repo.get_recommendations_by_user.assert_called_once_with(1, 1, 20)
+
+        # Verify result structure
+        assert result["total"] == 1
+        assert result["page"] == 1
+        assert result["page_size"] == 20
+        assert len(result["items"]) == 1
+        assert result["items"][0]["id"] == "507f1f77bcf86cd799439011"
+        assert result["items"][0]["user_id"] == 1
+
