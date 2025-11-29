@@ -158,3 +158,34 @@ class RecommendationService:
             "items": formatted_items,
         }
 
+    def record_click(self, recommendation_id: str, user_id: int) -> Dict[str, Any]:
+        """클릭 기록"""
+        success = self.repo.mark_as_clicked(recommendation_id)
+        if success:
+            logger.info(f"Marked recommendation {recommendation_id} as clicked by user {user_id}")
+        return {
+            "success": success,
+            "clicked_at": datetime.utcnow().isoformat() if success else None,
+        }
+
+    def record_interaction(
+        self, recommendation_id: str, user_id: int, paper_id: str, interaction_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """상호작용 데이터 기록"""
+        saved_doc = self.repo.save_interaction(
+            recommendation_id, user_id, paper_id, interaction_data
+        )
+        
+        if saved_doc:
+            serialize_object_id(saved_doc)
+            saved_doc["id"] = saved_doc.pop("_id")
+            
+            # datetime을 ISO 문자열로 변환
+            for field in ["created_at", "updated_at"]:
+                if field in saved_doc and hasattr(saved_doc[field], "isoformat"):
+                    saved_doc[field] = saved_doc[field].isoformat()
+            
+            logger.info(f"Saved interaction for recommendation {recommendation_id}")
+        
+        return saved_doc
+
