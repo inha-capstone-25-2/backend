@@ -2,7 +2,7 @@
 추천 시스템 API 엔드포인트.
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from pymongo.database import Database
 
@@ -17,7 +17,6 @@ from app.schemas.recommendation_interaction import (
     ClickResponse,
 )
 from app.services.recommendation_service import RecommendationService
-from app.core.exceptions import NotFoundException
 from bson import ObjectId
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
@@ -102,7 +101,7 @@ def record_recommendation_click(
     result = service.record_click(recommendation_id, current_user.id)
     
     if not result["success"]:
-        raise NotFoundException(f"Recommendation {recommendation_id} not found")
+        raise HTTPException(status_code=404, detail=f"Recommendation {recommendation_id} not found")
     
     return ClickResponse(**result)
 
@@ -125,10 +124,10 @@ def record_recommendation_interaction(
     rec = recommendations_coll.find_one({"_id": ObjectId(recommendation_id)})
     
     if not rec:
-        raise NotFoundException(f"Recommendation {recommendation_id} not found")
+        raise HTTPException(status_code=404, detail=f"Recommendation {recommendation_id} not found")
     
     if rec["user_id"] != current_user.id:
-        raise NotFoundException("Unauthorized access to this recommendation")
+        raise HTTPException(status_code=403, detail="Unauthorized access to this recommendation")
     
     service = RecommendationService(db_mongo)
     interaction_dict = interaction_data.model_dump(exclude_unset=True, exclude={"recommendation_id"})
@@ -141,7 +140,7 @@ def record_recommendation_interaction(
     )
     
     if not result:
-        raise NotFoundException("Failed to save interaction data")
+        raise HTTPException(status_code=500, detail="Failed to save interaction data")
     
     return RecommendationInteraction(**result)
 
