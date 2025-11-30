@@ -4,6 +4,7 @@
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pymongo.database import Database
+from bson import ObjectId
 
 from app.db.mongodb import get_mongo_db
 from app.api.deps import get_current_user
@@ -32,6 +33,13 @@ def create_event(
     사용자의 추천 관련 행동(expose, click, bookmark 등)을 기록합니다.
     RL 모델의 reward 계산에 사용됩니다.
     """
+    # 권한 검증: 본인의 이벤트만 기록 가능
+    if event_data.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403, 
+            detail="You can only log events for your own user ID"
+        )
+
     repo = RecommendationRepository(db_mongo)
     
     # 메타데이터 변환
@@ -48,14 +56,18 @@ def create_event(
     
     # 저장된 문서 조회
     if event_id:
-        event_doc = db_mongo["recommendation_events"].find_one({"_id": event_id})
-        if event_doc:
-            serialize_object_id(event_doc)
-            event_doc["id"] = event_doc.pop("_id")
-            if hasattr(event_doc.get("timestamp"), "isoformat"):
-                event_doc["timestamp"] = event_doc["timestamp"].isoformat()
-            
-            return RecommendationEvent(**event_doc)
+        try:
+            # event_id는 문자열이므로 ObjectId로 변환하여 조회
+            event_doc = db_mongo["recommendation_events"].find_one({"_id": ObjectId(event_id)})
+            if event_doc:
+                serialize_object_id(event_doc)
+                event_doc["id"] = event_doc.pop("_id")
+                if hasattr(event_doc.get("timestamp"), "isoformat"):
+                    event_doc["timestamp"] = event_doc["timestamp"].isoformat()
+                
+                return RecommendationEvent(**event_doc)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve created event: {str(e)}")
     
     raise HTTPException(status_code=500, detail="Failed to create event")
 
