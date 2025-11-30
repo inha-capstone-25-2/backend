@@ -218,6 +218,37 @@ class RecommendationRepository:
             logger.error(f"Failed to log event: {e}")
             return None
 
+    def log_session_context(
+        self,
+        user_id: int,
+        session_id: str,
+        context_data: Dict[str, Any],
+    ) -> str:
+        """
+        세션 컨텍스트 로깅 (RL 메타데이터 1번만 저장).
+        
+        Args:
+            user_id: 사용자 ID
+            session_id: 세션 ID
+            context_data: RL 메타데이터 (candidates, candidates_features, candidates_scores, final_display)
+        """
+        event_doc = {
+            "user_id": user_id,
+            "paper_id": "",  # 세션 컨텍스트는 특정 논문이 아님
+            "activity_type": "session_context",
+            "timestamp": datetime.utcnow(),
+            "session_id": session_id,
+            "metadata": context_data,
+        }
+
+        try:
+            result = self.events_collection.insert_one(event_doc)
+            logger.info(f"Logged session context for session {session_id}")
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Failed to log session context: {e}")
+            return None
+
     def get_events_by_session(
         self, session_id: str, page: int = 1, page_size: int = 50
     ) -> tuple[int, List[Dict[str, Any]]]:

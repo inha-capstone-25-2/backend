@@ -94,23 +94,29 @@ class RecommendationService:
         self.repo.log_recommendations_batch(log_docs)
         logger.info(f"[PERF] Batch logging took {time.time() - step_start:.3f}s")
 
-        # 2.5 Expose 이벤트 로깅 (RL Reward 기준점)
+        # 2.5 세션 컨텍스트 로깅 (RL 메타데이터 1번만 저장)
         step_start = time.time()
-        # 주의: candidate_ids는 이제 전체 후보군(50개)을 의미함
-        
+        self.repo.log_session_context(
+            user_id=user.id,
+            session_id=session_id,
+            context_data={
+                "candidates": all_candidate_ids,
+                "candidates_features": candidates_features_dict,
+                "candidates_scores": candidates_scores_dict,
+                "final_display": final_display,
+            }
+        )
+        logger.info(f"[PERF] Session context logging took {time.time() - step_start:.3f}s")
+
+        # 2.6 Expose 이벤트 로깅 (개별 position만 저장)
+        step_start = time.time()
         for idx, rec in enumerate(recommendations):
             self.repo.log_event(
                 user_id=user.id,
                 paper_id=rec.get("paper_id"),
                 activity_type=ActivityType.EXPOSE.value,
                 session_id=session_id,
-                metadata={
-                    "candidates": all_candidate_ids,  # 전체 후보군 50개 저장
-                    "candidates_features": candidates_features_dict,  # 딕셔너리 형태로 변경
-                    "candidates_scores": candidates_scores_dict,  # 딕셔너리 형태로 변경
-                    "final_display": final_display,  # 최종 추천된 6개 논문 ID
-                    "position": idx
-                }
+                metadata={"position": idx}  # position만 저장
             )
         logger.info(f"[PERF] Expose event logging took {time.time() - step_start:.3f}s")
 

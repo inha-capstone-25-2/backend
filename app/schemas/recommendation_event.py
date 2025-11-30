@@ -13,6 +13,7 @@ from enum import Enum
 
 class ActivityType(str, Enum):
     """이벤트 유형"""
+    SESSION_CONTEXT = "session_context"  # 세션 컨텍스트 (RL 메타데이터)
     EXPOSE = "expose"  # 추천 노출
     CLICK = "click"  # 클릭
     BOOKMARK = "bookmark"  # 북마크
