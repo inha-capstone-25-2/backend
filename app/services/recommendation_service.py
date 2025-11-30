@@ -10,6 +10,7 @@ from app.utils.rule_based_recommender import RuleBasedRecommender
 from app.utils.mongodb import serialize_object_id
 from app.models.user import User
 from app.schemas.recommendation import RecommendationItem, ScoreBreakdown
+from app.schemas.recommendation_event import ActivityType
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,23 @@ class RecommendationService:
         # 배치로 한 번에 로깅
         self.repo.log_recommendations_batch(log_docs)
         logger.info(f"[PERF] Batch logging took {time.time() - step_start:.3f}s")
+
+        # 2.5 Expose 이벤트 로깅 (RL Reward 기준점)
+        step_start = time.time()
+        candidate_ids = [rec.get("paper_id") for rec in recommendations]
+        
+        for idx, rec in enumerate(recommendations):
+            self.repo.log_event(
+                user_id=user.id,
+                paper_id=rec.get("paper_id"),
+                activity_type=ActivityType.EXPOSE.value,
+                session_id=session_id,
+                metadata={
+                    "candidates": candidate_ids,
+                    "position": idx
+                }
+            )
+        logger.info(f"[PERF] Expose event logging took {time.time() - step_start:.3f}s")
 
         # 3. 응답 생성
         step_start = time.time()
