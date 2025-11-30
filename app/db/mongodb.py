@@ -4,7 +4,6 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
 from app.core.settings import settings
-from app.core.settings import settings
 
 
 logger = logging.getLogger(__name__)

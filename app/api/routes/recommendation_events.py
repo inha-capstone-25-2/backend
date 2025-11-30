@@ -13,7 +13,6 @@ from app.schemas.recommendation_event import (
     RecommendationEventCreate,
     RecommendationEvent,
     EventListResponse,
-    ActivityType,
 )
 from app.repositories.recommendation_repository import RecommendationRepository
 from app.utils.mongodb import serialize_object_id
