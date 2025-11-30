@@ -116,7 +116,7 @@ def record_recommendation_interaction(
     """
     추천 논문 상호작용 데이터 저장.
     
-    체류 시간, 스크롤 깊이, 북마크 등의 사용자 상호작용 데이터를
+    체류 시간, 스크롤 깊이, 북마크 상호작용 데이터를
     recommendation_interactions 컬렉션에 저장합니다.
     """
     # recommendation_id로부터 user_id와 paper_id 조회
