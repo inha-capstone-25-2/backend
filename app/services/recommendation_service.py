@@ -27,6 +27,11 @@ class RecommendationService:
         start_time = time.time()
         logger.info(f"Generating recommendations for user {user.id}")
 
+        # 0. session_id 생성 (동일 추천 세션 그룹화용)
+        import uuid
+        session_id = str(uuid.uuid4())
+        logger.info(f"Generated session_id: {session_id}")
+
         # 1. 추천 생성
         step_start = time.time()
         recommender = RuleBasedRecommender()
@@ -44,6 +49,7 @@ class RecommendationService:
         log_docs = []
         for rec in recommendations:
             log_doc = {
+                "session_id": session_id,  # session_id 추가
                 "user_id": user.id,
                 "paper_id": rec.get("paper_id"),
                 "recommendation_type": "rule_based",
@@ -94,6 +100,7 @@ class RecommendationService:
 
         return {
             "user_id": user.id,
+            "session_id": session_id,  # session_id 추가
             "recommendation_type": "rule_based",
             "recommendations": recommendation_items,
             "total_count": len(recommendation_items),

@@ -36,6 +36,7 @@ class RecommendationRepository:
         score: float,
         breakdown: Dict[str, float],
         reasons: List[str],
+        session_id: str = None,
     ) -> None:
         """추천 결과를 MongoDB에 로깅"""
         log_doc = {
@@ -53,6 +54,10 @@ class RecommendationRepository:
             "was_clicked": False,
             "recommended_at": datetime.utcnow(),
         }
+        
+        # session_id 추가 (있는 경우에만)
+        if session_id:
+            log_doc["session_id"] = session_id
 
         try:
             self.recommendations_collection.insert_one(log_doc)
