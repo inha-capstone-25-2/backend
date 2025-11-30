@@ -33,19 +33,26 @@ class RecommendationService:
         session_id = str(uuid.uuid4())
         logger.info(f"Generated session_id: {session_id}")
 
-        # 1. 추천 생성
+        # 1. 추천 생성 (전체 후보군 조회)
         step_start = time.time()
         recommender = RuleBasedRecommender()
-        recommendations = recommender.recommend(
+        # top_k=None으로 호출하여 전체 후보군(50개)을 받아옴
+        all_recommendations = recommender.recommend(
             user=user,
             db_postgres=db_postgres,
             db_mongo=self.db_mongo,
-            top_k=top_k,
+            top_k=None,
             candidate_limit=candidate_limit,
         )
         logger.info(f"[PERF] Recommender.recommend took {time.time() - step_start:.3f}s")
 
-        # 2. 추천 로깅 (배치 처리)
+        # 전체 후보군 ID 리스트 (RL 학습용)
+        all_candidate_ids = [rec.get("paper_id") for rec in all_recommendations]
+
+        # 상위 k개만 선택하여 사용자에게 반환
+        recommendations = all_recommendations[:top_k]
+
+        # 2. 추천 로깅 (배치 처리) - 상위 k개만 로깅
         step_start = time.time()
         log_docs = []
         for rec in recommendations:
@@ -73,7 +80,7 @@ class RecommendationService:
 
         # 2.5 Expose 이벤트 로깅 (RL Reward 기준점)
         step_start = time.time()
-        candidate_ids = [rec.get("paper_id") for rec in recommendations]
+        # 주의: candidate_ids는 이제 전체 후보군(50개)을 의미함
         
         for idx, rec in enumerate(recommendations):
             self.repo.log_event(
@@ -82,7 +89,7 @@ class RecommendationService:
                 activity_type=ActivityType.EXPOSE.value,
                 session_id=session_id,
                 metadata={
-                    "candidates": candidate_ids,
+                    "candidates": all_candidate_ids,  # 전체 후보군 50개 저장
                     "position": idx
                 }
             )
