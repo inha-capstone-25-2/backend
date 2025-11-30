@@ -4,16 +4,7 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
 from app.core.settings import settings
-from app.core.constants import (
-    COLLECTION_SEARCH_HISTORY,
-    COLLECTION_USER_ACTIVITIES,
-    COLLECTION_RECOMMENDATION_INTERACTIONS,
-    COLLECTION_RECOMMENDATION_EVENTS,
-    TTL_SEARCH_HISTORY_SECONDS,
-    TTL_USER_ACTIVITIES_SECONDS,
-    TTL_RECOMMENDATION_INTERACTIONS_SECONDS,
-    TTL_RECOMMENDATION_EVENTS_SECONDS,
-)
+from app.core.settings import settings
 
 
 logger = logging.getLogger(__name__)
@@ -70,80 +61,12 @@ class MongoDBManager:
             self.db = None
 
     def _create_indexes(self) -> None:
-        """TTL 인덱스 등 필요한 인덱스 생성"""
+        """필요한 인덱스 생성 (app/db/indexes.py 위임)"""
         if not self.db:
             return
 
-        try:
-            # search_history: 30일 후 자동 삭제
-            self.db[COLLECTION_SEARCH_HISTORY].create_index(
-                "searched_at",
-                expireAfterSeconds=TTL_SEARCH_HISTORY_SECONDS,
-                name="ttl_searched_at",
-            )
-            logger.info("TTL index created for search_history (30 days)")
-
-            # user_activities: 90일 후 자동 삭제
-            self.db[COLLECTION_USER_ACTIVITIES].create_index(
-                "timestamp",
-                expireAfterSeconds=TTL_USER_ACTIVITIES_SECONDS,
-                name="ttl_timestamp",
-            )
-            logger.info("TTL index created for user_activities (90 days)")
-
-            # recommendation_interactions: 60일 후 자동 삭제
-            self.db[COLLECTION_RECOMMENDATION_INTERACTIONS].create_index(
-                "created_at",
-                expireAfterSeconds=TTL_RECOMMENDATION_INTERACTIONS_SECONDS,
-                name="ttl_created_at",
-            )
-            logger.info("TTL index created for recommendation_interactions (60 days)")
-
-            # recommendation_events: 90일 후 자동 삭제
-            self.db[COLLECTION_RECOMMENDATION_EVENTS].create_index(
-                "timestamp",
-                expireAfterSeconds=TTL_RECOMMENDATION_EVENTS_SECONDS,
-                name="ttl_timestamp",
-            )
-            logger.info("TTL index created for recommendation_events (90 days)")
-
-            # papers 컬렉션: 추천 시스템용 및 검색 API용 인덱스
-            papers_collection = self.db[settings.mongo_collection]
-            
-            # categories 인덱스 (관심사 기반 필터링)
-            papers_collection.create_index(
-                [("categories", 1)],
-                name="categories_only",
-                background=True
-            )
-            logger.info("Index created for papers: categories (recommendation)")
-
-            # view_count, bookmark_count 복합 인덱스 (인기도 정렬)
-            papers_collection.create_index(
-                [("view_count", -1), ("bookmark_count", -1)],
-                name="popularity_sort",
-                background=True
-            )
-            logger.info("Index created for papers: view_count + bookmark_count (popularity)")
-
-            # categories + view_count 복합 인덱스 (검색 API용)
-            papers_collection.create_index(
-                [("categories", 1), ("view_count", -1)],
-                name="categories_view_count",
-                background=True
-            )
-            logger.info("Index created for papers: categories + view_count (search API)")
-
-            # categories + bookmark_count 복합 인덱스 (검색 API용)
-            papers_collection.create_index(
-                [("categories", 1), ("bookmark_count", -1)],
-                name="categories_bookmark_count",
-                background=True
-            )
-            logger.info("Index created for papers: categories + bookmark_count (search API)")
-
-        except Exception as e:
-            logger.warning(f"Index creation failed (may already exist): {e}")
+        from app.db.indexes import ensure_indexes
+        ensure_indexes(self.db)
 
 
     def close(self) -> None:

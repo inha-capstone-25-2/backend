@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
 from pymongo.database import Database
@@ -263,5 +263,67 @@ class RecommendationRepository:
         except Exception as e:
             logger.error(f"Failed to get events for user {user_id}: {e}")
             return 0, []
+
+    def get_user_context_stats(self, user_id: int) -> Dict[str, float]:
+        """
+        RL 모델 입력을 위한 사용자 컨텍스트 통계 계산.
+        
+        Returns:
+            dict: {
+                "activity_count": 최근 30일 활동 수,
+                "avg_dwell_time": 평균 체류 시간 (초),
+                "bookmark_rate": 북마크 비율 (0.0 ~ 1.0)
+            }
+        """
+        try:
+            # 1. 최근 30일 활동 수 (user_activities 컬렉션 가정)
+            # 현재 user_activities 컬렉션 접근이 없으므로 events_collection으로 대체하거나 추가 필요
+            # 여기서는 recommendation_events 기준으로 계산
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            activity_count = self.events_collection.count_documents({
+                "user_id": user_id,
+                "timestamp": {"$gte": thirty_days_ago}
+            })
+
+            # 2. 평균 체류 시간 (detail_view 이벤트의 dwell_time_ms)
+            pipeline = [
+                {
+                    "$match": {
+                        "user_id": user_id,
+                        "activity_type": "detail_view",
+                        "metadata.dwell_time_ms": {"$exists": True}
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "avg_dwell_ms": {"$avg": "$metadata.dwell_time_ms"}
+                    }
+                }
+            ]
+            avg_dwell_result = list(self.events_collection.aggregate(pipeline))
+            avg_dwell_time = (avg_dwell_result[0]["avg_dwell_ms"] / 1000.0) if avg_dwell_result else 0.0
+
+            # 3. 북마크 비율 (북마크 수 / 전체 상호작용 수)
+            total_interactions = self.events_collection.count_documents({"user_id": user_id})
+            bookmark_count = self.events_collection.count_documents({
+                "user_id": user_id,
+                "activity_type": "bookmark"
+            })
+            bookmark_rate = (bookmark_count / total_interactions) if total_interactions > 0 else 0.0
+
+            return {
+                "activity_count": float(activity_count),
+                "avg_dwell_time": float(avg_dwell_time),
+                "bookmark_rate": float(bookmark_rate),
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to calculate user context stats for {user_id}: {e}")
+            return {
+                "activity_count": 0.0,
+                "avg_dwell_time": 0.0,
+                "bookmark_rate": 0.0,
+            }
 
 
