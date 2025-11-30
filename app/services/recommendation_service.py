@@ -61,12 +61,12 @@ class RecommendationService:
             rec.get("paper_id"): rec.get("total_score", 0.0)
             for rec in all_recommendations
         }
-        
-        # 최종 추천된 6개 논문 ID 리스트 (RL Action)
-        final_display = [rec.get("paper_id") for rec in recommendations]
 
         # 상위 k개만 선택하여 사용자에게 반환
         recommendations = all_recommendations[:top_k]
+        
+        # 최종 추천된 6개 논문 ID 리스트 (RL Action)
+        final_display = [rec.get("paper_id") for rec in recommendations]
 
         # 2. 추천 로깅 (배치 처리) - 상위 k개만 로깅
         step_start = time.time()
