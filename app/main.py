@@ -25,6 +25,7 @@ from app.api.routes.user_interests import router as user_interests_router
 from app.api.routes.bookmarks import router as bookmarks_router
 from app.api.routes.activities import router as activities_router
 from app.api.routes.recommendations import router as recommendations_router
+from app.api.routes.recommendation_events import router as recommendation_events_router
 from app.db.postgres import init_db
 from app.loader.arxiv_loader import load_arxiv_data_to_mongodb
 
@@ -149,6 +150,7 @@ app.include_router(user_interests_router)
 app.include_router(bookmarks_router)
 app.include_router(activities_router)
 app.include_router(recommendations_router)
+app.include_router(recommendation_events_router)
 
 
 @app.get("/")

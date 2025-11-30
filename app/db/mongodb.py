@@ -8,9 +8,11 @@ from app.core.constants import (
     COLLECTION_SEARCH_HISTORY,
     COLLECTION_USER_ACTIVITIES,
     COLLECTION_RECOMMENDATION_INTERACTIONS,
+    COLLECTION_RECOMMENDATION_EVENTS,
     TTL_SEARCH_HISTORY_SECONDS,
     TTL_USER_ACTIVITIES_SECONDS,
     TTL_RECOMMENDATION_INTERACTIONS_SECONDS,
+    TTL_RECOMMENDATION_EVENTS_SECONDS,
 )
 
 
@@ -96,6 +98,14 @@ class MongoDBManager:
                 name="ttl_created_at",
             )
             logger.info("TTL index created for recommendation_interactions (60 days)")
+
+            # recommendation_events: 90일 후 자동 삭제
+            self.db[COLLECTION_RECOMMENDATION_EVENTS].create_index(
+                "timestamp",
+                expireAfterSeconds=TTL_RECOMMENDATION_EVENTS_SECONDS,
+                name="ttl_timestamp",
+            )
+            logger.info("TTL index created for recommendation_events (90 days)")
 
             # papers 컬렉션: 추천 시스템용 및 검색 API용 인덱스
             papers_collection = self.db[settings.mongo_collection]

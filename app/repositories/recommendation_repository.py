@@ -9,6 +9,7 @@ from bson import ObjectId
 from app.core.constants import (
     COLLECTION_PAPER_RECOMMENDATIONS,
     COLLECTION_RECOMMENDATION_INTERACTIONS,
+    COLLECTION_RECOMMENDATION_EVENTS,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,9 @@ class RecommendationRepository:
         ]
         self.interactions_collection: Collection = db[
             COLLECTION_RECOMMENDATION_INTERACTIONS
+        ]
+        self.events_collection: Collection = db[
+            COLLECTION_RECOMMENDATION_EVENTS
         ]
 
     def log_recommendation(
@@ -179,5 +183,80 @@ class RecommendationRepository:
         except Exception as e:
             logger.error(f"Failed to get user interactions: {e}")
             return []
+
+    def log_event(
+        self,
+        user_id: int,
+        paper_id: str,
+        activity_type: str,
+        session_id: str,
+        metadata: Dict[str, Any] = None,
+    ) -> str:
+        """추천 이벤트 로깅"""
+        event_doc = {
+            "user_id": user_id,
+            "paper_id": paper_id,
+            "activity_type": activity_type,
+            "timestamp": datetime.utcnow(),
+            "session_id": session_id,
+            "metadata": metadata or {},
+        }
+
+        try:
+            result = self.events_collection.insert_one(event_doc)
+            logger.info(
+                f"Logged event: {activity_type} for paper {paper_id} "
+                f"by user {user_id} in session {session_id}"
+            )
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Failed to log event: {e}")
+            return None
+
+    def get_events_by_session(
+        self, session_id: str, page: int = 1, page_size: int = 50
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """세션별 이벤트 조회 (시간순 정렬)"""
+        try:
+            query = {"session_id": session_id}
+            total = self.events_collection.count_documents(query)
+
+            skip = (page - 1) * page_size
+            cursor = (
+                self.events_collection.find(query)
+                .sort("timestamp", 1)  # 시간순 오름차순
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            items = list(cursor)
+            return total, items
+
+        except Exception as e:
+            logger.error(f"Failed to get events for session {session_id}: {e}")
+            return 0, []
+
+    def get_events_by_user(
+        self, user_id: int, page: int = 1, page_size: int = 50
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """사용자별 이벤트 조회 (최신순 정렬)"""
+        try:
+            query = {"user_id": user_id}
+            total = self.events_collection.count_documents(query)
+
+            skip = (page - 1) * page_size
+            cursor = (
+                self.events_collection.find(query)
+                .sort("timestamp", -1)  # 최신순 내림차순
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            items = list(cursor)
+            return total, items
+
+        except Exception as e:
+            logger.error(f"Failed to get events for user {user_id}: {e}")
+            return 0, []
 
 
