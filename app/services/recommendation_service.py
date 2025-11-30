@@ -48,6 +48,9 @@ class RecommendationService:
 
         # 전체 후보군 ID 리스트 (RL 학습용)
         all_candidate_ids = [rec.get("paper_id") for rec in all_recommendations]
+        
+        # 전체 후보군 특징 벡터 리스트 (RL 학습용)
+        all_candidate_features = [rec.get("breakdown", {}) for rec in all_recommendations]
 
         # 상위 k개만 선택하여 사용자에게 반환
         recommendations = all_recommendations[:top_k]
@@ -90,6 +93,7 @@ class RecommendationService:
                 session_id=session_id,
                 metadata={
                     "candidates": all_candidate_ids,  # 전체 후보군 50개 저장
+                    "candidates_features": all_candidate_features,  # 전체 후보군 특징 저장
                     "position": idx
                 }
             )
