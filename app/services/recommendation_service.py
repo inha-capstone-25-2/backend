@@ -49,8 +49,21 @@ class RecommendationService:
         # 전체 후보군 ID 리스트 (RL 학습용)
         all_candidate_ids = [rec.get("paper_id") for rec in all_recommendations]
         
-        # 전체 후보군 특징 벡터 리스트 (RL 학습용)
-        all_candidate_features = [rec.get("breakdown", {}) for rec in all_recommendations]
+        # 전체 후보군 특징 벡터 딕셔너리 (RL 학습용)
+        # ML 팀 요구: paper_id를 키로, feature breakdown을 값으로
+        candidates_features_dict = {
+            rec.get("paper_id"): rec.get("breakdown", {}) 
+            for rec in all_recommendations
+        }
+        
+        # 전체 후보군 총점 딕셔너리 (RL 학습용)
+        candidates_scores_dict = {
+            rec.get("paper_id"): rec.get("total_score", 0.0)
+            for rec in all_recommendations
+        }
+        
+        # 최종 추천된 6개 논문 ID 리스트 (RL Action)
+        final_display = [rec.get("paper_id") for rec in recommendations]
 
         # 상위 k개만 선택하여 사용자에게 반환
         recommendations = all_recommendations[:top_k]
@@ -93,7 +106,9 @@ class RecommendationService:
                 session_id=session_id,
                 metadata={
                     "candidates": all_candidate_ids,  # 전체 후보군 50개 저장
-                    "candidates_features": all_candidate_features,  # 전체 후보군 특징 저장
+                    "candidates_features": candidates_features_dict,  # 딕셔너리 형태로 변경
+                    "candidates_scores": candidates_scores_dict,  # 딕셔너리 형태로 변경
+                    "final_display": final_display,  # 최종 추천된 6개 논문 ID
                     "position": idx
                 }
             )
