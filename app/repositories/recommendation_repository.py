@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
 from pymongo.database import Database
@@ -9,6 +9,7 @@ from bson import ObjectId
 from app.core.constants import (
     COLLECTION_PAPER_RECOMMENDATIONS,
     COLLECTION_RECOMMENDATION_INTERACTIONS,
+    COLLECTION_RECOMMENDATION_EVENTS,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,9 @@ class RecommendationRepository:
         self.interactions_collection: Collection = db[
             COLLECTION_RECOMMENDATION_INTERACTIONS
         ]
+        self.events_collection: Collection = db[
+            COLLECTION_RECOMMENDATION_EVENTS
+        ]
 
     def log_recommendation(
         self,
@@ -32,6 +36,7 @@ class RecommendationRepository:
         score: float,
         breakdown: Dict[str, float],
         reasons: List[str],
+        session_id: str = None,
     ) -> None:
         """추천 결과를 MongoDB에 로깅"""
         log_doc = {
@@ -49,6 +54,10 @@ class RecommendationRepository:
             "was_clicked": False,
             "recommended_at": datetime.utcnow(),
         }
+        
+        # session_id 추가 (있는 경우에만)
+        if session_id:
+            log_doc["session_id"] = session_id
 
         try:
             self.recommendations_collection.insert_one(log_doc)
@@ -179,5 +188,173 @@ class RecommendationRepository:
         except Exception as e:
             logger.error(f"Failed to get user interactions: {e}")
             return []
+
+    def log_event(
+        self,
+        user_id: int,
+        paper_id: str,
+        activity_type: str,
+        session_id: str,
+        metadata: Dict[str, Any] = None,
+    ) -> str:
+        """추천 이벤트 로깅"""
+        event_doc = {
+            "user_id": user_id,
+            "paper_id": paper_id,
+            "activity_type": activity_type,
+            "timestamp": datetime.utcnow(),
+            "session_id": session_id,
+            "metadata": metadata or {},
+        }
+
+        try:
+            result = self.events_collection.insert_one(event_doc)
+            logger.info(
+                f"Logged event: {activity_type} for paper {paper_id} "
+                f"by user {user_id} in session {session_id}"
+            )
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Failed to log event: {e}")
+            return None
+
+    def log_session_context(
+        self,
+        user_id: int,
+        session_id: str,
+        context_data: Dict[str, Any],
+    ) -> str:
+        """
+        세션 컨텍스트 로깅 (RL 메타데이터 1번만 저장).
+        
+        Args:
+            user_id: 사용자 ID
+            session_id: 세션 ID
+            context_data: RL 메타데이터 (candidates, candidates_features, candidates_scores, final_display)
+        """
+        event_doc = {
+            "user_id": user_id,
+            "paper_id": "",  # 세션 컨텍스트는 특정 논문이 아님
+            "activity_type": "session_context",
+            "timestamp": datetime.utcnow(),
+            "session_id": session_id,
+            "metadata": context_data,
+        }
+
+        try:
+            result = self.events_collection.insert_one(event_doc)
+            logger.info(f"Logged session context for session {session_id}")
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Failed to log session context: {e}")
+            return None
+
+    def get_events_by_session(
+        self, session_id: str, page: int = 1, page_size: int = 50
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """세션별 이벤트 조회 (시간순 정렬)"""
+        try:
+            query = {"session_id": session_id}
+            total = self.events_collection.count_documents(query)
+
+            skip = (page - 1) * page_size
+            cursor = (
+                self.events_collection.find(query)
+                .sort("timestamp", 1)  # 시간순 오름차순
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            items = list(cursor)
+            return total, items
+
+        except Exception as e:
+            logger.error(f"Failed to get events for session {session_id}: {e}")
+            return 0, []
+
+    def get_events_by_user(
+        self, user_id: int, page: int = 1, page_size: int = 50
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """사용자별 이벤트 조회 (최신순 정렬)"""
+        try:
+            query = {"user_id": user_id}
+            total = self.events_collection.count_documents(query)
+
+            skip = (page - 1) * page_size
+            cursor = (
+                self.events_collection.find(query)
+                .sort("timestamp", -1)  # 최신순 내림차순
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            items = list(cursor)
+            return total, items
+
+        except Exception as e:
+            logger.error(f"Failed to get events for user {user_id}: {e}")
+            return 0, []
+
+    def get_user_context_stats(self, user_id: int) -> Dict[str, float]:
+        """
+        RL 모델 입력을 위한 사용자 컨텍스트 통계 계산.
+        
+        Returns:
+            dict: {
+                "activity_count": 최근 30일 활동 수,
+                "avg_dwell_time": 평균 체류 시간 (초),
+                "bookmark_rate": 북마크 비율 (0.0 ~ 1.0)
+            }
+        """
+        try:
+            # 1. 최근 30일 활동 수 (user_activities 컬렉션 가정)
+            # 현재 user_activities 컬렉션 접근이 없으므로 events_collection으로 대체하거나 추가 필요
+            # 여기서는 recommendation_events 기준으로 계산
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            activity_count = self.events_collection.count_documents({
+                "user_id": user_id,
+                "timestamp": {"$gte": thirty_days_ago}
+            })
+
+            # 2. 평균 체류 시간 (detail_view 이벤트의 dwell_time_ms)
+            pipeline = [
+                {
+                    "$match": {
+                        "user_id": user_id,
+                        "activity_type": "detail_view",
+                        "metadata.dwell_time_ms": {"$exists": True}
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "avg_dwell_ms": {"$avg": "$metadata.dwell_time_ms"}
+                    }
+                }
+            ]
+            avg_dwell_result = list(self.events_collection.aggregate(pipeline))
+            avg_dwell_time = (avg_dwell_result[0]["avg_dwell_ms"] / 1000.0) if avg_dwell_result else 0.0
+
+            # 3. 북마크 비율 (북마크 수 / 전체 상호작용 수)
+            total_interactions = self.events_collection.count_documents({"user_id": user_id})
+            bookmark_count = self.events_collection.count_documents({
+                "user_id": user_id,
+                "activity_type": "bookmark"
+            })
+            bookmark_rate = (bookmark_count / total_interactions) if total_interactions > 0 else 0.0
+
+            return {
+                "activity_count": float(activity_count),
+                "avg_dwell_time": float(avg_dwell_time),
+                "bookmark_rate": float(bookmark_rate),
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to calculate user context stats for {user_id}: {e}")
+            return {
+                "activity_count": 0.0,
+                "avg_dwell_time": 0.0,
+                "bookmark_rate": 0.0,
+            }
 
 

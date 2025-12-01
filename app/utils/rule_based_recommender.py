@@ -40,7 +40,7 @@ class RuleBasedRecommender:
         user: User,
         db_postgres: Session,
         db_mongo: Database,
-        top_k: int = 10,
+        top_k: int = None,  # None이면 전체 반환
         candidate_limit: int = 50,  # 100 -> 50으로 축소
     ) -> List[Dict[str, Any]]:
         """
@@ -133,10 +133,16 @@ class RuleBasedRecommender:
         
         logger.info(f"[PERF] Score calculation took {time.time() - step_start:.3f}s")
 
-        # 5. 점수 기준 정렬 및 상위 k개 선택
+        # 5. 점수 기준 정렬
         step_start = time.time()
         recommendations.sort(key=lambda x: x["total_score"], reverse=True)
-        results = recommendations[:top_k]
+        
+        # top_k가 지정된 경우에만 슬라이싱 (None이면 전체 반환)
+        if top_k is not None:
+            results = recommendations[:top_k]
+        else:
+            results = recommendations
+            
         logger.info(f"[PERF] Sorting and filtering took {time.time() - step_start:.3f}s")
         
         logger.info(f"[PERF] Total recommendation time: {time.time() - start_time:.3f}s")

@@ -91,8 +91,10 @@ class TestRecommendationService:
         )
 
         # Verify custom parameters were passed
+        # 현재 구현: recommender는 항상 top_k=None으로 호출되어 전체 후보군을 가져온 후
+        # 서비스 레이어에서 슬라이싱함
         call_args = mock_recommender.recommend.call_args
-        assert call_args.kwargs["top_k"] == 5
+        assert call_args.kwargs["top_k"] is None  # 전체 후보군 조회
         assert call_args.kwargs["candidate_limit"] == 50
 
     @patch("app.services.recommendation_service.RuleBasedRecommender")

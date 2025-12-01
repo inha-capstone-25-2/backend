@@ -40,6 +40,7 @@ class RecommendationResponse(BaseModel):
     """추천 결과 응답"""
 
     user_id: int = Field(..., description="사용자 ID")
+    session_id: str = Field(..., description="추천 세션 ID")
     recommendation_type: str = Field("rule_based", description="추천 타입")
     recommendations: List[RecommendationItem] = Field(
         ..., description="추천 논문 리스트"
@@ -52,6 +53,7 @@ class RecommendationLog(BaseModel):
     """추천 로그 항목 (MongoDB paper_recommendations 컬렉션)"""
 
     id: str = Field(..., description="로그 ID")
+    session_id: Optional[str] = Field(None, description="추천 세션 ID")
     user_id: int = Field(..., description="사용자 ID")
     paper_id: str = Field(..., description="논문 ID")
     recommendation_type: str = Field(..., description="추천 타입")
