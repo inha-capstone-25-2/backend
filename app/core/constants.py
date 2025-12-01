@@ -18,6 +18,14 @@ COLLECTION_ARXIV_FAILURES = "arxiv_failures"
 SEARCH_CANDIDATE_LIMIT = 2000  # Text Search 후보 제한
 DEFAULT_PAGE_SIZE = 10  # 기본 페이지 크기
 
+# 추천 시스템 관련 상수
+RECOMMENDATION_CANDIDATE_LIMIT = 50  # 추천 후보 논문 개수
+RECOMMENDATION_TOP_K_DEFAULT = 10  # 기본 추천 개수
+
+# 캐시 관련 상수
+USER_CACHE_TTL_SECONDS = 5 * 60  # 사용자 정보 캐시 TTL (5분)
+USER_CACHE_MAX_SIZE = 1024  # 사용자 정보 캐시 최대 크기
+
 # TTL (Time To Live) 상수 (초 단위)
 TTL_SEARCH_HISTORY_SECONDS = 30 * 24 * 60 * 60  # 30일
 TTL_USER_ACTIVITIES_SECONDS = 90 * 24 * 60 * 60  # 90일

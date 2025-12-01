@@ -7,6 +7,7 @@ Dev 환경용 Mock paper_recommendations 데이터 생성 스크립트.
 from __future__ import annotations
 import logging
 import random
+import uuid
 from datetime import datetime, timedelta
 from pymongo.database import Database
 from app.core.constants import COLLECTION_PAPER_RECOMMENDATIONS
@@ -61,7 +62,6 @@ def seed_paper_recommendations(db: Database) -> int:
         user_id = random.randint(1, 500)
         
         # 세션 ID 생성
-        import uuid
         session_id = str(uuid.uuid4())
         
         # 랜덤 추천 타입
