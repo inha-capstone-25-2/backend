@@ -1,5 +1,6 @@
 import logging
 import math
+import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -81,7 +82,6 @@ class PaperRepository:
             # 2. 후보군에 대해 정렬 및 상세 정보 조회 (Step 2)
             
             try:
-                import time
                 start_time = time.time()
 
                 # Step 1: 후보군 조회 (Text Search Score)
@@ -249,14 +249,6 @@ class PaperRepository:
         return doc
 
     # --- Helper Methods ---
-
-    def _sort_items(self, items: List[Dict], sort_by: str):
-        if sort_by == "view_count":
-            items.sort(key=lambda x: x.get("view_count", 0), reverse=True)
-        elif sort_by == "update_date":
-            items.sort(key=lambda x: x.get("update_date", ""), reverse=True)
-        else:  # relevance
-            items.sort(key=lambda x: x.get("score", 0), reverse=True)
 
     def _get_sort_field(self, sort_by: str):
         if sort_by == "view_count":

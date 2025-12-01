@@ -6,13 +6,14 @@ from jose import JWTError, jwt
 from app.db.postgres import get_db
 from app.models.user import User
 from app.core.settings import settings
+from app.core.constants import USER_CACHE_TTL_SECONDS, USER_CACHE_MAX_SIZE
 from cachetools import TTLCache
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-# 사용자 정보 캐시 (TTL 5분, 최대 1024개)
+# 사용자 정보 캐시
 # Key: (username, token_version)
-user_cache = TTLCache(maxsize=1024, ttl=300)
+user_cache = TTLCache(maxsize=USER_CACHE_MAX_SIZE, ttl=USER_CACHE_TTL_SECONDS)
 
 
 def get_current_user(

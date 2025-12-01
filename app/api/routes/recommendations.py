@@ -101,7 +101,7 @@ def record_recommendation_click(
     result = service.record_click(recommendation_id, current_user.id)
     
     if not result["success"]:
-        raise HTTPException(status_code=404, detail=f"Recommendation {recommendation_id} not found")
+        raise HTTPException(status_code=404, detail=f"추천 ID {recommendation_id}를 찾을 수 없습니다")
     
     return ClickResponse(**result)
 
@@ -124,10 +124,10 @@ def record_recommendation_interaction(
     rec = recommendations_coll.find_one({"_id": ObjectId(recommendation_id)})
     
     if not rec:
-        raise HTTPException(status_code=404, detail=f"Recommendation {recommendation_id} not found")
+        raise HTTPException(status_code=404, detail=f"추천 ID {recommendation_id}를 찾을 수 없습니다")
     
     if rec["user_id"] != current_user.id:
-        raise HTTPException(status_code=403, detail="Unauthorized access to this recommendation")
+        raise HTTPException(status_code=403, detail="이 추천에 접근할 권한이 없습니다")
     
     service = RecommendationService(db_mongo)
     interaction_dict = interaction_data.model_dump(exclude_unset=True, exclude={"recommendation_id"})
@@ -140,7 +140,7 @@ def record_recommendation_interaction(
     )
     
     if not result:
-        raise HTTPException(status_code=500, detail="Failed to save interaction data")
+        raise HTTPException(status_code=500, detail="상호작용 데이터 저장에 실패했습니다")
     
     return RecommendationInteraction(**result)
 

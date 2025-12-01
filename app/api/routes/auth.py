@@ -23,7 +23,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     )
     if exists:
         raise HTTPException(
-            status_code=400, detail="Email or username already registered"
+            status_code=400, detail="이미 등록된 이메일 또는 사용자명입니다"
         )
     user = User(
         email=payload.email,
@@ -42,7 +42,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     user = db.query(User).filter(User.username == form.username).first()
     if not user or not verify_password(form.password, user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="잘못된 인증 정보입니다"
         )
     access_token = create_access_token(
         data={"sub": user.username, "ver": user.token_version or 0},
