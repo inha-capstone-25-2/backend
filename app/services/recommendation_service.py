@@ -10,6 +10,7 @@ from app.utils.rule_based_recommender import RuleBasedRecommender
 from app.utils.mongodb import serialize_object_id
 from app.models.user import User
 from app.schemas.recommendation import RecommendationItem, ScoreBreakdown
+from app.schemas.paper import Summary
 from app.schemas.recommendation_event import ActivityType
 
 logger = logging.getLogger(__name__)
@@ -128,10 +129,14 @@ class RecommendationService:
             serialize_object_id(paper)
             paper["id"] = paper.pop("_id")
 
+            # summary 필드를 Summary 객체로 변환
+            summary_data = paper.get("summary")
+            summary_obj = Summary(**summary_data) if summary_data else None
+
             item = RecommendationItem(
                 paper_id=rec["paper_id"],
                 title=paper.get("title", ""),
-                abstract=None,  # projection에서 제외했으므로 None
+                summary=summary_obj,
                 authors=paper.get("authors"),
                 categories=paper.get("categories", []),
                 keywords=paper.get("keywords", []),

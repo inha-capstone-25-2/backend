@@ -4,6 +4,7 @@
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+from app.schemas.paper import Summary
 
 
 class ScoreBreakdown(BaseModel):
@@ -20,7 +21,7 @@ class RecommendationItem(BaseModel):
 
     paper_id: str = Field(..., description="논문 ID")
     title: str = Field(..., description="논문 제목")
-    abstract: Optional[str] = Field(None, description="초록")
+    summary: Optional[Summary] = Field(None, description="요약")
     authors: Optional[str] = Field(None, description="저자")
     categories: List[str] = Field(
         default_factory=list, description="카테고리 코드 리스트"

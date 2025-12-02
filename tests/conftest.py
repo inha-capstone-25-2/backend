@@ -38,7 +38,10 @@ def sample_paper_doc():
     return {
         "_id": "2301.00001",
         "title": "Test Paper",
-        "abstract": "This is a test paper abstract.",
+        "summary": {
+            "en": "This is a test paper abstract.",
+            "ko": None
+        },
         "authors": "John Doe, Jane Smith",
         "categories": ["cs.AI", "cs.LG"],
         "update_date": "2023-01-01",
