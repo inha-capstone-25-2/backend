@@ -17,6 +17,8 @@ boto3
 requests
 cachetools
 numpy
+elasticsearch>=8.0.0
+
 
 # Testing dependencies
 pytest>=7.4.0
