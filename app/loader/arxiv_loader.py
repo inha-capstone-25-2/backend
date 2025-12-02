@@ -10,14 +10,14 @@ logger = logging.getLogger(__name__)
 def load_arxiv_data_to_mongodb() -> bool:
     """
     arXiv 데이터 로드 메인 함수.
-    - 로컬: prod MongoDB에서 복제
-    - prod: S3/URL 다운로드 후 MongoDB 적재
+    - local: prod MongoDB에서 복제
+    - dev/prod: S3/URL 다운로드 후 MongoDB 적재
     """
     if settings.app_env == "local":
         logger.info("[arxiv-job] local env: copying from prod MongoDB")
         return copy_prod_to_local_mongo()
     else:
-        logger.info("[arxiv-job] prod env: downloading and ingesting")
+        logger.info(f"[arxiv-job] {settings.app_env} env: downloading and ingesting")
         if not ensure_arxiv_file():
             logger.error("[arxiv-job] file preparation failed")
             return False
