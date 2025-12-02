@@ -10,11 +10,18 @@ from typing import Optional, List
 from datetime import datetime
 
 
+class Summary(BaseModel):
+    """논문 요약 (다국어 지원)"""
+
+    en: Optional[str] = None
+    ko: Optional[str] = None
+
+
 class PaperListItem(BaseModel):
     """
     논문 리스트 아이템 모델 (검색 결과용).
 
-    abstract를 제외하여 네트워크 전송량을 최소화합니다.
+    summary를 제외하여 네트워크 전송량을 최소화합니다.
     MongoDB _id는 id 필드로 변환되어 반환됩니다.
     """
 
@@ -37,7 +44,7 @@ class Paper(BaseModel):
 
     id: str
     title: Optional[str] = None
-    abstract: Optional[str] = None
+    summary: Optional[Summary] = None
     authors: Optional[str] = None
     categories: Optional[List[str]] = None
     update_date: Optional[str] = None

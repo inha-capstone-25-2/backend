@@ -52,11 +52,15 @@ def stream_and_insert_data(
 
             # 파싱
             codes = parse_categories(data.get("categories"))
+            abstract_text = data.get("abstract")
             doc = {
                 "_id": arxiv_id,  # arXiv ID를 PK로 사용
                 "title": data.get("title"),
                 "authors": data.get("authors"),
-                "abstract": data.get("abstract"),
+                "summary": {
+                    "en": abstract_text,
+                    "ko": None  # 초기값은 None, 향후 번역 기능 추가 시 사용
+                } if abstract_text else None,
                 "categories": codes,
                 "update_date": data.get("update_date"),
             }
@@ -136,7 +140,8 @@ def create_unique_index(collection) -> None:
 def create_text_search_index(collection) -> None:
     """
     전문 검색 인덱스 생성.
-    title, abstract, authors 필드에 가중치를 적용한 Text Search 인덱스.
+    title, authors 필드에 가중치를 적용한 Text Search 인덱스.
+    summary는 크기가 크므로 제외하여 인덱스 크기 최적화.
     """
     try:
         collection.create_index(
@@ -150,7 +155,7 @@ def create_text_search_index(collection) -> None:
             name="papers_fulltext_search",
         )
         logger.info("[arxiv-job] Text Search 인덱스 생성 시작 (백그라운드)")
-        logger.info("[arxiv-job] 가중치: title=10, abstract=5, authors=3")
+        logger.info("[arxiv-job] 가중치: title=10, authors=3")
     except Exception as e:
         logger.error(f"[arxiv-job] Text Search 인덱스 생성 실패: {e}")
 
@@ -159,7 +164,7 @@ def create_search_indexes(collection) -> None:
     """
     검색용 인덱스 생성 (데이터 삽입 후 실행).
     1. 복합 인덱스: categories + update_date (카테고리 필터 + 날짜 정렬)
-    2. Text Search 인덱스: title, abstract, authors (전문 검색)
+    2. Text Search 인덱스: title, authors (전문 검색)
     3. 추천 시스템용 인덱스: categories, view_count/bookmark_count
     4. 검색 API용 복합 인덱스: categories + view_count, categories + bookmark_count
     """
