@@ -83,56 +83,31 @@ def get_index_definitions(papers_collection_name: str) -> dict:
             ),
         ],
 
-        # 5. Papers (검색 및 추천용)
-        papers_collection_name: [
-            # 관심사 필터링
-            IndexModel(
-                [("categories", ASCENDING)],
-                name="categories_only",
-                background=True,
-            ),
-            # 인기도 정렬
-            IndexModel(
-                [("view_count", DESCENDING), ("bookmark_count", DESCENDING)],
-                name="popularity_sort",
-                background=True,
-            ),
-            # 카테고리 + 인기도 (검색 최적화)
-            IndexModel(
-                [("categories", ASCENDING), ("view_count", DESCENDING)],
-                name="categories_view_count",
-                background=True,
-            ),
-            IndexModel(
-                [("categories", ASCENDING), ("bookmark_count", DESCENDING)],
-                name="categories_bookmark_count",
-                background=True,
-            ),
-            # Text Search Index (Fallback용)
-            IndexModel(
-                [
-                    ("title", "text"),
-                    ("summary.en", "text"),
-                    ("authors", "text"),
-                ],
-                name="text_search_idx",
-                weights={"title": 3, "authors": 2, "summary.en": 1},
-                background=True,
-            ),
-        ],
+        # 5. Papers (검색은 Elasticsearch 사용, MongoDB는 인덱스 없이 fallback)
+        # _id는 자동 인덱스가 생성되므로 기본 조회는 문제없음
+        papers_collection_name: [],
     }
 
 
-def ensure_indexes(db: Database) -> None:
+def ensure_indexes(db: Database, skip_papers: bool = False) -> None:
     """
     정의된 모든 인덱스를 생성합니다.
     이미 존재하는 인덱스는 건너뜁니다 (멱등성 보장).
+    
+    Args:
+        db: MongoDB Database 인스턴스
+        skip_papers: True일 경우 papers 컬렉션 인덱스 생성을 스킵 (기본값: False)
     """
     logger.info("Starting MongoDB index creation...")
     
     definitions = get_index_definitions(settings.mongo_collection)
     
     for collection_name, indexes in definitions.items():
+        # papers 컬렉션 스킵 (데이터 적재 후 생성)
+        if skip_papers and collection_name == settings.mongo_collection:
+            logger.info(f"Skipping index creation for {collection_name} (will be created after data load)")
+            continue
+            
         try:
             collection = db[collection_name]
             # 인덱스 생성 (create_indexes는 여러 개를 한 번에 생성)

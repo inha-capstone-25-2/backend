@@ -311,10 +311,9 @@ def ingest_arxiv_to_mongo() -> bool:
         )
         logger.info(f"[arxiv-job] 데이터 적재 완료: {count:,}건")
 
-        # 3. 검색용 인덱스 생성 (데이터 삽입 후)
-        logger.info("[arxiv-job] 검색 인덱스 생성 시작")
-        create_search_indexes(collection)
-        logger.info("[arxiv-job] 검색 인덱스 생성 완료")
+        # 3. 검색용 인덱스 생성 스킵 (Elasticsearch 사용)
+        # Elasticsearch가 메인 검색 엔진이므로 MongoDB 인덱스 불필요
+        logger.info("[arxiv-job] 검색 인덱스 생성 스킵 (Elasticsearch 사용)")
 
         # 4. PostgreSQL 카테고리 시딩
         seed_categories_from_mongo(collection)
