@@ -78,8 +78,8 @@ def stream_and_insert_data(
                     collection.bulk_write(batch, ordered=False)
                     count += len(batch)
 
-                    # 진행상황 로깅 (50,000건마다)
-                    if count % 50000 == 0:
+                    # 진행상황 로깅 (100,000건마다)
+                    if count % 100000 == 0:
                         elapsed = time.time() - start_time
                         rate = count / elapsed if elapsed > 0 else 0
                         logger.info(
