@@ -67,6 +67,14 @@ class Settings(BaseSettings):
         default="arxiv_papers", validation_alias="PROD_MONGO_COLLECTION"
     )
 
+    # Elasticsearch
+    es_host: str = Field(default="localhost", validation_alias="ES_HOST")
+    es_port: int = Field(default=9200, validation_alias="ES_PORT")
+    es_user: str | None = Field(default=None, validation_alias="ES_USER")
+    es_password: str | None = Field(default=None, validation_alias="ES_PASSWORD")
+    es_use_ssl: bool = Field(default=False, validation_alias="ES_USE_SSL")
+    es_index_name: str = Field(default="papers", validation_alias="ES_INDEX_NAME")
+
     # Auth/JWT
     secret_key: str = Field(default="change-me-in-prod", validation_alias="SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")

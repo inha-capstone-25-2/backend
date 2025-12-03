@@ -6,6 +6,8 @@ from typing import List, Dict, Any, Optional
 
 from pymongo.database import Database
 from pymongo.collection import Collection
+from elasticsearch import Elasticsearch
+from elasticsearch.exceptions import ConnectionError as ESConnectionError
 
 from app.core.settings import settings
 from app.core.exceptions import DatabaseException
@@ -16,16 +18,23 @@ from app.core.constants import (
 )
 from app.utils.mongodb import serialize_object_id, transform_id_field
 from app.schemas.paper import SearchHistoryItem
+from app.repositories.elasticsearch_repository import ElasticsearchRepository
 
 logger = logging.getLogger(__name__)
 
 
 class PaperRepository:
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, es_client: Elasticsearch | None = None):
         self.db = db
         self.papers_collection: Collection = db[settings.mongo_collection]
         self.history_collection: Collection = db[COLLECTION_SEARCH_HISTORY]
         self.activities_collection: Collection = db[COLLECTION_USER_ACTIVITIES]
+        
+        # Elasticsearch Repository (옵션널)
+        self.es_repo: ElasticsearchRepository | None = None
+        if es_client is not None:
+            self.es_repo = ElasticsearchRepository(es_client)
+            logger.info("[PaperRepo] Elasticsearch repository initialized")
 
     def save_search_history(
         self,
@@ -57,7 +66,72 @@ class PaperRepository:
         page_size: int,
         sort_by: str,
     ) -> Dict[str, Any]:
-        """논문 검색 로직 (Text Search 최적화)"""
+        """
+        논문 검색 로직 (Elasticsearch 우선, MongoDB Fallback).
+        
+        Elasticsearch가 활성화되어 있으면 먼저 시도하고,
+        실패하거나 비활성화된 경우 MongoDB Text Search를 사용합니다.
+        """
+        
+        # 1. Elasticsearch 검색 시도
+        if self.es_repo is not None:
+            try:
+                logger.info("[PaperRepo] Attempting Elasticsearch search")
+                result = self._search_with_elasticsearch(
+                    q, categories, page, page_size, sort_by
+                )
+                logger.info("[PaperRepo] Elasticsearch search successful")
+                return result
+            except Exception as e:
+                logger.warning(
+                    f"[PaperRepo] Elasticsearch search failed: {e}. "
+                    "Falling back to MongoDB"
+                )
+                # Fallback to MongoDB (아래에서 처리)
+        
+        # 2. MongoDB Text Search Fallback
+        logger.info("[PaperRepo] Using MongoDB Text Search")
+        return self._search_with_mongodb(q, categories, page, page_size, sort_by)
+
+    def _search_with_elasticsearch(
+        self,
+        q: str | None,
+        categories: List[str] | None,
+        page: int,
+        page_size: int,
+        sort_by: str,
+    ) -> Dict[str, Any]:
+        """Elasticsearch를 사용한 검색"""
+        if self.es_repo is None:
+            raise ValueError("Elasticsearch repository not initialized")
+        
+        # Elasticsearch 검색 실행
+        es_result = self.es_repo.search_papers(
+            q=q,
+            categories=categories,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+        )
+        
+        # 결과 변환
+        items = es_result["items"]
+        total = es_result["total"]
+        is_approximate = es_result.get("is_approximate", False)
+        
+        return self._build_search_response(
+            page, page_size, total, items, is_approximate
+        )
+
+    def _search_with_mongodb(
+        self,
+        q: str | None,
+        categories: List[str] | None,
+        page: int,
+        page_size: int,
+        sort_by: str,
+    ) -> Dict[str, Any]:
+        """MongoDB Text Search를 사용한 검색 (기존 로직)"""
 
         # 공통 변수 초기화
         skip = (page - 1) * page_size
