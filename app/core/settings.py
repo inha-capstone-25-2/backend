@@ -37,6 +37,17 @@ class Settings(BaseSettings):
     db_password: str = Field(default="", validation_alias="POSTGRES_PASSWORD")
     db_name: str = Field(default="app", validation_alias="POSTGRES_DB")
 
+    # PostgreSQL SSH Tunnel
+    db_ssh_host: str | None = Field(default=None, validation_alias="POSTGRES_SSH_HOST")
+    db_ssh_port: int = Field(default=22, validation_alias="POSTGRES_SSH_PORT")
+    db_ssh_user: str | None = Field(default=None, validation_alias="POSTGRES_SSH_USER")
+    db_ssh_pem_key_path: str | None = Field(
+        default=None, validation_alias="POSTGRES_SSH_PEM_KEY_PATH"
+    )
+    db_local_bind_port: int = Field(
+        default=5433, validation_alias="POSTGRES_LOCAL_BIND_PORT"
+    )
+
     # Mongo
     mongo_host: str = Field(default="localhost", validation_alias="MONGO_HOST")
     mongo_port: int = Field(default=27017, validation_alias="MONGO_PORT")
@@ -47,6 +58,17 @@ class Settings(BaseSettings):
     )
     mongo_db: str = Field(default="arxiv", validation_alias="MONGO_DB")
     mongo_collection: str = Field(default="papers", validation_alias="MONGO_COLLECTION")
+
+    # Mongo SSH Tunnel
+    mongo_ssh_host: str | None = Field(default=None, validation_alias="MONGO_SSH_HOST")
+    mongo_ssh_port: int = Field(default=22, validation_alias="MONGO_SSH_PORT")
+    mongo_ssh_user: str | None = Field(default=None, validation_alias="MONGO_SSH_USER")
+    mongo_ssh_pem_key_path: str | None = Field(
+        default=None, validation_alias="MONGO_SSH_PEM_KEY_PATH"
+    )
+    mongo_local_bind_port: int = Field(
+        default=27018, validation_alias="MONGO_LOCAL_BIND_PORT"
+    )
 
     # Production Mongo (for local env data copy)
     prod_mongo_host: str | None = Field(
@@ -67,6 +89,23 @@ class Settings(BaseSettings):
         default="arxiv_papers", validation_alias="PROD_MONGO_COLLECTION"
     )
 
+    # Prod Mongo SSH Tunnel
+    prod_mongo_ssh_host: str | None = Field(
+        default=None, validation_alias="PROD_MONGO_SSH_HOST"
+    )
+    prod_mongo_ssh_port: int = Field(
+        default=22, validation_alias="PROD_MONGO_SSH_PORT"
+    )
+    prod_mongo_ssh_user: str | None = Field(
+        default=None, validation_alias="PROD_MONGO_SSH_USER"
+    )
+    prod_mongo_ssh_pem_key_path: str | None = Field(
+        default=None, validation_alias="PROD_MONGO_SSH_PEM_KEY_PATH"
+    )
+    prod_mongo_local_bind_port: int = Field(
+        default=27019, validation_alias="PROD_MONGO_LOCAL_BIND_PORT"
+    )
+
     # Elasticsearch
     es_host: str = Field(default="localhost", validation_alias="ES_HOST")
     es_port: int = Field(default=9200, validation_alias="ES_PORT")
@@ -74,6 +113,17 @@ class Settings(BaseSettings):
     es_password: str | None = Field(default=None, validation_alias="ES_PASSWORD")
     es_use_ssl: bool = Field(default=False, validation_alias="ES_USE_SSL")
     es_index_name: str = Field(default="papers", validation_alias="ES_INDEX_NAME")
+
+    # Elasticsearch SSH Tunnel
+    es_ssh_host: str | None = Field(default=None, validation_alias="ES_SSH_HOST")
+    es_ssh_port: int = Field(default=22, validation_alias="ES_SSH_PORT")
+    es_ssh_user: str | None = Field(default=None, validation_alias="ES_SSH_USER")
+    es_ssh_pem_key_path: str | None = Field(
+        default=None, validation_alias="ES_SSH_PEM_KEY_PATH"
+    )
+    es_local_bind_port: int = Field(
+        default=9201, validation_alias="ES_LOCAL_BIND_PORT"
+    )
 
     # Auth/JWT
     secret_key: str = Field(default="change-me-in-prod", validation_alias="SECRET_KEY")

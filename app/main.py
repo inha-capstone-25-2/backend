@@ -98,6 +98,27 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"close_mongo failed: {e}")
 
+    try:
+        from app.db.postgres import close_postgres
+
+        close_postgres()
+    except Exception as e:
+        logger.error(f"close_postgres failed: {e}")
+
+    try:
+        from app.db.elasticsearch import close_elasticsearch
+
+        close_elasticsearch()
+    except Exception as e:
+        logger.error(f"close_elasticsearch failed: {e}")
+
+    try:
+        from app.db.ssh_tunnel import ssh_tunnel_manager
+
+        ssh_tunnel_manager.close_all_tunnels()
+    except Exception as e:
+        logger.error(f"close_all_tunnels failed: {e}")
+
 
 app = FastAPI(lifespan=lifespan)
 

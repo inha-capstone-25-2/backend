@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
 from app.core.settings import settings
+from app.db.ssh_tunnel import ssh_tunnel_manager
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,26 @@ class MongoDBManager:
         password = settings.mongo_password
         auth_source = settings.mongo_auth_source
         db_name = settings.mongo_db
+
+        # SSH 터널링 설정 확인 및 적용
+        if settings.mongo_ssh_host:
+            try:
+                ssh_tunnel_manager.create_tunnel(
+                    name="mongo",
+                    ssh_host=settings.mongo_ssh_host,
+                    ssh_port=settings.mongo_ssh_port,
+                    ssh_user=settings.mongo_ssh_user,
+                    ssh_pkey=settings.mongo_ssh_pem_key_path,
+                    remote_bind_address=("127.0.0.1", port),
+                    local_bind_port=settings.mongo_local_bind_port,
+                )
+                # 터널을 통해 접속하므로 호스트와 포트 변경
+                host = "localhost"
+                port = settings.mongo_local_bind_port
+                logger.info(f"MongoDB SSH tunnel established on localhost:{port}")
+            except Exception as e:
+                logger.error(f"Failed to establish SSH tunnel for MongoDB: {e}")
+                return
 
         if not host:
             logger.error("MONGO_HOST is not set. MongoDB will not be initialized.")
@@ -79,6 +100,10 @@ class MongoDBManager:
             finally:
                 self.client = None
                 self.db = None
+        
+        # SSH 터널 종료
+        if settings.mongo_ssh_host:
+            ssh_tunnel_manager.close_tunnel("mongo")
 
     def get_db(self) -> Database:
         """Database 인스턴스 반환"""
@@ -128,6 +153,26 @@ def get_prod_mongo_client() -> MongoClient:
     user = settings.prod_mongo_user
     password = settings.prod_mongo_password
     auth_source = settings.prod_mongo_auth_source
+
+    # SSH 터널링 설정 확인 및 적용
+    if settings.prod_mongo_ssh_host:
+        try:
+            ssh_tunnel_manager.create_tunnel(
+                name="prod_mongo",
+                ssh_host=settings.prod_mongo_ssh_host,
+                ssh_port=settings.prod_mongo_ssh_port,
+                ssh_user=settings.prod_mongo_ssh_user,
+                ssh_pkey=settings.prod_mongo_ssh_pem_key_path,
+                remote_bind_address=("127.0.0.1", port),
+                local_bind_port=settings.prod_mongo_local_bind_port,
+            )
+            # 터널을 통해 접속하므로 호스트와 포트 변경
+            host = "localhost"
+            port = settings.prod_mongo_local_bind_port
+            logger.info(f"Prod MongoDB SSH tunnel established on localhost:{port}")
+        except Exception as e:
+            logger.error(f"Failed to establish SSH tunnel for Prod MongoDB: {e}")
+            raise
 
     if not host:
         raise RuntimeError(
