@@ -17,6 +17,7 @@ services:
       - ./data:/app/data
       - ./app:/app/app
       - ./run_seed.py:/app/run_seed.py
+      - ./env:/app/env:ro
     ports:
       - "80:8000"
     extra_hosts:
