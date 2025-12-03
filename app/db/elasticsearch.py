@@ -81,9 +81,8 @@ def get_es() -> Generator[Elasticsearch, None, None]:
         yield client
     except ESConnectionError as e:
         logger.error(f"[ES] Dependency injection failed: {e}")
-        # Fallback을 위해 None을 yield할 수도 있지만, 
-        # 여기서는 예외를 발생시켜 상위 레이어에서 Fallback 처리하도록 함
-        raise
+        # Fallback을 위해 None을 yield
+        yield None
 
 
 def close_elasticsearch():

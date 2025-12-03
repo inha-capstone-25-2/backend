@@ -30,7 +30,7 @@ def search_papers(
         description="정렬 기준: relevance(관련도), view_count(조회수), update_date(최신순)",
     ),
     db: Database = Depends(get_mongo_db),
-    es_client: Elasticsearch = Depends(get_es),
+    es_client: Elasticsearch | None = Depends(get_es),
     current_user: User = Depends(get_current_user),
 ):
     service = PaperService(db, es_client)
