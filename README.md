@@ -1,3 +1,7 @@
+## Architecture Diagram
+
+![capstone-architecture-diagram.png](docs/capstone-architecture-diagram.png)
+
 ## 현 백엔드 레포에서 환경변수가 의미하는 게 뭔가요
 
 - `EC2_HOST` : EC2 퍼블릭 IP 주소
