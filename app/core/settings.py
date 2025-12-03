@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     )
 
     # Elasticsearch
-    es_host: str = Field(default="35.87.65.168", validation_alias="ES_HOST")
+    es_host: str = Field(default="localhost", validation_alias="ES_HOST")
     es_port: int = Field(default=9200, validation_alias="ES_PORT")
     es_user: str | None = Field(default=None, validation_alias="ES_USER")
     es_password: str | None = Field(default=None, validation_alias="ES_PASSWORD")
