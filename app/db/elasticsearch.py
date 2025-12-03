@@ -10,6 +10,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionError as ESConnectionError
 
 from app.core.settings import settings
+from app.db.ssh_tunnel import ssh_tunnel_manager
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,32 @@ def get_elasticsearch_client() -> Elasticsearch:
     global _es_client
     
     if _es_client is None:
+        # SSH 터널링 설정 확인 및 적용
+        host_url = settings.es_host
+        port = settings.es_port
+        
+        if settings.es_ssh_host:
+            try:
+                ssh_tunnel_manager.create_tunnel(
+                    name="es",
+                    ssh_host=settings.es_ssh_host,
+                    ssh_port=settings.es_ssh_port,
+                    ssh_user=settings.es_ssh_user,
+                    ssh_pkey=settings.es_ssh_pem_key_path,
+                    remote_bind_address=("127.0.0.1", port),
+                    local_bind_port=settings.es_local_bind_port,
+                )
+                # 터널을 통해 접속하므로 호스트와 포트 변경
+                host_url = "localhost"
+                port = settings.es_local_bind_port
+                logger.info(f"[ES] SSH tunnel established on localhost:{port}")
+            except Exception as e:
+                logger.error(f"[ES] Failed to establish SSH tunnel: {e}")
+                raise ESConnectionError(f"SSH tunnel failed: {e}")
+
         # Elasticsearch 연결 정보 구성
         scheme = "https" if settings.es_use_ssl else "http"
-        host = f"{scheme}://{settings.es_host}:{settings.es_port}"
+        host = f"{scheme}://{host_url}:{port}"
         
         # 인증 정보가 있는 경우
         if settings.es_user and settings.es_password:
@@ -103,6 +127,10 @@ def close_elasticsearch():
         _es_client.close()
         logger.info("[ES] Elasticsearch connection closed")
         _es_client = None
+    
+    # SSH 터널 종료
+    if settings.es_ssh_host:
+        ssh_tunnel_manager.close_tunnel("es")
 
 
 def check_elasticsearch_health() -> dict:
