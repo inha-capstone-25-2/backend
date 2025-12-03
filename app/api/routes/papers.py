@@ -2,8 +2,9 @@ from fastapi import APIRouter, Query, Depends
 from typing import List
 import logging
 from pymongo.database import Database
-
+from elasticsearch import Elasticsearch
 from app.db.mongodb import get_mongo_db
+from app.db.elasticsearch import get_es
 from app.schemas.paper import (
     Paper,
     PaperSearchResponse,
@@ -29,9 +30,10 @@ def search_papers(
         description="정렬 기준: relevance(관련도), view_count(조회수), update_date(최신순)",
     ),
     db: Database = Depends(get_mongo_db),
+    es_client: Elasticsearch = Depends(get_es),
     current_user: User = Depends(get_current_user),
 ):
-    service = PaperService(db)
+    service = PaperService(db, es_client)
     return service.search_papers(
         user=current_user, q=q, categories=categories, page=page, sort_by=sort_by
     )
