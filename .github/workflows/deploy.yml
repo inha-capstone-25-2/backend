@@ -28,7 +28,7 @@ jobs:
           host: ${{ secrets.EC2_PROD_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "app/**,requirements.txt,Dockerfile,docker-compose.prod.yml,env/prod/.env,env/capstone-02.pem"
+          source: "app/**,requirements.txt,Dockerfile,docker-compose.prod.yml,env/prod/.env"
           target: ${{ secrets.EC2_PATH }}
           overwrite: true
           debug: true  # 디버그 활성화
