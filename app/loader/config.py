@@ -10,7 +10,7 @@ DATA_FILE_PATH = Path(
 )
 
 # 배치 및 진행률 설정
-BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "5000"))
+BATCH_SIZE = int(os.getenv("ARXIV_BATCH_SIZE", "10000"))
 PROGRESS_EVERY = int(os.getenv("ARXIV_PROGRESS_EVERY", "5000"))
 MIN_FREE_GB = int(os.getenv("ARXIV_MIN_FREE_GB", "5"))
 

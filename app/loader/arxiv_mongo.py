@@ -1,5 +1,8 @@
 from __future__ import annotations
-import json
+try:
+    import ujson as json
+except ImportError:
+    import json
 import logging
 import os
 import time
@@ -53,18 +56,20 @@ def stream_and_insert_data(
             # 파싱
             codes = parse_categories(data.get("categories"))
             abstract_text = data.get("abstract")
+            
+            # 문서 구성 (불필요한 comprehension 제거)
             doc = {
                 "_id": arxiv_id,  # arXiv ID를 PK로 사용
                 "title": data.get("title"),
                 "authors": data.get("authors"),
-                "summary": {
-                    "en": abstract_text,
-                    "ko": None  # 초기값은 None, 향후 번역 기능 추가 시 사용
-                } if abstract_text else None,
                 "categories": codes,
                 "update_date": data.get("update_date"),
             }
-            doc = {k: v for k, v in doc.items() if v is not None}
+            
+            # summary는 있는 경우만 추가
+            if abstract_text:
+                doc["summary"] = {"en": abstract_text, "ko": None}
+            
             batch.append(UpdateOne({"_id": arxiv_id}, {"$set": doc}, upsert=True))
 
             # 배치 크기 도달 시 즉시 삽입
