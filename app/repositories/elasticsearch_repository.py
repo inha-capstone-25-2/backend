@@ -274,3 +274,27 @@ class ElasticsearchRepository:
         except Exception as e:
             logger.error(f"[ES] Failed to create index: {e}")
             return False
+
+    def update_mapping(self) -> bool:
+        """
+        인덱스 매핑을 업데이트합니다 (새로운 필드 추가 등).
+        """
+        try:
+            if not self.check_index_exists():
+                return self.create_index_if_not_exists()
+
+            # 추가할 필드 정의
+            mapping = {
+                "properties": {
+                    "view_count": {"type": "integer"},
+                    "bookmark_count": {"type": "integer"},
+                }
+            }
+
+            self.es_client.indices.put_mapping(index=self.index_name, body=mapping)
+            logger.info(f"[ES] Successfully updated mapping for '{self.index_name}'")
+            return True
+
+        except Exception as e:
+            logger.error(f"[ES] Failed to update mapping: {e}")
+            return False

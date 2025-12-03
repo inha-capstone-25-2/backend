@@ -140,3 +140,21 @@ def check_elasticsearch_health() -> dict:
             "status": "unavailable",
             "error": str(e),
         }
+
+
+def init_elasticsearch() -> None:
+    """
+    애플리케이션 시작 시 Elasticsearch 초기화.
+    인덱스 존재 여부를 확인하고 매핑을 업데이트합니다.
+    """
+    try:
+        client = get_elasticsearch_client()
+        # 순환 참조 방지를 위해 함수 내부에서 import
+        from app.repositories.elasticsearch_repository import ElasticsearchRepository
+        
+        repo = ElasticsearchRepository(client)
+        repo.update_mapping()
+        
+    except Exception as e:
+        # ES 초기화 실패가 앱 구동을 막지 않도록 로그만 남김
+        logger.error(f"[ES] Initialization failed: {e}")

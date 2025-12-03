@@ -108,6 +108,17 @@ def get_index_definitions(papers_collection_name: str) -> dict:
                 name="categories_bookmark_count",
                 background=True,
             ),
+            # Text Search Index (Fallback용)
+            IndexModel(
+                [
+                    ("title", "text"),
+                    ("summary.en", "text"),
+                    ("authors", "text"),
+                ],
+                name="text_search_idx",
+                weights={"title": 3, "authors": 2, "summary.en": 1},
+                background=True,
+            ),
         ],
     }
 

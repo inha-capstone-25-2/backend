@@ -81,6 +81,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"init_mongo failed: {e}")
 
+    try:
+        from app.db.elasticsearch import init_elasticsearch
+
+        init_elasticsearch()
+    except Exception as e:
+        logger.error(f"init_elasticsearch failed: {e}")
+
     _ensure_daily_job()
     if not scheduler.running:
         scheduler.start()
