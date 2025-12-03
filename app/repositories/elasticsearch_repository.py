@@ -286,8 +286,8 @@ class ElasticsearchRepository:
             # 추가할 필드 정의
             mapping = {
                 "properties": {
-                    "view_count": {"type": "integer"},
-                    "bookmark_count": {"type": "integer"},
+                    "view_count": {"type": "long"},
+                    "bookmark_count": {"type": "long"},
                 }
             }
 

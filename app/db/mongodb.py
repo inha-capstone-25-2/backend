@@ -62,7 +62,7 @@ class MongoDBManager:
 
     def _create_indexes(self) -> None:
         """필요한 인덱스 생성 (app/db/indexes.py 위임)"""
-        if not self.db:
+        if self.db is None:
             return
 
         from app.db.indexes import ensure_indexes
