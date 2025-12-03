@@ -28,7 +28,7 @@ class MongoDBManager:
         auth_source = settings.mongo_auth_source
         db_name = settings.mongo_db
 
-        # SSH 터널링 설정 확인 및 적용
+            # SSH 터널링 설정 확인 및 적용
         if settings.mongo_ssh_host:
             try:
                 ssh_tunnel_manager.create_tunnel(
@@ -46,7 +46,7 @@ class MongoDBManager:
                 logger.info(f"MongoDB SSH tunnel established on localhost:{port}")
             except Exception as e:
                 logger.error(f"Failed to establish SSH tunnel for MongoDB: {e}")
-                return
+                raise
 
         if not host:
             logger.error("MONGO_HOST is not set. MongoDB will not be initialized.")
@@ -79,6 +79,7 @@ class MongoDBManager:
             logger.error(f"MongoDB initialization failed: {e}")
             self.client = None
             self.db = None
+            raise
 
     def _create_indexes(self) -> None:
         """필요한 인덱스 생성 (app/db/indexes.py 위임)"""
@@ -147,6 +148,9 @@ def get_prod_mongo_client() -> MongoClient:
     Production MongoDB 클라이언트를 생성하여 반환.
     로컬 환경에서 데이터 복제 시에만 사용.
     (이 함수는 별도의 연결을 생성하므로 Manager와 무관하게 유지)
+    
+    주의: 사용 후 반드시 close_prod_mongo_client(client)를 호출하여 
+    SSH 터널과 연결을 정리해야 합니다.
     """
     host = settings.prod_mongo_host
     port = settings.prod_mongo_port
@@ -201,3 +205,19 @@ def get_prod_mongo_client() -> MongoClient:
     except PyMongoError as e:
         logger.error(f"Failed to connect to production MongoDB: {e}")
         raise
+
+
+def close_prod_mongo_client(client: MongoClient) -> None:
+    """
+    Production MongoDB 클라이언트와 관련 SSH 터널을 종료합니다.
+    """
+    if client:
+        try:
+            client.close()
+            logger.info("Prod MongoDB client closed")
+        except Exception as e:
+            logger.error(f"Error closing Prod MongoDB client: {e}")
+
+    # SSH 터널 종료
+    if settings.prod_mongo_ssh_host:
+        ssh_tunnel_manager.close_tunnel("prod_mongo")
