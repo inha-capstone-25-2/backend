@@ -52,6 +52,13 @@ def get_elasticsearch_client() -> Elasticsearch:
         try:
             if not _es_client.ping():
                 logger.error(f"[ES] Failed to ping Elasticsearch at {host}")
+                try:
+                    _es_client.info()
+                except Exception as e:
+                    logger.error(f"[ES] Connection diagnosis: {e}")
+                    if hasattr(e, "body"):
+                        logger.error(f"[ES] Error body: {e.body}")
+                
                 raise ESConnectionError(f"Cannot connect to Elasticsearch at {host}")
             
             logger.info(f"[ES] Successfully connected to Elasticsearch at {host}")
