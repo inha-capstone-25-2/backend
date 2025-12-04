@@ -158,6 +158,7 @@ def generate_batch_summaries_task(
                     
                     batch_texts.append(full_text)
                     batch_ids.append(arxiv_id)
+                    logger.info(f"[Celery] Paper {arxiv_id}: full_text length = {len(full_text)} chars")
                     
                 except Exception as e:
                     failed_count += 1

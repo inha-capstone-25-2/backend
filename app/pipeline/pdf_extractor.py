@@ -158,6 +158,9 @@ def fetch_arxiv_pdf_text_sync(arxiv_id: str) -> Optional[str]:
 
             if text:
                 logger.info(f"[PDFExtractor] Extracted {len(text)} chars from {arxiv_id}")
+                # 추출된 텍스트가 너무 짧으면 내용 확인 (디버깅용)
+                if len(text) < 500:
+                    logger.warning(f"[PDFExtractor] Short text preview: {text[:200]}...")
             return text
 
         except requests.Timeout:
