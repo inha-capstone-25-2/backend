@@ -83,7 +83,7 @@ class Settings(BaseSettings):
 
     # Summary Server (GPU)
     summary_server_url: str = Field(
-        default="http://localhost:8000", validation_alias="SUMMARY_SERVER_URL"
+        default="http://localhost:8000", validation_alias="GPU_SERVER"
     )
 
     # Redis (Celery)
