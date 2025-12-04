@@ -72,9 +72,8 @@ class MongoDBManager:
 
         from app.db.indexes import ensure_indexes
         
-        # papers 컬렉션 인덱스는 데이터 적재 후 생성하도록 스킵
-        # (데이터 적재 시 성능 향상을 위해 인덱스 없이 삽입)
-        ensure_indexes(self.db, skip_papers=True)
+        # papers 컬렉션 포함 모든 인덱스 생성
+        ensure_indexes(self.db, skip_papers=False)
 
 
     def close(self) -> None:

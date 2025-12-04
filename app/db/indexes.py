@@ -83,9 +83,15 @@ def get_index_definitions(papers_collection_name: str) -> dict:
             ),
         ],
 
-        # 5. Papers (검색은 Elasticsearch 사용, MongoDB는 인덱스 없이 fallback)
-        # _id는 자동 인덱스가 생성되므로 기본 조회는 문제없음
-        papers_collection_name: [],
+        # 5. Papers (검색은 Elasticsearch 사용)
+        # summary.ko 인덱스: 요약되지 않은 논문 조회 최적화
+        papers_collection_name: [
+            IndexModel(
+                [("summary.ko", ASCENDING)],
+                name="summary_ko_idx",
+                sparse=True,  # null 값이 많은 경우 효율적
+            )
+        ],
     }
 
 
