@@ -63,36 +63,56 @@ def generate_batch_summaries_task(
         # 진행률 업데이트
         self.update_state(
             state="PROGRESS",
-            meta={"current": 0, "total": len(papers), "status": "텍스트 추출 중..."},
+            meta={"current": 0, "total": len(papers), "status": "PDF에서 텍스트 추출 중..."},
         )
 
-        # 텍스트 추출 및 정리
+        # PDF에서 텍스트 추출
+        from app.pipeline.pdf_extractor import fetch_arxiv_pdf_text_sync
+        from app.pipeline.text_utils import build_full_text_with_pdf
+
         texts_to_summarize = []
         paper_id_map = []
 
         for i, paper in enumerate(papers):
             try:
-                raw_text = build_raw_text(paper)
-                if not raw_text:
-                    logger.warning(
-                        f"[Celery] No text found for paper {paper['_id']}"
-                    )
+                arxiv_id = paper["_id"]
+                
+                # arXiv PDF에서 본문 추출
+                pdf_text = fetch_arxiv_pdf_text_sync(arxiv_id)
+                
+                if not pdf_text:
+                    logger.warning(f"[Celery] Failed to extract PDF for {arxiv_id}")
+                    # PDF 실패 시 Abstract만 사용
+                    full_text = build_raw_text(paper)
+                else:
+                    # Abstract + PDF 본문 결합
+                    full_text = build_full_text_with_pdf(paper, pdf_text)
+
+                if not full_text:
+                    logger.warning(f"[Celery] No text found for paper {arxiv_id}")
                     continue
 
-                cleaned_text = clean_summary_en(raw_text)
+                cleaned_text = clean_summary_en(full_text)
                 if not cleaned_text:
-                    logger.warning(
-                        f"[Celery] Empty text after cleaning for paper {paper['_id']}"
-                    )
+                    logger.warning(f"[Celery] Empty text after cleaning for paper {arxiv_id}")
                     continue
 
                 texts_to_summarize.append(cleaned_text)
-                paper_id_map.append(paper["_id"])
+                paper_id_map.append(arxiv_id)
+
+                # 진행률 업데이트 (매 5개마다)
+                if (i + 1) % 5 == 0:
+                    self.update_state(
+                        state="PROGRESS",
+                        meta={
+                            "current": i + 1,
+                            "total": len(papers),
+                            "status": f"PDF 추출 중... ({i+1}/{len(papers)})",
+                        },
+                    )
 
             except Exception as e:
-                logger.error(
-                    f"[Celery] Error extracting text for paper {paper.get('_id')}: {e}"
-                )
+                logger.error(f"[Celery] Error extracting text for paper {paper.get('_id')}: {e}")
 
         if not texts_to_summarize:
             return {
