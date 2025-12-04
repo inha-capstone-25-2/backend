@@ -9,7 +9,6 @@ from typing import List, Dict, Any
 from app.celery import celery_app
 from app.db.mongodb import db_manager
 from app.core.settings import settings
-from app.clients.summary_client import get_summary_client
 from app.pipeline.text_utils import build_raw_text, build_full_text_with_pdf
 from app.pipeline.pdf_extractor import fetch_arxiv_pdf_text_sync
 from pymongo.errors import PyMongoError
@@ -90,10 +89,6 @@ def generate_batch_summaries_task(
             meta={"current": 0, "total": len(papers), "status": "PDF에서 텍스트 추출 중..."},
         )
 
-        # PDF에서 텍스트 추출
-        from app.pipeline.pdf_extractor import fetch_arxiv_pdf_text_sync
-        from app.pipeline.text_utils import build_raw_text, build_full_text_with_pdf
-
         texts_to_summarize = []
         paper_id_map = []
 
@@ -162,7 +157,10 @@ def generate_batch_summaries_task(
         )
 
         # GPU 서버에 배치 요약 요청 (동기 처리)
-        summary_client = get_summary_client()
+        # 매번 새 인스턴스 생성하여 환경변수 변경사항 반영
+        from app.clients.summary_client import SummaryClient
+        summary_client = SummaryClient()
+        logger.info(f"[Celery] GPU Server URL: {summary_client.base_url}")
         
         # 동기 방식으로 요청하기 위해 asyncio 사용
         import asyncio
