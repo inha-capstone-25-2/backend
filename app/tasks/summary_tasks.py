@@ -94,88 +94,121 @@ def generate_batch_summaries_task(
         success_count = 0
         failed_count = 0
         errors = []
+        
+        # 배치 크기 설정 (GPU 서버 최적화를 위해 20개씩 처리)
+        BATCH_SIZE = 20
 
-        # 논문을 1개씩 처리 (PDF 추출 → GPU 요약 → DB 저장)
-        for i, paper in enumerate(papers):
-            paper_start_time = time.time()
-            arxiv_id = paper["_id"]
+        # 논문을 배치 단위로 처리 (PDF 추출 → GPU 요약 → DB 저장)
+        for batch_start in range(0, len(papers), BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, len(papers))
+            batch_papers = papers[batch_start:batch_end]
+            batch_num = batch_start // BATCH_SIZE + 1
+            total_batches = (len(papers) + BATCH_SIZE - 1) // BATCH_SIZE
+            
+            batch_start_time = time.time()
+            logger.info(f"[Celery] [Batch {batch_num}/{total_batches}] Processing {len(batch_papers)} papers...")
+            
+            # 1. 배치 내 모든 논문의 PDF 텍스트 추출
+            batch_texts = []
+            batch_ids = []
+            
+            for paper in batch_papers:
+                arxiv_id = paper["_id"]
+                
+                try:
+                    pdf_text = fetch_arxiv_pdf_text_sync(arxiv_id)
+                    
+                    if not pdf_text:
+                        logger.warning(f"[Celery] Failed to extract PDF for {arxiv_id}, using abstract only")
+                        full_text = build_raw_text(paper)
+                    else:
+                        full_text = build_full_text_with_pdf(paper, pdf_text)
+
+                    if not full_text:
+                        logger.warning(f"[Celery] No text found for paper {arxiv_id}")
+                        failed_count += 1
+                        errors.append(f"No text for {arxiv_id}")
+                        continue
+                    
+                    batch_texts.append(full_text)
+                    batch_ids.append(arxiv_id)
+                    
+                except Exception as e:
+                    failed_count += 1
+                    errors.append(f"PDF extraction error for {arxiv_id}: {str(e)}")
+                    logger.error(f"[Celery] PDF extraction error for {arxiv_id}: {e}")
+            
+            if not batch_texts:
+                logger.warning(f"[Celery] [Batch {batch_num}/{total_batches}] No texts to process, skipping...")
+                continue
+            
+            # 2. GPU 서버에 배치 요약 요청
+            logger.info(
+                f"[Celery] [Batch {batch_num}/{total_batches}] Sending {len(batch_texts)} texts to GPU server..."
+            )
             
             try:
-                logger.info(f"[Celery] [{i+1}/{len(papers)}] Processing paper: {arxiv_id}")
-                
-                # 1. PDF 텍스트 추출
-                pdf_text = fetch_arxiv_pdf_text_sync(arxiv_id)
-                
-                if not pdf_text:
-                    logger.warning(f"[Celery] [{i+1}/{len(papers)}] Failed to extract PDF for {arxiv_id}, using abstract only")
-                    full_text = build_raw_text(paper)
-                else:
-                    full_text = build_full_text_with_pdf(paper, pdf_text)
-
-                if not full_text:
-                    logger.warning(f"[Celery] [{i+1}/{len(papers)}] No text found for paper {arxiv_id}")
-                    failed_count += 1
-                    errors.append(f"No text for {arxiv_id}")
-                    continue
-
-                # 2. GPU 서버에 요약 요청 (1개씩 전송)
-                logger.info(f"[Celery] [{i+1}/{len(papers)}] Sending to GPU server... (text length: {len(full_text)})")
-                
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 
                 try:
                     results = loop.run_until_complete(
-                        summary_client.summarize_batch([full_text])  # 1개만 전송
+                        summary_client.summarize_batch(batch_texts)
                     )
                 finally:
                     loop.close()
 
-                if not results:
-                    logger.error(f"[Celery] [{i+1}/{len(papers)}] Empty result from GPU server for {arxiv_id}")
-                    failed_count += 1
-                    errors.append(f"Empty GPU result for {arxiv_id}")
+                if not results or len(results) != len(batch_ids):
+                    logger.error(
+                        f"[Celery] [Batch {batch_num}/{total_batches}] "
+                        f"Result count mismatch: expected {len(batch_ids)}, got {len(results) if results else 0}"
+                    )
+                    failed_count += len(batch_ids)
+                    for arxiv_id in batch_ids:
+                        errors.append(f"Batch result mismatch for {arxiv_id}")
                     continue
 
-                result = results[0]
-                summary_en = result.get("summary_en", "")
-                summary_ko = result.get("summary_ko", "")
+                # 3. MongoDB에 결과 저장
+                for arxiv_id, result in zip(batch_ids, results):
+                    summary_en = result.get("summary_en", "")
+                    summary_ko = result.get("summary_ko", "")
 
-                # 3. MongoDB에 저장
-                update_result = collection.update_one(
-                    {"_id": arxiv_id},
-                    {"$set": {"summary.en": summary_en, "summary.ko": summary_ko}},
-                )
-
-                paper_duration = time.time() - paper_start_time
-                
-                if update_result.modified_count > 0:
-                    success_count += 1
-                    logger.info(
-                        f"[Celery] [{i+1}/{len(papers)}] ✓ Completed {arxiv_id} in {paper_duration:.1f}s"
+                    update_result = collection.update_one(
+                        {"_id": arxiv_id},
+                        {"$set": {"summary.en": summary_en, "summary.ko": summary_ko}},
                     )
-                else:
-                    failed_count += 1
-                    errors.append(f"Failed to update {arxiv_id}")
-                    logger.warning(f"[Celery] [{i+1}/{len(papers)}] ✗ Failed to update {arxiv_id}")
 
-                # 진행률 업데이트
-                self.update_state(
-                    state="PROGRESS",
-                    meta={
-                        "current": i + 1,
-                        "total": len(papers),
-                        "status": f"처리 중... ({i+1}/{len(papers)}) - {arxiv_id}",
-                        "success": success_count,
-                        "failed": failed_count,
-                    },
+                    if update_result.modified_count > 0:
+                        success_count += 1
+                    else:
+                        failed_count += 1
+                        errors.append(f"Failed to update {arxiv_id}")
+
+                batch_duration = time.time() - batch_start_time
+                avg_per_paper = batch_duration / len(batch_ids)
+                logger.info(
+                    f"[Celery] [Batch {batch_num}/{total_batches}] ✓ Completed {len(batch_ids)} papers "
+                    f"in {batch_duration:.1f}s (avg: {avg_per_paper:.1f}s/paper)"
                 )
 
             except Exception as e:
-                failed_count += 1
-                error_msg = f"Error processing {arxiv_id}: {str(e)}"
-                logger.error(f"[Celery] [{i+1}/{len(papers)}] {error_msg}")
-                errors.append(error_msg)
+                failed_count += len(batch_ids)
+                error_msg = f"Batch {batch_num} GPU error: {str(e)}"
+                logger.error(f"[Celery] [Batch {batch_num}/{total_batches}] {error_msg}")
+                for arxiv_id in batch_ids:
+                    errors.append(f"GPU error for {arxiv_id}: {str(e)}")
+
+            # 진행률 업데이트
+            self.update_state(
+                state="PROGRESS",
+                meta={
+                    "current": batch_end,
+                    "total": len(papers),
+                    "status": f"처리 중... (Batch {batch_num}/{total_batches})",
+                    "success": success_count,
+                    "failed": failed_count,
+                },
+            )
 
         total_duration = time.time() - start_time
 
