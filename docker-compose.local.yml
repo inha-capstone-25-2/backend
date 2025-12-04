@@ -27,6 +27,29 @@ services:
       redis:
         condition: service_healthy
 
+  celery_worker:
+    image: python:3.11-slim
+    container_name: celery_worker_local
+    working_dir: /app
+    command: >
+      bash -lc "pip install --no-cache-dir -r requirements.txt &&
+      celery -A app.celery worker --loglevel=info"
+    volumes:
+      - .:/app
+      - C:/Users/chosh/.kaggle:/root/.kaggle:ro
+    env_file:
+      - env/local/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_HOST=redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   # PostgreSQL
   postgres:
     image: postgres:15
