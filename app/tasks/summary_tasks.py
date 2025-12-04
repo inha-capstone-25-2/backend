@@ -32,6 +32,9 @@ def generate_batch_summaries_task(
     Returns:
         처리 결과 통계
     """
+    import time
+    start_time = time.time()
+    
     is_all_papers = not paper_ids  # 빈 리스트면 모든 논문
     logger.info(
         f"[Celery] Task {self.request.id} started: "
@@ -74,7 +77,10 @@ def generate_batch_summaries_task(
                 "errors": [],
             }
 
-        # 진행률 업데이트
+        # 1. PDF 텍스트 추출 단계
+        extract_start_time = time.time()
+        logger.info(f"[Celery] Step 1/3: Extracting text from PDFs for {len(papers)} papers...")
+        
         self.update_state(
             state="PROGRESS",
             meta={"current": 0, "total": len(papers), "status": "PDF에서 텍스트 추출 중..."},
@@ -82,7 +88,7 @@ def generate_batch_summaries_task(
 
         # PDF에서 텍스트 추출
         from app.pipeline.pdf_extractor import fetch_arxiv_pdf_text_sync
-        from app.pipeline.text_utils import build_full_text_with_pdf
+        from app.pipeline.text_utils import build_raw_text, build_full_text_with_pdf
 
         texts_to_summarize = []
         paper_id_map = []
@@ -110,8 +116,10 @@ def generate_batch_summaries_task(
                 texts_to_summarize.append(full_text)
                 paper_id_map.append(arxiv_id)
 
-                # 진행률 업데이트 (매 5개마다)
-                if (i + 1) % 5 == 0:
+                # 진행률 업데이트 (매 5개마다 또는 마지막)
+                if (i + 1) % 5 == 0 or (i + 1) == len(papers):
+                    progress_percent = int((i + 1) / len(papers) * 100)
+                    logger.info(f"[Celery] Extraction progress: {i + 1}/{len(papers)} ({progress_percent}%)")
                     self.update_state(
                         state="PROGRESS",
                         meta={
@@ -124,6 +132,9 @@ def generate_batch_summaries_task(
             except Exception as e:
                 logger.error(f"[Celery] Error extracting text for paper {paper.get('_id')}: {e}")
 
+        extract_duration = time.time() - extract_start_time
+        logger.info(f"[Celery] Step 1/3 Completed. Duration: {extract_duration:.2f}s. Valid texts: {len(texts_to_summarize)}")
+
         if not texts_to_summarize:
             return {
                 "total": total_requested,
@@ -133,7 +144,10 @@ def generate_batch_summaries_task(
                 "errors": ["No valid texts to summarize"],
             }
 
-        # 진행률 업데이트
+        # 2. GPU 요약 요청 단계
+        gpu_start_time = time.time()
+        logger.info(f"[Celery] Step 2/3: Requesting summaries from GPU server for {len(texts_to_summarize)} texts...")
+
         self.update_state(
             state="PROGRESS",
             meta={
@@ -156,13 +170,17 @@ def generate_batch_summaries_task(
             results = loop.run_until_complete(
                 summary_client.summarize_batch(texts_to_summarize)
             )
+            gpu_duration = time.time() - gpu_start_time
             logger.info(
-                f"[Celery] Received {len(results)} results from GPU server"
+                f"[Celery] Step 2/3 Completed. Received {len(results)} results. Duration: {gpu_duration:.2f}s"
             )
         finally:
             loop.close()
 
-        # 진행률 업데이트
+        # 3. DB 저장 단계
+        save_start_time = time.time()
+        logger.info(f"[Celery] Step 3/3: Saving summaries to MongoDB...")
+
         self.update_state(
             state="PROGRESS",
             meta={
@@ -198,8 +216,10 @@ def generate_batch_summaries_task(
                     failed_count += 1
                     errors.append(f"Failed to update {paper_id}")
 
-                # 진행률 업데이트 (매 10개마다)
-                if (i + 1) % 10 == 0:
+                # 진행률 업데이트 (매 10개마다 또는 마지막)
+                if (i + 1) % 10 == 0 or (i + 1) == len(results):
+                    progress_percent = int((i + 1) / len(results) * 100)
+                    logger.info(f"[Celery] Saving progress: {i + 1}/{len(results)} ({progress_percent}%)")
                     self.update_state(
                         state="PROGRESS",
                         meta={
@@ -215,15 +235,23 @@ def generate_batch_summaries_task(
                 logger.error(f"[Celery] {error_msg}")
                 errors.append(error_msg)
 
+        save_duration = time.time() - save_start_time
+        total_duration = time.time() - start_time
+
         final_result = {
             "total": total_requested,
             "skipped": total_requested - len(papers),
             "success": success_count,
             "failed": failed_count,
             "errors": errors,
+            "duration_seconds": round(total_duration, 2)
         }
 
-        logger.info(f"[Celery] Task {self.request.id} completed: {final_result}")
+        logger.info(
+            f"[Celery] Task {self.request.id} completed in {total_duration:.2f}s. "
+            f"(Extract: {extract_duration:.2f}s, GPU: {gpu_duration:.2f}s, Save: {save_duration:.2f}s). "
+            f"Result: {final_result}"
+        )
         return final_result
 
     except Exception as e:
