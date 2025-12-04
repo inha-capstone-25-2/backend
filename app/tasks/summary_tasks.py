@@ -136,8 +136,8 @@ def generate_batch_summaries_task(
         failed_count = 0
         errors = []
         
-        # 배치 크기 설정 (GPU 서버 최적화를 위해 100개씩 처리)
-        BATCH_SIZE = 100
+        # 배치 크기 설정 (GPU 서버 최적화를 위해 50개씩 처리)
+        BATCH_SIZE = 50
 
         # 논문을 배치 단위로 처리 (PDF 추출 → GPU 요약 → DB 저장)
         for batch_start in range(0, len(papers), BATCH_SIZE):
