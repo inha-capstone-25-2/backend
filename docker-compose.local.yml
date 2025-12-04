@@ -18,10 +18,13 @@ services:
       - env/local/.env
     environment:
       - PYTHONUNBUFFERED=1
+      - REDIS_HOST=redis
     depends_on:
       postgres:
         condition: service_healthy
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # PostgreSQL
@@ -56,6 +59,21 @@ services:
       timeout: 3s
       retries: 30
 
+  # Redis
+  redis:
+    image: redis:7
+    container_name: redis_local
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
 volumes:
   pg_data:
   mongo_data:
+  redis_data:

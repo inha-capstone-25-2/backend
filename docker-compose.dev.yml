@@ -12,6 +12,7 @@ services:
       APP_ENV: dev
       KAGGLE_CONFIG_DIR: /root/.kaggle
       DATA_DIR: /app/data
+      REDIS_HOST: redis
     volumes:
       - ./.kaggle:/root/.kaggle:ro
       - ./data:/app/data
@@ -22,4 +23,25 @@ services:
       - "80:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: always
+
+  # Redis
+  redis:
+    image: redis:7
+    container_name: redis_dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: always
+
+volumes:
+  redis_data:
