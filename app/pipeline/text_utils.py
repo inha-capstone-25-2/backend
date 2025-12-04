@@ -118,7 +118,7 @@ def build_raw_text(doc: Dict) -> str:
     """
     MongoDB 문서에서 원문 텍스트 추출.
 
-    abstract와 본문을 결합하여 전체 텍스트를 생성합니다.
+    summary.en(Abstract)과 본문(text)을 결합하여 전체 텍스트를 생성합니다.
 
     Args:
         doc: MongoDB 논문 문서
@@ -126,14 +126,14 @@ def build_raw_text(doc: Dict) -> str:
     Returns:
         원문 텍스트
     """
-    # summary.en 또는 abstract 필드 사용
+    # summary.en 필드 사용 (Abstract)
     abstract = ""
     if "summary" in doc and isinstance(doc["summary"], dict):
         abstract = doc["summary"].get("en") or ""
-    elif "abstract" in doc:
-        abstract = doc.get("abstract") or ""
 
+    # 본문 (text 필드)
     body = doc.get("text") or ""
+    
     raw_text = (abstract + "\n" + body).strip()
 
     return raw_text
