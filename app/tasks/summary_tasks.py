@@ -43,7 +43,11 @@ def generate_batch_summaries_task(
     )
 
     try:
-        # MongoDB 연결
+        # Celery Worker는 별도 프로세스이므로 MongoDB 연결 초기화 필요
+        if db_manager.db is None:
+            logger.info("[Celery] Initializing MongoDB connection...")
+            db_manager.connect()
+        
         db = db_manager.get_db()
         collection = db[settings.mongo_collection]
 
