@@ -18,8 +18,12 @@ class MongoDBManager:
         self.client: Optional[MongoClient] = None
         self.db: Optional[Database] = None
 
-    def connect(self) -> None:
-        """MongoDB 연결 초기화"""
+    def connect(self, skip_indexes: bool = False) -> None:
+        """MongoDB 연결 초기화
+        
+        Args:
+            skip_indexes: True이면 인덱스 생성을 건너뜀 (Celery worker용)
+        """
         host = settings.mongo_host
         port = settings.mongo_port
         user = settings.mongo_user
@@ -52,7 +56,8 @@ class MongoDBManager:
                 f"user={user or 'none'}"
             )
 
-            self._create_indexes()
+            if not skip_indexes:
+                self._create_indexes()
 
         except PyMongoError as e:
             logger.error(f"MongoDB initialization failed: {e}")

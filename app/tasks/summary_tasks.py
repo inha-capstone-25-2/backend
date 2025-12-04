@@ -43,9 +43,10 @@ def generate_batch_summaries_task(
 
     try:
         # Celery Worker는 별도 프로세스이므로 MongoDB 연결 초기화 필요
+        # 인덱스 생성은 FastAPI 앱 시작 시에만 수행
         if db_manager.db is None:
             logger.info("[Celery] Initializing MongoDB connection...")
-            db_manager.connect()
+            db_manager.connect(skip_indexes=True)
         
         db = db_manager.get_db()
         collection = db[settings.mongo_collection]
