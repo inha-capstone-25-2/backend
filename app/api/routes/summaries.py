@@ -13,7 +13,7 @@ from app.tasks.summary_tasks import generate_batch_summaries_task
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/summaries", tags=["summaries"])
+router = APIRouter(prefix="/summaries", tags=["summaries"])
 
 
 # --- Request/Response Schemas ---
