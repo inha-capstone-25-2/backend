@@ -28,6 +28,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=3600,  # 1시간 타임아웃
     result_expires=3600,  # 결과 1시간 보관
+    # 병렬 워커 설정
+    worker_concurrency=3,  # 3개의 워커 프로세스
+    worker_prefetch_multiplier=1,  # 각 워커가 한 번에 1개의 태스크만 가져옴 (긴 작업에 적합)
 )
 
 if __name__ == "__main__":
