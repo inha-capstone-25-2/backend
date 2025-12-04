@@ -22,7 +22,7 @@ router = APIRouter(prefix="/summaries", tags=["summaries"])
 class BatchSummaryRequest(BaseModel):
     """배치 요약 요청 스키마"""
 
-    paper_ids: List[str]
+    paper_ids: Optional[List[str]] = None  # None이면 모든 논문 처리
     force: bool = False  # 이미 요약된 논문도 강제 재생성
 
 
@@ -56,9 +56,10 @@ async def create_batch_summaries(request: BatchSummaryRequest):
     배치 논문 요약 생성 (비동기).
 
     여러 논문 ID를 받아 Celery 태스크를 시작하고 job_id를 반환합니다.
+    paper_ids가 없으면 모든 논문을 처리합니다.
 
     Args:
-        request: 논문 ID 리스트 및 옵션
+        request: 논문 ID 리스트 및 옵션 (paper_ids가 None이면 모든 논문)
 
     Returns:
         작업 ID 및 상태
@@ -66,25 +67,29 @@ async def create_batch_summaries(request: BatchSummaryRequest):
     Raises:
         HTTPException: 요청 검증 실패 시
     """
-    if not request.paper_ids:
-        raise HTTPException(status_code=400, detail="paper_ids는 비어있을 수 없습니다")
+    # paper_ids가 None이면 빈 리스트 (모든 논문 처리)
+    paper_ids = request.paper_ids if request.paper_ids else []
 
     logger.info(
-        f"[API] Batch summary request: {len(request.paper_ids)} papers, force={request.force}"
+        f"[API] Batch summary request: "
+        f"{'ALL papers' if not paper_ids else f'{len(paper_ids)} papers'}, "
+        f"force={request.force}"
     )
 
     # Celery 태스크 시작
     task = generate_batch_summaries_task.apply_async(
-        args=[request.paper_ids, request.force]
+        args=[paper_ids, request.force]
     )
 
     logger.info(f"[API] Celery task started: {task.id}")
 
+    total_msg = "모든 논문" if not paper_ids else f"{len(paper_ids)}개 논문"
+
     return BatchSummaryStartResponse(
         job_id=task.id,
         status="pending",
-        total_papers=len(request.paper_ids),
-        message=f"{len(request.paper_ids)}개 논문의 요약 생성 작업이 시작되었습니다",
+        total_papers=len(paper_ids) if paper_ids else 0,  # 0은 "전체"를 의미
+        message=f"{total_msg}의 요약 생성 작업이 시작되었습니다",
     )
 
 

@@ -25,14 +25,17 @@ def generate_batch_summaries_task(
 
     Args:
         self: Celery 태스크 인스턴스
-        paper_ids: 요약할 논문 ID 리스트
+        paper_ids: 요약할 논문 ID 리스트 (빈 리스트면 모든 논문)
         force: 이미 요약된 논문도 강제 재생성
 
     Returns:
         처리 결과 통계
     """
+    is_all_papers = not paper_ids  # 빈 리스트면 모든 논문
     logger.info(
-        f"[Celery] Task {self.request.id} started: {len(paper_ids)} papers, force={force}"
+        f"[Celery] Task {self.request.id} started: "
+        f"{'ALL papers' if is_all_papers else f'{len(paper_ids)} papers'}, "
+        f"force={force}"
     )
 
     try:
@@ -41,20 +44,30 @@ def generate_batch_summaries_task(
         collection = db[settings.mongo_collection]
 
         # MongoDB에서 논문 조회
-        query = {"_id": {"$in": paper_ids}}
-        if not force:
-            # 이미 요약된 논문 제외
-            query["summary.ko"] = {"$in": [None, ""]}
+        if is_all_papers:
+            # 모든 논문 조회
+            query = {}
+            if not force:
+                # 이미 요약된 논문 제외
+                query["summary.ko"] = {"$in": [None, ""]}
+        else:
+            # 특정 논문만 조회
+            query = {"_id": {"$in": paper_ids}}
+            if not force:
+                # 이미 요약된 논문 제외
+                query["summary.ko"] = {"$in": [None, ""]}
 
         papers = list(collection.find(query))
+        total_requested = len(papers) if is_all_papers else len(paper_ids)
+
         logger.info(
             f"[Celery] Found {len(papers)} papers to summarize (force={force})"
         )
 
         if not papers:
             return {
-                "total": len(paper_ids),
-                "skipped": len(paper_ids),
+                "total": total_requested,
+                "skipped": total_requested,
                 "success": 0,
                 "failed": 0,
                 "errors": [],
@@ -116,8 +129,8 @@ def generate_batch_summaries_task(
 
         if not texts_to_summarize:
             return {
-                "total": len(paper_ids),
-                "skipped": len(paper_ids) - len(papers),
+                "total": total_requested,
+                "skipped": total_requested - len(papers),
                 "success": 0,
                 "failed": len(papers),
                 "errors": ["No valid texts to summarize"],
@@ -206,8 +219,8 @@ def generate_batch_summaries_task(
                 errors.append(error_msg)
 
         final_result = {
-            "total": len(paper_ids),
-            "skipped": len(paper_ids) - len(papers),
+            "total": total_requested,
+            "skipped": total_requested - len(papers),
             "success": success_count,
             "failed": failed_count,
             "errors": errors,
