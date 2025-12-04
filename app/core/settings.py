@@ -81,6 +81,18 @@ class Settings(BaseSettings):
     es_use_ssl: bool = Field(default=False, validation_alias="ES_USE_SSL")
     es_index_name: str = Field(default="papers", validation_alias="ES_INDEX_NAME")
 
+    # Summary Server (GPU)
+    summary_server_url: str = Field(
+        default="http://localhost:8000", validation_alias="SUMMARY_SERVER_URL"
+    )
+
+    # Redis (Celery)
+    redis_host: str = Field(default="localhost", validation_alias="REDIS_HOST")
+    redis_port: int = Field(default=6379, validation_alias="REDIS_PORT")
+    redis_db: int = Field(default=0, validation_alias="REDIS_DB")
+
+
+
 
 
     # Auth/JWT
