@@ -52,6 +52,7 @@ def generate_batch_summaries_task(
         collection = db[settings.mongo_collection]
 
         # MongoDB에서 논문 조회
+        logger.info("[Celery] Building query for papers...")
         if is_all_papers:
             # 모든 논문 조회
             query = {}
@@ -65,11 +66,19 @@ def generate_batch_summaries_task(
                 # 이미 요약된 논문 제외
                 query["summary.ko"] = {"$in": [None, ""]}
 
-        papers = list(collection.find(query))
-        total_requested = len(papers) if is_all_papers else len(paper_ids)
+        logger.info(f"[Celery] Query: {query}")
+        logger.info("[Celery] Counting matching documents...")
+        total_count = collection.count_documents(query)
+        logger.info(f"[Celery] Total matching documents: {total_count}")
+        
+        # 한 번에 최대 100개만 처리 (배치 크기 제한)
+        batch_limit = 100
+        logger.info(f"[Celery] Fetching up to {batch_limit} papers...")
+        papers = list(collection.find(query).limit(batch_limit))
+        total_requested = total_count if is_all_papers else len(paper_ids)
 
         logger.info(
-            f"[Celery] Found {len(papers)} papers to summarize (force={force})"
+            f"[Celery] Found {len(papers)} papers to summarize (total: {total_count}, force={force})"
         )
 
         if not papers:
