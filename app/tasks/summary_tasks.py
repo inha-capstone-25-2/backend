@@ -65,12 +65,38 @@ def generate_batch_summaries_task(
                 query["summary.ko"] = {"$in": [None, ""]}
 
         logger.info(f"[Celery] Query: {query}")
-        total_count = collection.count_documents(query)
-        logger.info(f"[Celery] Total matching documents: {total_count}")
         
         # 한 번에 최대 100개만 처리
         batch_limit = 100
-        papers = list(collection.find(query).limit(batch_limit))
+        
+        # 최적화: 필요한 필드만 projection으로 가져오기
+        projection = {
+            "_id": 1,
+            "title": 1,
+            "summary.en": 1,
+            "authors": 1,
+        }
+        
+        # 최적화: count_documents는 느리므로, force=True이고 전체 문서일 때는 estimated_document_count 사용
+        if is_all_papers and force:
+            # estimated_document_count는 메타데이터 기반으로 매우 빠름
+            total_count = collection.estimated_document_count()
+            logger.info(f"[Celery] Estimated total documents: {total_count}")
+        elif is_all_papers and not force:
+            # 요약이 없는 문서만 카운트 - 인덱스가 있으면 빠름
+            # 전체 카운트 대신 바로 find로 진행
+            total_count = -1  # 나중에 계산
+            logger.info("[Celery] Skipping count for performance, fetching documents directly...")
+        else:
+            total_count = len(paper_ids)
+            logger.info(f"[Celery] Requested paper count: {total_count}")
+        
+        # 문서 조회 (projection 적용)
+        papers = list(collection.find(query, projection).limit(batch_limit))
+        
+        if total_count == -1:
+            total_count = len(papers)  # 실제 조회된 개수로 대체
+            
         total_requested = total_count if is_all_papers else len(paper_ids)
 
         logger.info(
