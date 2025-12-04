@@ -6,7 +6,7 @@ GPU 서버를 사용하여 논문의 배치 요약을 생성하고 MongoDB에 �
 
 import logging
 from typing import List, Dict, Any
-from app.db.mongodb import get_mongo_db
+from app.db.mongodb import db_manager
 from app.core.settings import settings
 from app.clients.summary_client import get_summary_client
 from app.pipeline.text_utils import clean_summary_en, build_raw_text
@@ -47,7 +47,8 @@ class SummaryService:
                 "errors": [],
             }
 
-        db = get_mongo_db()
+        # db_manager.get_db() 직접 사용 (generator 아님)
+        db = db_manager.get_db()
         collection = db[settings.mongo_collection]
 
         # MongoDB에서 논문 조회
@@ -109,9 +110,10 @@ class SummaryService:
 
         # GPU 서버에 배치 요약 요청
         try:
-            summaries = await self.summary_client.summarize_batch(texts_to_summarize)
+            # GPU 서버 응답: [{"summary_en": ..., "summary_ko": ...}, ...]
+            results = await self.summary_client.summarize_batch(texts_to_summarize)
             logger.info(
-                f"[SummaryService] Received {len(summaries)} summaries from GPU server"
+                f"[SummaryService] Received {len(results)} results from GPU server"
             )
         except Exception as e:
             logger.error(f"[SummaryService] GPU server error: {e}")
@@ -123,23 +125,26 @@ class SummaryService:
                 "errors": [str(e)],
             }
 
-        # MongoDB에 일괄 업데이트
+        # MongoDB에 일괄 업데이트 (summary.en, summary.ko 모두 저장)
         success_count = 0
         failed_count = 0
         errors = []
 
-        for i, summary in enumerate(summaries):
+        for i, result in enumerate(results):
             if i >= len(paper_id_map):
                 break
 
             paper_id = paper_id_map[i]
+            summary_en = result.get("summary_en", "")
+            summary_ko = result.get("summary_ko", "")
 
             try:
-                result = collection.update_one(
-                    {"_id": paper_id}, {"$set": {"summary.ko": summary}}
+                update_result = collection.update_one(
+                    {"_id": paper_id},
+                    {"$set": {"summary.en": summary_en, "summary.ko": summary_ko}},
                 )
 
-                if result.modified_count > 0:
+                if update_result.modified_count > 0:
                     success_count += 1
                     logger.debug(f"[SummaryService] Updated summary for {paper_id}")
                 else:
@@ -152,7 +157,7 @@ class SummaryService:
                 logger.error(f"[SummaryService] {error_msg}")
                 errors.append(error_msg)
 
-        result = {
+        final_result = {
             "total": len(paper_ids),
             "skipped": len(paper_ids) - len(papers),
             "success": success_count,
@@ -160,8 +165,8 @@ class SummaryService:
             "errors": errors,
         }
 
-        logger.info(f"[SummaryService] Batch summary result: {result}")
-        return result
+        logger.info(f"[SummaryService] Batch summary result: {final_result}")
+        return final_result
 
 
 def get_summary_service() -> SummaryService:

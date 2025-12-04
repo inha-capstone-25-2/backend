@@ -4,15 +4,11 @@ Celery 설정.
 Redis를 브로커 및 백엔드로 사용하여 비동기 작업을 처리합니다.
 """
 
-import os
 from celery import Celery
 from app.core.settings import settings
 
-# Redis URL 구성
-redis_host = os.getenv("REDIS_HOST", "localhost")
-redis_port = os.getenv("REDIS_PORT", "6379")
-redis_db = os.getenv("REDIS_DB", "0")
-redis_url = f"redis://{redis_host}:{redis_port}/{redis_db}"
+# Redis URL 구성 (settings 객체 사용)
+redis_url = f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}"
 
 # Celery 앱 생성
 celery_app = Celery(

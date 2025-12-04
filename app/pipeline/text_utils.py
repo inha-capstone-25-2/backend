@@ -60,7 +60,7 @@ def chunk_text(text: str, max_chars: int = 4000) -> List[str]:
     """
     긴 텍스트를 청크로 분할.
 
-    단락 단위로 분할하여 최대 길이를 초과하지 않도록 합니다.
+    단락 단위로 분할하되, 단락이 max_chars를 초과하면 문장 단위로 추가 분할합니다.
 
     Args:
         text: 분할할 텍스트
@@ -74,7 +74,34 @@ def chunk_text(text: str, max_chars: int = 4000) -> List[str]:
     buf = ""
 
     for p in paragraphs:
-        if len(buf) + len(p) + 1 > max_chars:
+        # 단일 단락이 max_chars를 초과하는 경우 문장 단위로 분할
+        if len(p) > max_chars:
+            # 현재 버퍼가 있으면 먼저 저장
+            if buf:
+                chunks.append(buf.strip())
+                buf = ""
+            
+            # 문장 단위로 분할 (마침표, 물음표, 느낌표 기준)
+            sentences = re.split(r'(?<=[.!?])\s+', p)
+            sentence_buf = ""
+            
+            for sentence in sentences:
+                if len(sentence_buf) + len(sentence) + 1 > max_chars:
+                    if sentence_buf:
+                        chunks.append(sentence_buf.strip())
+                    # 단일 문장이 max_chars 초과 시 강제 분할
+                    if len(sentence) > max_chars:
+                        for i in range(0, len(sentence), max_chars):
+                            chunks.append(sentence[i:i + max_chars].strip())
+                        sentence_buf = ""
+                    else:
+                        sentence_buf = sentence
+                else:
+                    sentence_buf += (" " + sentence) if sentence_buf else sentence
+            
+            if sentence_buf:
+                buf = sentence_buf
+        elif len(buf) + len(p) + 1 > max_chars:
             if buf:
                 chunks.append(buf.strip())
             buf = p
