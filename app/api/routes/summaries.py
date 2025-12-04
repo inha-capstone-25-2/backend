@@ -57,6 +57,7 @@ async def create_batch_summaries(request: BatchSummaryRequest):
 
     여러 논문 ID를 받아 Celery 태스크를 시작하고 job_id를 반환합니다.
     paper_ids가 없으면 모든 논문을 처리합니다.
+    Celery 설정의 worker_concurrency만큼 여러 워커가 병렬로 처리합니다.
 
     Args:
         request: 논문 ID 리스트 및 옵션 (paper_ids가 None이면 모든 논문)
@@ -67,30 +68,62 @@ async def create_batch_summaries(request: BatchSummaryRequest):
     Raises:
         HTTPException: 요청 검증 실패 시
     """
+    from app.celery import celery_app
+    from celery import group
+    
     # paper_ids가 None이면 빈 리스트 (모든 논문 처리)
     paper_ids = request.paper_ids if request.paper_ids else []
+    
+    # Celery 설정에서 워커 수 가져오기
+    num_chunks = celery_app.conf.get('worker_concurrency', 1) or 1
 
     logger.info(
         f"[API] Batch summary request: "
         f"{'ALL papers' if not paper_ids else f'{len(paper_ids)} papers'}, "
-        f"force={request.force}"
+        f"force={request.force}, workers={num_chunks}"
     )
 
-    # Celery 태스크 시작
-    task = generate_batch_summaries_task.apply_async(
-        args=[paper_ids, request.force]
-    )
-
-    logger.info(f"[API] Celery task started: {task.id}")
-
-    total_msg = "모든 논문" if not paper_ids else f"{len(paper_ids)}개 논문"
-
-    return BatchSummaryStartResponse(
-        job_id=task.id,
-        status="pending",
-        total_papers=len(paper_ids) if paper_ids else 0,  # 0은 "전체"를 의미
-        message=f"{total_msg}의 요약 생성 작업이 시작되었습니다",
-    )
+    # 모든 논문을 처리하는 경우, 여러 태스크로 분할하여 병렬 실행
+    if num_chunks > 1 and not paper_ids:
+        # 각 청크별 태스크 생성 (chunk_index를 전달하여 각자 다른 범위 처리)
+        tasks = []
+        for i in range(num_chunks):
+            task = generate_batch_summaries_task.s(
+                paper_ids,  # 빈 리스트
+                request.force,
+                i,  # chunk_index
+                num_chunks  # total_chunks
+            )
+            tasks.append(task)
+        
+        # Celery Group으로 병렬 실행
+        job = group(tasks).apply_async()
+        job_id = job.id
+        
+        logger.info(f"[API] Celery group started with {num_chunks} tasks: {job_id}")
+        
+        return BatchSummaryStartResponse(
+            job_id=job_id,
+            status="pending",
+            total_papers=0,  # 전체
+            message=f"모든 논문의 요약 생성 작업이 {num_chunks}개 워커로 시작되었습니다",
+        )
+    else:
+        # 단일 태스크 실행
+        task = generate_batch_summaries_task.apply_async(
+            args=[paper_ids, request.force, 0, 1]
+        )
+        
+        logger.info(f"[API] Celery task started: {task.id}")
+        
+        total_msg = "모든 논문" if not paper_ids else f"{len(paper_ids)}개 논문"
+        
+        return BatchSummaryStartResponse(
+            job_id=task.id,
+            status="pending",
+            total_papers=len(paper_ids) if paper_ids else 0,
+            message=f"{total_msg}의 요약 생성 작업이 시작되었습니다",
+        )
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)

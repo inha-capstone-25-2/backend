@@ -20,17 +20,21 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(bind=True, name="summary_tasks.generate_batch_summaries")
 def generate_batch_summaries_task(
-    self, paper_ids: List[str], force: bool = False
+    self, paper_ids: List[str], force: bool = False,
+    chunk_index: int = 0, total_chunks: int = 1
 ) -> Dict[str, Any]:
     """
     배치 논문 요약 생성 Celery 태스크.
     
     논문을 배치 단위로 처리하여 GPU 서버 효율을 최적화합니다.
+    chunk_index와 total_chunks를 사용하여 여러 워커가 다른 범위를 처리합니다.
 
     Args:
         self: Celery 태스크 인스턴스
         paper_ids: 요약할 논문 ID 리스트 (빈 리스트면 모든 논문)
         force: 이미 요약된 논문도 강제 재생성
+        chunk_index: 현재 청크 인덱스 (0부터 시작)
+        total_chunks: 전체 청크 수
 
     Returns:
         처리 결과 통계
@@ -40,7 +44,7 @@ def generate_batch_summaries_task(
     # 워커 식별자 추출 (예: W1, W2, ...)
     worker_name = self.request.hostname or "unknown"
     worker_id = worker_name.split("-")[-1] if "-" in worker_name else "0"
-    W = f"[W{worker_id}]"  # 짧은 워커 프리픽스
+    W = f"[W{worker_id}][C{chunk_index}]"  # 워커 + 청크 프리픽스
     
     is_all_papers = not paper_ids  # 빈 리스트면 모든 논문
     logger.info(
@@ -96,8 +100,14 @@ def generate_batch_summaries_task(
             total_count = len(paper_ids)
             logger.info(f"{W} Requested paper count: {total_count}")
         
-        # 문서 조회 (projection 적용)
-        papers = list(collection.find(query, projection).limit(batch_limit))
+        # 청크별 skip/limit 계산 (병렬 처리용)
+        # 각 청크는 batch_limit 개씩 처리하되, 서로 다른 시작점에서 시작
+        skip_count = chunk_index * batch_limit
+        
+        logger.info(f"{W} Chunk {chunk_index}/{total_chunks}: skip={skip_count}, limit={batch_limit}")
+        
+        # 문서 조회 (projection 적용, 청크별 skip/limit)
+        papers = list(collection.find(query, projection).skip(skip_count).limit(batch_limit))
         
         if total_count == -1:
             total_count = len(papers)  # 실제 조회된 개수로 대체
