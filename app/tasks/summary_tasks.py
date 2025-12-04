@@ -7,7 +7,7 @@
 import logging
 from typing import List, Dict, Any
 from app.celery import celery_app
-from app.db.mongodb import get_mongo_db
+from app.db.mongodb import db_manager
 from app.core.settings import settings
 from app.clients.summary_client import get_summary_client
 from app.pipeline.text_utils import build_raw_text, build_full_text_with_pdf
@@ -41,7 +41,7 @@ def generate_batch_summaries_task(
 
     try:
         # MongoDB 연결
-        db = get_mongo_db()
+        db = db_manager.get_db()
         collection = db[settings.mongo_collection]
 
         # MongoDB에서 논문 조회
