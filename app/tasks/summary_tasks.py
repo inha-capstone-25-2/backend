@@ -122,11 +122,12 @@ def generate_batch_summaries_task(
         asyncio.set_event_loop(loop)
         
         try:
-            summaries = loop.run_until_complete(
+            # GPU 서버 응답: [{"summary_en": ..., "summary_ko": ...}, ...]
+            results = loop.run_until_complete(
                 summary_client.summarize_batch(texts_to_summarize)
             )
             logger.info(
-                f"[Celery] Received {len(summaries)} summaries from GPU server"
+                f"[Celery] Received {len(results)} results from GPU server"
             )
         finally:
             loop.close()
@@ -136,28 +137,31 @@ def generate_batch_summaries_task(
             state="PROGRESS",
             meta={
                 "current": 0,
-                "total": len(summaries),
+                "total": len(results),
                 "status": "MongoDB에 저장 중...",
             },
         )
 
-        # MongoDB에 일괄 업데이트
+        # MongoDB에 일괄 업데이트 (summary.en, summary.ko 모두 저장)
         success_count = 0
         failed_count = 0
         errors = []
 
-        for i, summary in enumerate(summaries):
+        for i, result in enumerate(results):
             if i >= len(paper_id_map):
                 break
 
             paper_id = paper_id_map[i]
+            summary_en = result.get("summary_en", "")
+            summary_ko = result.get("summary_ko", "")
 
             try:
-                result = collection.update_one(
-                    {"_id": paper_id}, {"$set": {"summary.ko": summary}}
+                update_result = collection.update_one(
+                    {"_id": paper_id},
+                    {"$set": {"summary.en": summary_en, "summary.ko": summary_ko}},
                 )
 
-                if result.modified_count > 0:
+                if update_result.modified_count > 0:
                     success_count += 1
                     logger.debug(f"[Celery] Updated summary for {paper_id}")
                 else:
@@ -170,8 +174,8 @@ def generate_batch_summaries_task(
                         state="PROGRESS",
                         meta={
                             "current": i + 1,
-                            "total": len(summaries),
-                            "status": f"저장 중... ({i+1}/{len(summaries)})",
+                            "total": len(results),
+                            "status": f"저장 중... ({i+1}/{len(results)})",
                         },
                     )
 
@@ -181,7 +185,7 @@ def generate_batch_summaries_task(
                 logger.error(f"[Celery] {error_msg}")
                 errors.append(error_msg)
 
-        result = {
+        final_result = {
             "total": len(paper_ids),
             "skipped": len(paper_ids) - len(papers),
             "success": success_count,
@@ -189,8 +193,8 @@ def generate_batch_summaries_task(
             "errors": errors,
         }
 
-        logger.info(f"[Celery] Task {self.request.id} completed: {result}")
-        return result
+        logger.info(f"[Celery] Task {self.request.id} completed: {final_result}")
+        return final_result
 
     except Exception as e:
         logger.error(f"[Celery] Task {self.request.id} failed: {e}")

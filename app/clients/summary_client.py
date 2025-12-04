@@ -22,7 +22,7 @@ class SummaryClient:
     def __init__(
         self,
         base_url: Optional[str] = None,
-        timeout: int = 120,
+        timeout: int = 300,  # GPU 서버 권장: 긴 텍스트 처리 시간 고려
     ):
         """
         Args:
@@ -30,20 +30,20 @@ class SummaryClient:
             timeout: 요청 타임아웃 (초)
         """
         self.base_url = base_url or getattr(
-            settings, "summary_server_url", "http://localhost:8001"
+            settings, "summary_server_url", "http://localhost:8000"
         )
         self.timeout = timeout
         logger.info(f"[SummaryClient] Initialized with base_url: {self.base_url}")
 
-    async def summarize_batch(self, texts: List[str]) -> List[str]:
+    async def summarize_batch(self, texts: List[str]) -> List[dict]:
         """
-        배치 텍스트 요약 생성.
+        배치 텍스트 요약 및 번역 생성.
 
         Args:
             texts: 요약할 텍스트 리스트
 
         Returns:
-            요약 결과 리스트
+            요약 결과 리스트 [{"summary_en": ..., "summary_ko": ...}, ...]
 
         Raises:
             httpx.HTTPError: HTTP 요청 실패 시
@@ -59,12 +59,13 @@ class SummaryClient:
                 )
                 response.raise_for_status()
                 data = response.json()
-                summaries = data.get("summaries", [])
+                # GPU 서버 응답: {"results": [{"summary_en": ..., "summary_ko": ...}, ...]}
+                results = data.get("results", [])
 
                 logger.info(
-                    f"[SummaryClient] Successfully summarized {len(summaries)} texts"
+                    f"[SummaryClient] Successfully summarized {len(results)} texts"
                 )
-                return summaries
+                return results
 
         except httpx.TimeoutException as e:
             logger.error(f"[SummaryClient] Timeout error: {e}")
