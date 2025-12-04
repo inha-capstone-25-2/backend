@@ -10,7 +10,8 @@ from app.celery import celery_app
 from app.db.mongodb import get_mongo_db
 from app.core.settings import settings
 from app.clients.summary_client import get_summary_client
-from app.pipeline.text_utils import clean_summary_en, build_raw_text
+from app.pipeline.text_utils import build_raw_text, build_full_text_with_pdf
+from app.pipeline.pdf_extractor import fetch_arxiv_pdf_text_sync
 from pymongo.errors import PyMongoError
 
 logger = logging.getLogger(__name__)
@@ -105,12 +106,8 @@ def generate_batch_summaries_task(
                     logger.warning(f"[Celery] No text found for paper {arxiv_id}")
                     continue
 
-                cleaned_text = clean_summary_en(full_text)
-                if not cleaned_text:
-                    logger.warning(f"[Celery] Empty text after cleaning for paper {arxiv_id}")
-                    continue
-
-                texts_to_summarize.append(cleaned_text)
+                # 전처리 없이 원문 그대로 전송 (GPU 서버가 처리)
+                texts_to_summarize.append(full_text)
                 paper_id_map.append(arxiv_id)
 
                 # 진행률 업데이트 (매 5개마다)

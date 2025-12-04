@@ -131,9 +131,9 @@ def _clean_pdf_text(text: str) -> str:
 
 def fetch_arxiv_pdf_text_sync(arxiv_id: str) -> Optional[str]:
     """
-    동기 버전: arXiv 논문 PDF에서 텍스트 추출.
+    arXiv 논문 PDF에서 텍스트 추출 (재시도 포함).
 
-    Celery 태스크 등 동기 환경에서 사용합니다.
+    최대 3회 재시도하며, 실패 시 None 반환.
 
     Args:
         arxiv_id: arXiv 논문 ID
@@ -141,28 +141,38 @@ def fetch_arxiv_pdf_text_sync(arxiv_id: str) -> Optional[str]:
     Returns:
         추출된 텍스트 또는 None
     """
+    import time
     import requests
 
     pdf_url = ARXIV_PDF_URL.format(arxiv_id=arxiv_id)
+    max_retries = 3
 
-    try:
-        response = requests.get(pdf_url, timeout=HTTP_TIMEOUT, allow_redirects=True)
-        response.raise_for_status()
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(pdf_url, timeout=HTTP_TIMEOUT, allow_redirects=True)
+            response.raise_for_status()
 
-        pdf_bytes = response.content
-        text = extract_text_from_pdf_bytes(pdf_bytes)
+            # PDF 바이트에서 텍스트 추출 (공통 함수 사용)
+            pdf_bytes = response.content
+            text = extract_text_from_pdf_bytes(pdf_bytes)
 
-        if text:
-            logger.info(f"[PDFExtractor] Sync extracted {len(text)} chars from {arxiv_id}")
+            if text:
+                logger.info(f"[PDFExtractor] Extracted {len(text)} chars from {arxiv_id}")
+            return text
 
-        return text
+        except requests.Timeout:
+            logger.warning(f"[PDFExtractor] Timeout for {arxiv_id}, attempt {attempt + 1}/{max_retries}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # 지수 백오프: 1초, 2초, 4초
+            continue
+        except requests.HTTPError as e:
+            logger.error(f"[PDFExtractor] HTTP error for {arxiv_id}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[PDFExtractor] Error for {arxiv_id}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+            continue
 
-    except requests.HTTPError as e:
-        logger.error(f"[PDFExtractor] Sync HTTP error for {arxiv_id}: {e}")
-        return None
-    except requests.Timeout:
-        logger.error(f"[PDFExtractor] Sync timeout downloading {arxiv_id}")
-        return None
-    except Exception as e:
-        logger.error(f"[PDFExtractor] Sync error fetching {arxiv_id}: {e}")
-        return None
+    logger.error(f"[PDFExtractor] All retries failed for {arxiv_id}")
+    return None
