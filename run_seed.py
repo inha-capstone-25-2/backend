@@ -36,6 +36,7 @@ from app.seed.search_history_seed import seed_search_history
 from app.seed.papers_enrichment_seed import enrich_papers
 from app.seed.paper_recommendations_seed import seed_paper_recommendations
 from app.seed.recommendation_events_seed import seed_recommendation_events
+from app.seed.recommendation_interactions_seed import seed_recommendation_interactions
 from app.db.postgres import get_db
 from app.db.mongodb import get_mongo_db, init_mongo
 
@@ -112,27 +113,31 @@ def seed_mongo_all() -> None:
 
     try:
         # 1. Bookmarks
-        logger.info("\n[1/6] Seeding Bookmarks (500 bookmarks)...")
+        logger.info("\n[1/7] Seeding Bookmarks (500 bookmarks)...")
         seed_bookmarks(db)
 
         # 2. User Activities
-        logger.info("\n[2/6] Seeding User Activities (1,000 activities)...")
+        logger.info("\n[2/7] Seeding User Activities (1,000 activities)...")
         seed_activities(db)
 
         # 3. Search History
-        logger.info("\n[3/6] Seeding Search History (300 searches)...")
+        logger.info("\n[3/7] Seeding Search History (300 searches)...")
         seed_search_history(db)
 
         # 4. Papers Enrichment
-        logger.info("\n[4/6] Enriching Papers collection...")
+        logger.info("\n[4/7] Enriching Papers collection...")
         enrich_papers(db)
 
         # 5. Paper Recommendations
-        logger.info("\n[5/6] Seeding Paper Recommendations (500 recommendations)...")
+        logger.info("\n[5/7] Seeding Paper Recommendations (500 recommendations)...")
         seed_paper_recommendations(db)
 
-        # 6. Recommendation Events
-        logger.info("\n[6/6] Seeding Recommendation Events...")
+        # 6. Recommendation Interactions (클릭된 추천에 대한 상호작용 데이터)
+        logger.info("\n[6/7] Seeding Recommendation Interactions...")
+        seed_recommendation_interactions(db)
+
+        # 7. Recommendation Events
+        logger.info("\n[7/7] Seeding Recommendation Events...")
         seed_recommendation_events(db)
 
     except Exception as e:
@@ -230,6 +235,13 @@ def seed_events_only() -> None:
     logger.info("✅ Recommendation Events seeding completed!")
 
 
+def seed_interactions_only() -> None:
+    logger.info("Seeding Recommendation Interactions only...")
+    db = next(get_mongo_db())
+    seed_recommendation_interactions(db)
+    logger.info("✅ Recommendation Interactions seeding completed!")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Dev 환경용 Mock 데이터 생성 CLI")
     parser.add_argument(
@@ -243,6 +255,7 @@ def main():
             "searches",
             "papers",
             "recommendations",
+            "interactions",
             "events",
             "all",
         ],
@@ -293,6 +306,8 @@ def main():
         seed_recommendations_only()
     elif args.only == "events":
         seed_events_only()
+    elif args.only == "interactions":
+        seed_interactions_only()
     else:
         seed_all()
 
