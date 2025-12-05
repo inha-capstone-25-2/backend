@@ -66,14 +66,14 @@ class MongoDBManager:
             raise
 
     def _create_indexes(self) -> None:
-        """필요한 인덱스 생성 (app/db/indexes.py 위임)"""
+        """필요한 인덱스 생성 및 동기화 (app/db/indexes.py 위임)"""
         if self.db is None:
             return
 
-        from app.db.indexes import ensure_indexes
+        from app.db.indexes import sync_indexes
         
-        # papers 컬렉션 포함 모든 인덱스 생성
-        ensure_indexes(self.db, skip_papers=False)
+        # 인덱스 동기화: deprecated 인덱스 삭제 + 새 인덱스 생성
+        sync_indexes(self.db, skip_papers=False)
 
 
     def close(self) -> None:
