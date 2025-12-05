@@ -91,10 +91,10 @@ def get_index_definitions(papers_collection_name: str) -> dict:
         # 5. Papers (검색은 Elasticsearch 사용)
         papers_collection_name: [
             # summary.ko 인덱스: 요약되지 않은 논문 조회 최적화
+            # sparse=False로 설정하여 null 값도 인덱스에 포함 (null 조회 쿼리 최적화)
             IndexModel(
                 [("summary.ko", ASCENDING)],
                 name="summary_ko_idx",
-                sparse=True,  # null 값이 많은 경우 효율적
             ),
             # update_date 인덱스: 최신 논문 조회 최적화 (sort by update_date DESC)
             IndexModel(
@@ -143,3 +143,71 @@ def ensure_indexes(db: Database, skip_papers: bool = False) -> None:
             logger.error(f"Failed to create indexes for {collection_name}: {e}")
             
     logger.info("MongoDB index creation completed.")
+
+
+def sync_indexes(db: Database, skip_papers: bool = False, dry_run: bool = False) -> dict:
+    """
+    코드에 정의된 인덱스와 DB의 인덱스를 동기화합니다.
+    
+    - 코드에 없는 인덱스 → 삭제 (deprecated 정리)
+    - 코드에만 있는 인덱스 → 생성
+    - _id 인덱스는 건드리지 않음
+    
+    Args:
+        db: MongoDB Database 인스턴스
+        skip_papers: True일 경우 papers 컬렉션 스킵
+        dry_run: True일 경우 실제 변경 없이 변경 예정 사항만 반환
+        
+    Returns:
+        {"dropped": [...], "created": [...], "unchanged": [...]}
+    """
+    logger.info(f"Starting MongoDB index sync... (dry_run={dry_run})")
+    
+    definitions = get_index_definitions(settings.mongo_collection)
+    result = {"dropped": [], "created": [], "unchanged": []}
+    
+    for collection_name, defined_indexes in definitions.items():
+        if skip_papers and collection_name == settings.mongo_collection:
+            logger.info(f"Skipping sync for {collection_name}")
+            continue
+        
+        collection = db[collection_name]
+        
+        # 코드에 정의된 인덱스 이름들
+        defined_names = {idx.document.get("name") for idx in defined_indexes}
+        
+        # DB에 존재하는 인덱스 이름들 (_id 제외)
+        existing_indexes = collection.index_information()
+        existing_names = {name for name in existing_indexes.keys() if name != "_id_"}
+        
+        # 삭제할 인덱스: DB에만 있고 코드에는 없는 것
+        to_drop = existing_names - defined_names
+        for idx_name in to_drop:
+            logger.info(f"[{collection_name}] Dropping deprecated index: {idx_name}")
+            result["dropped"].append(f"{collection_name}.{idx_name}")
+            if not dry_run:
+                try:
+                    collection.drop_index(idx_name)
+                except Exception as e:
+                    logger.error(f"Failed to drop index {idx_name}: {e}")
+        
+        # 생성할 인덱스: 코드에만 있고 DB에는 없는 것
+        to_create = defined_names - existing_names
+        for idx in defined_indexes:
+            idx_name = idx.document.get("name")
+            if idx_name in to_create:
+                logger.info(f"[{collection_name}] Creating new index: {idx_name}")
+                result["created"].append(f"{collection_name}.{idx_name}")
+                if not dry_run:
+                    try:
+                        collection.create_indexes([idx])
+                    except Exception as e:
+                        logger.error(f"Failed to create index {idx_name}: {e}")
+        
+        # 변경 없는 인덱스
+        unchanged = defined_names & existing_names
+        for idx_name in unchanged:
+            result["unchanged"].append(f"{collection_name}.{idx_name}")
+    
+    logger.info(f"Index sync completed: {len(result['dropped'])} dropped, {len(result['created'])} created, {len(result['unchanged'])} unchanged")
+    return result
