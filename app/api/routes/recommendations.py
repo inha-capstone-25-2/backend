@@ -2,6 +2,8 @@
 추천 시스템 API 엔드포인트.
 """
 
+import logging
+import uuid
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from pymongo.database import Database
@@ -17,8 +19,10 @@ from app.schemas.recommendation_interaction import (
     ClickResponse,
 )
 from app.services.recommendation_service import RecommendationService
+from app.clients.rl_client import get_rl_client
 from bson import ObjectId
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
 
@@ -46,6 +50,76 @@ def get_recommendations(
     )
 
     return RecommendationResponse(**result)
+
+
+@router.get("/rl")
+async def get_rl_recommendations(
+    top_k: int = Query(6, ge=1, le=50, description="추천 논문 개수"),
+    candidate_k: int = Query(100, ge=10, le=500, description="후보군 크기"),
+    db_postgres: Session = Depends(get_db),
+    db_mongo: Database = Depends(get_mongo_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    RL 기반 사용자 맞춤 논문 추천.
+
+    GPU 서버의 RL 모델을 사용하여 추천합니다.
+    RL 서버 장애 시 Rule-based로 자동 fallback됩니다.
+    """
+    session_id = str(uuid.uuid4())
+    rl_client = get_rl_client()
+
+    try:
+        # RL 서버 호출
+        result = await rl_client.get_rl_recommendations(
+            user_id=current_user.id,
+            limit=top_k,
+            candidate_k=candidate_k,
+            session_id=session_id,
+        )
+        logger.info(f"[RL] Successfully got {len(result.get('recommendations', []))} recommendations from RL server")
+        return result
+
+    except Exception as e:
+        # Fallback: Rule-based 추천
+        logger.warning(f"[RL] RL server failed, falling back to rule-based: {e}")
+        
+        service = RecommendationService(db_mongo)
+        result = service.get_recommendations(
+            user=current_user, db_postgres=db_postgres, top_k=top_k
+        )
+        result["recommendation_type"] = "rule_based_fallback"
+        return RecommendationResponse(**result)
+
+
+@router.get("/similar/{paper_id}")
+async def get_similar_papers(
+    paper_id: str,
+    limit: int = Query(6, ge=1, le=20, description="추천 논문 개수"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    유사 논문 추천.
+
+    특정 논문과 유사한 논문을 추천합니다.
+    Content-based Filtering 기반입니다.
+    """
+    rl_client = get_rl_client()
+
+    try:
+        result = await rl_client.get_similar_papers(
+            paper_id=paper_id,
+            limit=limit,
+        )
+        logger.info(f"[RL] Got {len(result.get('recommendations', []))} similar papers for {paper_id}")
+        return result
+
+    except Exception as e:
+        logger.error(f"[RL] Failed to get similar papers: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"유사 논문 추천 서비스를 사용할 수 없습니다: {str(e)}"
+        )
 
 
 @router.get("/logs", response_model=RecommendationLogListResponse)
@@ -143,5 +217,3 @@ def record_recommendation_interaction(
         raise HTTPException(status_code=500, detail="상호작용 데이터 저장에 실패했습니다")
     
     return RecommendationInteraction(**result)
-
-
