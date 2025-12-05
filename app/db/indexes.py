@@ -40,13 +40,18 @@ def get_index_definitions(papers_collection_name: str) -> dict:
             )
         ],
 
-        # 2. User Activities (TTL)
+        # 2. User Activities (TTL + 추천 조회 최적화)
         COLLECTION_USER_ACTIVITIES: [
             IndexModel(
                 [("timestamp", ASCENDING)],
                 name="ttl_timestamp",
                 expireAfterSeconds=TTL_USER_ACTIVITIES_SECONDS,
-            )
+            ),
+            # 사용자별 활동 조회 최적화 (추천 시스템용)
+            IndexModel(
+                [("user_id", ASCENDING), ("activity_type", ASCENDING), ("timestamp", DESCENDING)],
+                name="user_activity_type_timestamp_idx",
+            ),
         ],
 
         # 3. Recommendation Interactions (TTL)
@@ -95,6 +100,16 @@ def get_index_definitions(papers_collection_name: str) -> dict:
             IndexModel(
                 [("update_date", DESCENDING)],
                 name="update_date_desc_idx",
+            ),
+            # 카테고리 기반 추천 쿼리 최적화
+            IndexModel(
+                [("categories", ASCENDING), ("view_count", DESCENDING), ("bookmark_count", DESCENDING)],
+                name="categories_popularity_idx",
+            ),
+            # 인기 논문 조회 (관심사 없는 사용자용)
+            IndexModel(
+                [("view_count", DESCENDING), ("bookmark_count", DESCENDING)],
+                name="popularity_idx",
             ),
         ],
     }
