@@ -195,6 +195,7 @@ def seed_interests_only() -> None:
 
 def seed_bookmarks_only() -> None:
     logger.info("Seeding Bookmarks only...")
+    init_mongo(skip_indexes=True)
     db = next(get_mongo_db())
     seed_bookmarks(db)
     logger.info("✅ Bookmarks seeding completed!")
@@ -202,6 +203,7 @@ def seed_bookmarks_only() -> None:
 
 def seed_activities_only() -> None:
     logger.info("Seeding User Activities only...")
+    init_mongo(skip_indexes=True)
     db = next(get_mongo_db())
     seed_activities(db)
     logger.info("✅ User Activities seeding completed!")
@@ -209,6 +211,7 @@ def seed_activities_only() -> None:
 
 def seed_searches_only() -> None:
     logger.info("Seeding Search History only...")
+    init_mongo(skip_indexes=True)
     db = next(get_mongo_db())
     seed_search_history(db)
     logger.info("✅ Search History seeding completed!")
@@ -216,6 +219,7 @@ def seed_searches_only() -> None:
 
 def enrich_papers_only() -> None:
     logger.info("Enriching Papers collection only...")
+    init_mongo(skip_indexes=True)
     db = next(get_mongo_db())
     enrich_papers(db)
     logger.info("✅ Papers enrichment completed!")
@@ -223,6 +227,7 @@ def enrich_papers_only() -> None:
 
 def seed_recommendations_only() -> None:
     logger.info("Seeding Paper Recommendations only...")
+    init_mongo(skip_indexes=True)
     db = next(get_mongo_db())
     seed_paper_recommendations(db)
     logger.info("✅ Paper Recommendations seeding completed!")
@@ -230,6 +235,7 @@ def seed_recommendations_only() -> None:
 
 def seed_events_only() -> None:
     logger.info("Seeding Recommendation Events only...")
+    init_mongo(skip_indexes=True)
     db = next(get_mongo_db())
     seed_recommendation_events(db)
     logger.info("✅ Recommendation Events seeding completed!")
@@ -237,6 +243,7 @@ def seed_events_only() -> None:
 
 def seed_interactions_only() -> None:
     logger.info("Seeding Recommendation Interactions only...")
+    init_mongo(skip_indexes=True)
     db = next(get_mongo_db())
     seed_recommendation_interactions(db)
     logger.info("✅ Recommendation Interactions seeding completed!")

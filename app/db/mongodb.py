@@ -105,9 +105,13 @@ class MongoDBManager:
 db_manager = MongoDBManager()
 
 
-def init_mongo() -> None:
-    """애플리케이션 시작 시 호출"""
-    db_manager.connect()
+def init_mongo(skip_indexes: bool = False) -> None:
+    """애플리케이션 시작 시 호출
+    
+    Args:
+        skip_indexes: True이면 인덱스 생성을 건너뜀 (시드 스크립트, Celery worker용)
+    """
+    db_manager.connect(skip_indexes=skip_indexes)
 
 
 def close_mongo() -> None:
