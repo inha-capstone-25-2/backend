@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories.user_interest_repository import UserInterestRepository
 from app.models.user import User
-from app.schemas.user_interest import InterestItem, InterestList, InterestRemovalResult
+from app.schemas.user_interest import InterestItem, InterestList, InterestRemovalResult, InterestAddResult
 from app.core.exceptions import ResourceNotFoundException, ValidationException
 
 logger = logging.getLogger(__name__)
@@ -24,9 +24,23 @@ class UserInterestService:
         self.db = db
         self.repo = UserInterestRepository(db)
 
+    @staticmethod
+    def _category_to_interest_item(category) -> InterestItem:
+        """Category 모델을 InterestItem 스키마로 변환한다.
+
+        Args:
+            category: Category 모델 인스턴스.
+
+        Returns:
+            InterestItem 스키마.
+        """
+        name_ko = next((n.name for n in category.names if n.locale == "ko"), None)
+        name_en = next((n.name for n in category.names if n.locale == "en"), None)
+        return InterestItem(code=category.code, name_ko=name_ko, name_en=name_en)
+
     def add_interests(
         self, user: User, category_codes: List[str]
-    ) -> Dict[str, int]:
+    ) -> InterestAddResult:
         """
         사용자 관심사 추가.
 
@@ -69,10 +83,10 @@ class UserInterestService:
 
         self.db.commit()
 
-        return {
-            "added": added_count,
-            "skipped": len(existing_ids)
-        }
+        return InterestAddResult(
+            added=added_count,
+            skipped=len(existing_ids)
+        )
 
     def list_interests(self, user: User) -> InterestList:
         """
@@ -85,23 +99,7 @@ class UserInterestService:
             InterestList 스키마
         """
         categories = self.repo.list_user_interests(user.id)
-
-        items: List[InterestItem] = []
-        for category in categories:
-            name_ko = next(
-                (n.name for n in category.names if n.locale == "ko"), None
-            )
-            name_en = next(
-                (n.name for n in category.names if n.locale == "en"), None
-            )
-            items.append(
-                InterestItem(
-                    code=category.code,
-                    name_ko=name_ko,
-                    name_en=name_en
-                )
-            )
-
+        items = [self._category_to_interest_item(cat) for cat in categories]
         return InterestList(items=items)
 
     def remove_interests(
@@ -135,21 +133,7 @@ class UserInterestService:
         self.db.commit()
 
         remaining_categories = self.repo.list_user_interests(user.id)
-        remaining_items = []
-        for category in remaining_categories:
-            name_ko = next(
-                (n.name for n in category.names if n.locale == "ko"), None
-            )
-            name_en = next(
-                (n.name for n in category.names if n.locale == "en"), None
-            )
-            remaining_items.append(
-                InterestItem(
-                    code=category.code,
-                    name_ko=name_ko,
-                    name_en=name_en
-                )
-            )
+        remaining_items = [self._category_to_interest_item(cat) for cat in remaining_categories]
 
         return InterestRemovalResult(
             removed=len(deleted),

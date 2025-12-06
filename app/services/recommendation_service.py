@@ -5,6 +5,7 @@
 
 import logging
 import time
+import uuid
 from datetime import datetime
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
@@ -14,7 +15,7 @@ from app.repositories.recommendation_repository import RecommendationRepository
 from app.utils.rule_based_recommender import RuleBasedRecommender
 from app.utils.mongodb import serialize_object_id
 from app.models.user import User
-from app.schemas.recommendation import RecommendationItem, ScoreBreakdown
+from app.schemas.recommendation import RecommendationItem, ScoreBreakdown, RecommendationResponse
 from app.schemas.paper import Summary
 from app.schemas.recommendation_event import ActivityType
 
@@ -38,17 +39,31 @@ class RecommendationService:
         self.db_mongo = db_mongo
         self.repo = RecommendationRepository(db_mongo)
 
+    def _format_recommendation_log(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """MongoDB 추천 로그 문서를 응답 형식으로 변환한다.
+
+        Args:
+            item: MongoDB 문서.
+
+        Returns:
+            포맷팅된 딕셔너리.
+        """
+        serialize_object_id(item)
+        item["id"] = item.pop("_id")
+        if "recommended_at" in item and hasattr(item["recommended_at"], "isoformat"):
+            item["recommended_at"] = item["recommended_at"].isoformat()
+        return item
+
     def get_recommendations(
-        self, user: User, db_postgres: Session, top_k: int, candidate_limit: int = 50  # 100 -> 50으로 축소
-    ) -> Dict[str, Any]:
+        self, user: User, db_postgres: Session, top_k: int, candidate_limit: int = 50
+    ) -> RecommendationResponse:
         """사용자 맞춤 논문 추천 및 로깅"""
         
         start_time = time.time()
-        logger.info(f"Generating recommendations for user {user.id}")
+        logger.info("Generating recommendations for user %s", user.id)
 
-        import uuid
         session_id = str(uuid.uuid4())
-        logger.info(f"Generated session_id: {session_id}")
+        logger.info("Generated session_id: %s", session_id)
 
         step_start = time.time()
         recommender = RuleBasedRecommender()
@@ -59,7 +74,7 @@ class RecommendationService:
             top_k=None,
             candidate_limit=candidate_limit,
         )
-        logger.info(f"[PERF] Recommender.recommend took {time.time() - step_start:.3f}s")
+        logger.info("[PERF] Recommender.recommend took %.3fs", time.time() - step_start)
 
         all_candidate_ids = [rec.get("paper_id") for rec in all_recommendations]
         
@@ -99,7 +114,7 @@ class RecommendationService:
             log_docs.append(log_doc)
         
         self.repo.log_recommendations_batch(log_docs)
-        logger.info(f"[PERF] Batch logging took {time.time() - step_start:.3f}s")
+        logger.info("[PERF] Batch logging took %.3fs", time.time() - step_start)
 
         step_start = time.time()
         self.repo.log_session_context(
@@ -112,7 +127,7 @@ class RecommendationService:
                 "final_display": final_display,
             }
         )
-        logger.info(f"[PERF] Session context logging took {time.time() - step_start:.3f}s")
+        logger.info("[PERF] Session context logging took %.3fs", time.time() - step_start)
 
         step_start = time.time()
         for idx, rec in enumerate(recommendations):
@@ -123,7 +138,7 @@ class RecommendationService:
                 session_id=session_id,
                 metadata={"position": idx}
             )
-        logger.info(f"[PERF] Expose event logging took {time.time() - step_start:.3f}s")
+        logger.info("[PERF] Expose event logging took %.3fs", time.time() - step_start)
 
         step_start = time.time()
         recommendation_items = []
@@ -152,38 +167,28 @@ class RecommendationService:
             )
             recommendation_items.append(item)
         
-        logger.info(f"[PERF] Response generation took {time.time() - step_start:.3f}s")
-        logger.info(f"[PERF] Total service time: {time.time() - start_time:.3f}s")
+        logger.info("[PERF] Response generation took %.3fs", time.time() - step_start)
+        logger.info("[PERF] Total service time: %.3fs", time.time() - start_time)
 
-        return {
-            "user_id": user.id,
-            "session_id": session_id,
-            "recommendation_type": "rule_based",
-            "recommendations": recommendation_items,
-            "total_count": len(recommendation_items),
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+        return RecommendationResponse(
+            user_id=user.id,
+            session_id=session_id,
+            recommendation_type="rule_based",
+            recommendations=recommendation_items,
+            total_count=len(recommendation_items),
+            timestamp=datetime.utcnow().isoformat(),
+        )
 
     def get_all_recommendation_logs(
         self, page: int = 1, page_size: int = 20
     ) -> Dict[str, Any]:
         """전체 추천 로그 조회"""
-        logger.info(f"Getting all recommendation logs (page={page}, page_size={page_size})")
+        logger.info("Getting all recommendation logs (page=%d, page_size=%d)", page, page_size)
 
         # Repository에서 데이터 조회
         total, items = self.repo.get_all_recommendations(page, page_size)
 
-        # MongoDB _id를 문자열로 변환 및 recommended_at 포맷팅
-        formatted_items = []
-        for item in items:
-            serialize_object_id(item)
-            item["id"] = item.pop("_id")
-            
-            # recommended_at을 ISO 형식 문자열로 변환
-            if "recommended_at" in item and hasattr(item["recommended_at"], "isoformat"):
-                item["recommended_at"] = item["recommended_at"].isoformat()
-            
-            formatted_items.append(item)
+        formatted_items = [self._format_recommendation_log(item) for item in items]
 
         return {
             "total": total,
@@ -197,23 +202,14 @@ class RecommendationService:
     ) -> Dict[str, Any]:
         """특정 사용자의 추천 로그 조회"""
         logger.info(
-            f"Getting recommendation logs for user {user_id} (page={page}, page_size={page_size})"
+            "Getting recommendation logs for user %d (page=%d, page_size=%d)",
+            user_id, page, page_size
         )
 
         # Repository에서 데이터 조회
         total, items = self.repo.get_recommendations_by_user(user_id, page, page_size)
 
-        # MongoDB _id를 문자열로 변환 및 recommended_at 포맷팅
-        formatted_items = []
-        for item in items:
-            serialize_object_id(item)
-            item["id"] = item.pop("_id")
-            
-            # recommended_at을 ISO 형식 문자열로 변환
-            if "recommended_at" in item and hasattr(item["recommended_at"], "isoformat"):
-                item["recommended_at"] = item["recommended_at"].isoformat()
-            
-            formatted_items.append(item)
+        formatted_items = [self._format_recommendation_log(item) for item in items]
 
         return {
             "total": total,
@@ -226,7 +222,7 @@ class RecommendationService:
         """클릭 기록"""
         success = self.repo.mark_as_clicked(recommendation_id)
         if success:
-            logger.info(f"Marked recommendation {recommendation_id} as clicked by user {user_id}")
+            logger.info("Marked recommendation %s as clicked by user %d", recommendation_id, user_id)
         return {
             "success": success,
             "clicked_at": datetime.utcnow().isoformat() if success else None,
@@ -249,7 +245,7 @@ class RecommendationService:
                 if field in saved_doc and hasattr(saved_doc[field], "isoformat"):
                     saved_doc[field] = saved_doc[field].isoformat()
             
-            logger.info(f"Saved interaction for recommendation {recommendation_id}")
+            logger.info("Saved interaction for recommendation %s", recommendation_id)
         
         return saved_doc
 
