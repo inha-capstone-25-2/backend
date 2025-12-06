@@ -7,7 +7,7 @@ Elasticsearch 클라이언트를 초기화하고 연결을 관리합니다.
 import logging
 from typing import Generator
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import ConnectionError as ESConnectionError
+from elasticsearch.exceptions import ConnectionError as ESConnectionError, ApiError
 
 from app.core.settings import settings
 
@@ -56,7 +56,7 @@ def get_elasticsearch_client() -> Elasticsearch:
                 logger.error(f"[ES] Failed to ping Elasticsearch at {host}")
                 try:
                     _es_client.info()
-                except Exception as e:
+                except (ESConnectionError, ApiError) as e:
                     logger.error(f"[ES] Connection diagnosis: {e}")
                     if hasattr(e, "body"):
                         logger.error(f"[ES] Error body: {e.body}")
@@ -70,7 +70,7 @@ def get_elasticsearch_client() -> Elasticsearch:
             logger.info(f"[ES] Cluster name: {info.get('cluster_name', 'unknown')}")
             logger.info(f"[ES] Version: {info.get('version', {}).get('number', 'unknown')}")
             
-        except Exception as e:
+        except (ESConnectionError, ApiError) as e:
             logger.error(f"[ES] Elasticsearch connection error: {e}")
             _es_client = None
             raise ESConnectionError(f"Elasticsearch connection failed: {e}")
@@ -132,7 +132,7 @@ def check_elasticsearch_health() -> dict:
             "active_primary_shards": health.get("active_primary_shards", 0),
             "active_shards": health.get("active_shards", 0),
         }
-    except Exception as e:
+    except (ESConnectionError, ApiError) as e:
         logger.error(f"[ES] Health check failed: {e}")
         return {
             "status": "unavailable",
@@ -153,6 +153,6 @@ def init_elasticsearch() -> None:
         repo = ElasticsearchRepository(client)
         repo.update_mapping()
         
-    except Exception as e:
+    except (ESConnectionError, ApiError) as e:
         # ES 초기화 실패가 앱 구동을 막지 않도록 로그만 남김
         logger.error(f"[ES] Initialization failed: {e}")

@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 
 from pymongo.database import Database
 from pymongo.collection import Collection
+from pymongo.errors import PyMongoError
 from bson import ObjectId
 
 from app.core.constants import (
@@ -80,7 +81,7 @@ class RecommendationRepository:
 
         try:
             self.recommendations_collection.insert_one(log_doc)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log recommendation: {e}")
 
     def log_recommendations_batch(self, log_docs: List[Dict[str, Any]]) -> None:
@@ -91,7 +92,7 @@ class RecommendationRepository:
         try:
             self.recommendations_collection.insert_many(log_docs, ordered=False)
             logger.info(f"Logged {len(log_docs)} recommendations in batch")
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log recommendations batch: {e}")
 
     def get_all_recommendations(
@@ -114,7 +115,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get all recommendations: {e}")
             return 0, []
 
@@ -139,7 +140,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get recommendations by user {user_id}: {e}")
             return 0, []
 
@@ -156,7 +157,7 @@ class RecommendationRepository:
                 },
             )
             return result.modified_count > 0
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to mark recommendation as clicked: {e}")
             return False
 
@@ -189,7 +190,7 @@ class RecommendationRepository:
             )
             return saved_doc
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to save interaction: {e}")
             return None
 
@@ -204,7 +205,7 @@ class RecommendationRepository:
                 .limit(limit)
             )
             return list(cursor)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get user interactions: {e}")
             return []
 
@@ -233,7 +234,7 @@ class RecommendationRepository:
                 f"by user {user_id} in session {session_id}"
             )
             return str(result.inserted_id)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log event: {e}")
             return None
 
@@ -264,7 +265,7 @@ class RecommendationRepository:
             result = self.events_collection.insert_one(event_doc)
             logger.info(f"Logged session context for session {session_id}")
             return str(result.inserted_id)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log session context: {e}")
             return None
 
@@ -287,7 +288,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get events for session {session_id}: {e}")
             return 0, []
 
@@ -310,7 +311,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get events for user {user_id}: {e}")
             return 0, []
 
@@ -363,7 +364,7 @@ class RecommendationRepository:
                 "bookmark_rate": float(bookmark_rate),
             }
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to calculate user context stats for {user_id}: {e}")
             return {
                 "activity_count": 0.0,

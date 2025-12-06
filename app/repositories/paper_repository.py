@@ -6,8 +6,9 @@ from typing import List, Dict, Any, Optional
 
 from pymongo.database import Database
 from pymongo.collection import Collection
+from pymongo.errors import PyMongoError
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import ConnectionError as ESConnectionError
+from elasticsearch.exceptions import ConnectionError as ESConnectionError, ApiError
 
 from app.core.settings import settings
 from app.core.exceptions import DatabaseException
@@ -55,7 +56,7 @@ class PaperRepository:
         try:
             self.history_collection.insert_one(history_doc)
             logger.debug(f"Search history saved for user {user_id}")
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to save search history: {e}")
 
     def search_papers(
@@ -81,7 +82,7 @@ class PaperRepository:
                 )
                 logger.info("[PaperRepo] Elasticsearch search successful")
                 return result
-            except Exception as e:
+            except (ApiError, ESConnectionError) as e:
                 logger.warning(
                     f"[PaperRepo] Elasticsearch search failed: {e}. "
                     "Falling back to MongoDB"
@@ -200,7 +201,7 @@ class PaperRepository:
                 total_time = time.time() - start_time
                 logger.info(f"[PERF] Total Search Time: {total_time:.4f}s")
 
-            except Exception as e:
+            except PyMongoError as e:
                 logger.error(f"[Search] Two-step search failed: {e}")
                 raise DatabaseException("Search operation failed")
 
