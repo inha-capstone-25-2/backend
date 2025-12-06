@@ -19,6 +19,7 @@ class ScoreBreakdown(BaseModel):
 class RecommendationItem(BaseModel):
     """개별 추천 아이템"""
 
+    recommendation_id: str = Field(..., description="추천 로그 ID (클릭/상호작용 추적용)")
     paper_id: str = Field(..., description="논문 ID")
     title: str = Field(..., description="논문 제목")
     summary: Optional[Summary] = Field(None, description="요약")

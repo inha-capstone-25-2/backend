@@ -90,12 +90,18 @@ class RecommendationService:
 
         recommendations = all_recommendations[:top_k]
         
+        # 미리 ObjectId 생성
+        import bson
+        for rec in recommendations:
+            rec["_id"] = bson.ObjectId()
+
         final_display = [rec.get("paper_id") for rec in recommendations]
 
         step_start = time.time()
         log_docs = []
         for rec in recommendations:
             log_doc = {
+                "_id": rec["_id"],  # 미리 생성한 ID 사용
                 "session_id": session_id,
                 "user_id": user.id,
                 "paper_id": rec.get("paper_id"),
@@ -151,6 +157,7 @@ class RecommendationService:
             summary_obj = Summary(**summary_data) if summary_data else None
 
             item = RecommendationItem(
+                recommendation_id=str(rec["_id"]),  # ID 매핑
                 paper_id=rec["paper_id"],
                 title=paper.get("title", ""),
                 summary=summary_obj,
