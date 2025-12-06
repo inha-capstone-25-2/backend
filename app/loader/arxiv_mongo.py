@@ -283,10 +283,8 @@ def ingest_arxiv_to_mongo() -> bool:
 
     logger.info(f"[arxiv-job] MongoDB collection: {collection.full_name}")
 
-    # 기존 데이터 삭제 (옵션)
-    if os.getenv("ARXIV_REMOVE_OLD_DATA"):
-        logger.info("[arxiv-job] removing old data")
-        collection.delete_many({})
+    logger.info("[arxiv-job] removing old data")
+    collection.delete_many({})
 
     create_unique_index(collection)
 
