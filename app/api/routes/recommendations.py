@@ -21,6 +21,7 @@ from app.schemas.recommendation_interaction import (
 from app.services.recommendation_service import RecommendationService
 from app.clients.rl_client import get_rl_client
 from bson import ObjectId
+from bson.errors import InvalidId
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
@@ -185,7 +186,12 @@ async def record_recommendation_click(
     """
     # 먼저 추천 정보 조회
     recommendations_coll = db_mongo["paper_recommendations"]
-    rec = recommendations_coll.find_one({"_id": ObjectId(recommendation_id)})
+    try:
+        rec_oid = ObjectId(recommendation_id)
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="유효하지 않은 추천 ID 형식입니다")
+
+    rec = recommendations_coll.find_one({"_id": rec_oid})
     
     logger.info(
         "[RL] 👆 Click event: user_id=%d, recommendation_id=%s",
@@ -245,7 +251,12 @@ async def record_recommendation_interaction(
     GPU 서버에도 상호작용 로그를 전송합니다.
     """
     recommendations_coll = db_mongo["paper_recommendations"]
-    rec = recommendations_coll.find_one({"_id": ObjectId(recommendation_id)})
+    try:
+        rec_oid = ObjectId(recommendation_id)
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="유효하지 않은 추천 ID 형식입니다")
+
+    rec = recommendations_coll.find_one({"_id": rec_oid})
     
     if not rec:
         raise HTTPException(status_code=404, detail=f"추천 ID {recommendation_id}를 찾을 수 없습니다")
