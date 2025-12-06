@@ -16,7 +16,6 @@ from __future__ import annotations
 import logging
 import random
 from typing import TYPE_CHECKING
-from faker import Faker
 import numpy as np
 from pymongo import UpdateOne
 from pymongo.errors import BulkWriteError
@@ -25,10 +24,6 @@ if TYPE_CHECKING:
     from pymongo.database import Database
 
 logger = logging.getLogger(__name__)
-
-# Faker 인스턴스
-fake_en = Faker("en_US")
-fake_ko = Faker("ko_KR")
 
 # 난이도 레벨
 DIFFICULTY_LEVELS = ["beginner", "intermediate", "advanced"]
@@ -87,15 +82,6 @@ def generate_embedding_vector(dim: int = None) -> list[float]:
 
     return vector.tolist()
 
-
-def generate_summary() -> dict[str, str]:
-    """
-    한글/영문 요약 생성.
-
-    Returns:
-        {"ko": "한글 요약", "en": "English summary"}
-    """
-    return {"ko": fake_ko.text(max_nb_chars=200), "en": fake_en.text(max_nb_chars=200)}
 
 
 def generate_keywords(count: int = None) -> list[str]:
@@ -157,7 +143,6 @@ def enrich_papers(db: Database, batch_size: int = 100) -> int:
             "bookmark_count": random.randint(0, 500),
             "view_count": random.randint(0, 10000),
             "embedding_vector": generate_embedding_vector(),
-            "summary": generate_summary(),
             "difficulty_level": random.choice(DIFFICULTY_LEVELS),
             "keywords": generate_keywords(),
         }
