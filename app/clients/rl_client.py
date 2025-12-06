@@ -88,6 +88,7 @@ class RLClient:
         limit: int = 6,
         candidate_k: int = 100,
         session_id: Optional[str] = None,
+        base_paper_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """RL 기반 추천을 조회한다.
 
@@ -96,6 +97,7 @@ class RLClient:
             limit: 추천 개수.
             candidate_k: 후보군 크기.
             session_id: 세션 ID.
+            base_paper_id: 현재 보고 있는 논문 ID (유사도 보너스용).
 
         Returns:
             recommendations 리스트를 포함한 추천 결과.
@@ -103,6 +105,8 @@ class RLClient:
         params = {"user_id": user_id, "limit": limit, "candidate_k": candidate_k}
         if session_id:
             params["session_id"] = session_id
+        if base_paper_id:
+            params["base_paper_id"] = base_paper_id
 
         return await self._request("/recommendations/rl", params)
 
@@ -192,6 +196,61 @@ class RLClient:
         except Exception as e:
             logger.error(f"[RLClient] Health check failed: {e}")
             return False
+
+    async def log_interaction(
+        self,
+        user_id: int,
+        paper_id: str,
+        action_type: str,
+        recommendation_id: str,
+        position: Optional[int] = None,
+        dwell_time: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """GPU 서버에 상호작용 로그를 전송한다.
+
+        Args:
+            user_id: 사용자 ID.
+            paper_id: 논문 ID.
+            action_type: 행동 유형 ("click" | "bookmark").
+            recommendation_id: 추천 세션 ID.
+            position: 추천 목록 내 위치.
+            dwell_time: 체류 시간 (초).
+
+        Returns:
+            GPU 서버 응답 (reward 포함).
+        """
+        url = f"{self.base_url}/recommendations/interactions"
+        payload = {
+            "user_id": user_id,
+            "paper_id": paper_id,
+            "action_type": action_type,
+            "recommendation_id": recommendation_id,
+        }
+        if position is not None:
+            payload["position"] = position
+        if dwell_time is not None:
+            payload["dwell_time"] = dwell_time
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                logger.info(
+                    "[RLClient] Logged interaction: user=%d, paper=%s, action=%s, reward=%s",
+                    user_id, paper_id, action_type, data.get("reward")
+                )
+                return data
+
+        except httpx.TimeoutException as e:
+            logger.warning("[RLClient] Interaction log timeout: %s", e)
+            return {"ok": False, "error": "timeout"}
+        except httpx.HTTPError as e:
+            logger.warning("[RLClient] Interaction log failed: %s", e)
+            return {"ok": False, "error": str(e)}
+        except Exception as e:
+            logger.warning("[RLClient] Interaction log unexpected error: %s", e)
+            return {"ok": False, "error": str(e)}
 
 
 # 싱글톤 인스턴스

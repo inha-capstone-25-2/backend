@@ -56,6 +56,7 @@ def get_recommendations(
 async def get_rl_recommendations(
     top_k: int = Query(6, ge=1, le=50, description="추천 논문 개수"),
     candidate_k: int = Query(100, ge=10, le=500, description="후보군 크기"),
+    base_paper_id: str | None = Query(None, description="현재 보고 있는 논문 ID (유사도 보너스용)"),
     db_postgres: Session = Depends(get_db),
     db_mongo: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),
@@ -68,28 +69,38 @@ async def get_rl_recommendations(
     """
     session_id = str(uuid.uuid4())
     rl_client = get_rl_client()
+    
+    logger.info(
+        "[RL] 🚀 Requesting RL recommendations: user_id=%d, top_k=%d, candidate_k=%d, base_paper_id=%s, session_id=%s",
+        current_user.id, top_k, candidate_k, base_paper_id, session_id
+    )
 
     try:
-        # RL 서버 호출
         result = await rl_client.get_rl_recommendations(
             user_id=current_user.id,
             limit=top_k,
             candidate_k=candidate_k,
             session_id=session_id,
+            base_paper_id=base_paper_id,
         )
-        logger.info(f"[RL] Successfully got {len(result.get('recommendations', []))} recommendations from RL server")
+        logger.info(
+            "[RL] ✅ RL recommendations success: user_id=%d, count=%d, mode=%s",
+            current_user.id, len(result.get('recommendations', [])), result.get('recommendation_type', 'unknown')
+        )
         return result
 
     except Exception as e:
-        # Fallback: Rule-based 추천
-        logger.warning(f"[RL] RL server failed, falling back to rule-based: {e}")
+        logger.warning(
+            "[RL] ⚠️ RL server failed, falling back to rule-based: user_id=%d, error=%s",
+            current_user.id, e
+        )
         
         service = RecommendationService(db_mongo)
         result = service.get_recommendations(
             user=current_user, db_postgres=db_postgres, top_k=top_k
         )
-        result["recommendation_type"] = "rule_based_fallback"
-        return RecommendationResponse(**result)
+        result.recommendation_type = "rule_based_fallback"
+        return result
 
 
 @router.get("/similar/{paper_id}")
@@ -160,7 +171,7 @@ def get_user_recommendation_logs(
 
 
 @router.post("/{recommendation_id}/click", response_model=ClickResponse)
-def record_recommendation_click(
+async def record_recommendation_click(
     recommendation_id: str,
     db_mongo: Database = Depends(get_mongo_db),
     current_user: User = Depends(get_current_user),
@@ -170,18 +181,57 @@ def record_recommendation_click(
     
     paper_recommendations 컬렉션의 was_clicked를 true로 업데이트하고
     clicked_at 시각을 기록합니다.
+    GPU 서버에도 상호작용 로그를 전송합니다.
     """
+    # 먼저 추천 정보 조회
+    recommendations_coll = db_mongo["paper_recommendations"]
+    rec = recommendations_coll.find_one({"_id": ObjectId(recommendation_id)})
+    
+    logger.info(
+        "[RL] 👆 Click event: user_id=%d, recommendation_id=%s",
+        current_user.id, recommendation_id
+    )
+    
     service = RecommendationService(db_mongo)
     result = service.record_click(recommendation_id, current_user.id)
     
     if not result["success"]:
         raise HTTPException(status_code=404, detail=f"추천 ID {recommendation_id}를 찾을 수 없습니다")
     
+    # GPU 서버에 상호작용 로그 전송 (RL 학습용)
+    if rec:
+        paper_id = rec.get("paper_id", "")
+        session_id = rec.get("session_id", recommendation_id)
+        
+        logger.info(
+            "[RL] 📤 Sending click to GPU server: user_id=%d, paper_id=%s, session_id=%s",
+            current_user.id, paper_id, session_id
+        )
+        
+        rl_client = get_rl_client()
+        gpu_response = await rl_client.log_interaction(
+            user_id=current_user.id,
+            paper_id=paper_id,
+            action_type="click",
+            recommendation_id=session_id,
+        )
+        
+        if gpu_response.get("ok") is False:
+            logger.warning(
+                "[RL] ⚠️ GPU server click log failed: error=%s",
+                gpu_response.get("error")
+            )
+        else:
+            logger.info(
+                "[RL] ✅ GPU server click log success: reward=%s",
+                gpu_response.get("reward")
+            )
+    
     return ClickResponse(**result)
 
 
 @router.post("/{recommendation_id}/interactions", response_model=RecommendationInteraction)
-def record_recommendation_interaction(
+async def record_recommendation_interaction(
     recommendation_id: str,
     interaction_data: RecommendationInteractionCreate,
     db_mongo: Database = Depends(get_mongo_db),
@@ -191,9 +241,9 @@ def record_recommendation_interaction(
     추천 논문 상호작용 데이터 저장.
     
     체류 시간, 스크롤 깊이, 북마크 상호작용 데이터를
-    recommendation_interactions 컬렉션에 저장합니다.
+    recommendation_interactions 컴렉션에 저장합니다.
+    GPU 서버에도 상호작용 로그를 전송합니다.
     """
-    # recommendation_id로부터 user_id와 paper_id 조회
     recommendations_coll = db_mongo["paper_recommendations"]
     rec = recommendations_coll.find_one({"_id": ObjectId(recommendation_id)})
     
@@ -202,6 +252,12 @@ def record_recommendation_interaction(
     
     if rec["user_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="이 추천에 접근할 권한이 없습니다")
+    
+    action_type = "bookmark" if interaction_data.is_bookmarked else "view"
+    logger.info(
+        "[RL] 📊 Interaction event: user_id=%d, recommendation_id=%s, action=%s, dwell_time=%s",
+        current_user.id, recommendation_id, action_type, interaction_data.dwell_time
+    )
     
     service = RecommendationService(db_mongo)
     interaction_dict = interaction_data.model_dump(exclude_unset=True, exclude={"recommendation_id"})
@@ -215,5 +271,34 @@ def record_recommendation_interaction(
     
     if not result:
         raise HTTPException(status_code=500, detail="상호작용 데이터 저장에 실패했습니다")
+    
+    # GPU 서버에 상호작용 로그 전송 (RL 학습용)
+    paper_id = rec["paper_id"]
+    session_id = rec.get("session_id", recommendation_id)
+    
+    logger.info(
+        "[RL] 📤 Sending interaction to GPU server: user_id=%d, paper_id=%s, action=%s, dwell_time=%s",
+        current_user.id, paper_id, action_type, interaction_data.dwell_time
+    )
+    
+    rl_client = get_rl_client()
+    gpu_response = await rl_client.log_interaction(
+        user_id=current_user.id,
+        paper_id=paper_id,
+        action_type=action_type,
+        recommendation_id=session_id,
+        dwell_time=interaction_data.dwell_time,
+    )
+    
+    if gpu_response.get("ok") is False:
+        logger.warning(
+            "[RL] ⚠️ GPU server interaction log failed: error=%s",
+            gpu_response.get("error")
+        )
+    else:
+        logger.info(
+            "[RL] ✅ GPU server interaction log success: reward=%s",
+            gpu_response.get("reward")
+        )
     
     return RecommendationInteraction(**result)
