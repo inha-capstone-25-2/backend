@@ -42,3 +42,12 @@ class InterestRemovalResult(BaseModel):
     removed: int
     not_found: list[str]
     remaining: InterestList
+
+
+class InterestAddResult(BaseModel):
+    """
+    관심 카테고리 추가 결과 응답 모델.
+    """
+
+    added: int
+    skipped: int

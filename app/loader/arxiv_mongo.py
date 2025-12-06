@@ -174,17 +174,13 @@ def create_search_indexes(collection) -> None:
     4. 검색 API용 복합 인덱스: categories + view_count, categories + bookmark_count
     """
     try:
-        # 1. 복합 인덱스: 카테고리 필터 + 날짜 정렬
         collection.create_index(
             [("categories", 1), ("update_date", -1)], name="categories_update_date"
         )
         logger.info("[arxiv-job] 복합 인덱스 생성 완료: categories + update_date")
 
-        # 2. Text Search 인덱스
         create_text_search_index(collection)
 
-        # 3. 추천 시스템용 인덱스
-        # 3-1. categories 단일 인덱스 (관심사 기반 필터링)
         collection.create_index(
             [("categories", 1)], 
             name="categories_only",
@@ -192,7 +188,6 @@ def create_search_indexes(collection) -> None:
         )
         logger.info("[arxiv-job] 인덱스 생성 완료: categories (추천 시스템용)")
 
-        # 3-2. view_count, bookmark_count 복합 인덱스 (인기도 정렬)
         collection.create_index(
             [("view_count", -1), ("bookmark_count", -1)],
             name="popularity_sort",
@@ -200,8 +195,6 @@ def create_search_indexes(collection) -> None:
         )
         logger.info("[arxiv-job] 인덱스 생성 완료: view_count + bookmark_count (인기도 정렬)")
 
-        # 4. 검색 API용 복합 인덱스
-        # 4-1. categories + view_count (카테고리 필터 + 조회수 정렬)
         collection.create_index(
             [("categories", 1), ("view_count", -1)],
             name="categories_view_count",
@@ -209,7 +202,6 @@ def create_search_indexes(collection) -> None:
         )
         logger.info("[arxiv-job] 인덱스 생성 완료: categories + view_count (검색 API용)")
 
-        # 4-2. categories + bookmark_count (카테고리 필터 + 북마크 정렬)
         collection.create_index(
             [("categories", 1), ("bookmark_count", -1)],
             name="categories_bookmark_count",
@@ -249,19 +241,15 @@ def run_mock_seeding(db) -> None:
     """
     logger.info("[arxiv-job] Starting mock data seeding...")
     try:
-        # 1. Papers Enrichment (필수: view_count 등이 있어야 정렬 가능)
         logger.info("[arxiv-job] Enriching papers (view_count, embeddings)...")
         enrich_papers(db)
 
-        # 2. Bookmarks 시딩
         logger.info("[arxiv-job] Seeding bookmarks...")
         seed_bookmarks(db)
 
-        # 3. Activities 시딩
         logger.info("[arxiv-job] Seeding user activities...")
         seed_activities(db)
 
-        # 4. Search History 시딩
         logger.info("[arxiv-job] Seeding search history...")
         seed_search_history(db)
 
@@ -300,25 +288,19 @@ def ingest_arxiv_to_mongo() -> bool:
         logger.info("[arxiv-job] removing old data")
         collection.delete_many({})
 
-    # 1. 고유 인덱스만 먼저 생성 (중복 방지용) - _id는 자동이므로 skip
     create_unique_index(collection)
 
     try:
-        # 2. 데이터 스트리밍 삽입
         logger.info("[arxiv-job] 데이터 적재 시작 (스트리밍 방식)")
         count = stream_and_insert_data(
             collection, failures_collection, DATA_FILE_PATH, BATCH_SIZE
         )
         logger.info(f"[arxiv-job] 데이터 적재 완료: {count:,}건")
 
-        # 3. 검색용 인덱스 생성 스킵 (Elasticsearch 사용)
-        # Elasticsearch가 메인 검색 엔진이므로 MongoDB 인덱스 불필요
         logger.info("[arxiv-job] 검색 인덱스 생성 스킵 (Elasticsearch 사용)")
 
-        # 4. PostgreSQL 카테고리 시딩
         seed_categories_from_mongo(collection)
 
-        # 5. Mock 데이터 시딩 (자동 실행)
         run_mock_seeding(db)
 
         return True

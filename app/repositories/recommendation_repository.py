@@ -1,9 +1,15 @@
+"""추천 저장소 모듈.
+
+추천 로그, 상호작용 데이터, 추천 이벤트의 CRUD 연산을 담당합니다.
+"""
+
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
 from pymongo.database import Database
 from pymongo.collection import Collection
+from pymongo.errors import PyMongoError
 from bson import ObjectId
 
 from app.core.constants import (
@@ -16,7 +22,21 @@ logger = logging.getLogger(__name__)
 
 
 class RecommendationRepository:
+    """추천 데이터 저장소.
+
+    Attributes:
+        db: MongoDB 데이터베이스 인스턴스.
+        recommendations_collection: 추천 로그 컬렉션.
+        interactions_collection: 상호작용 컬렉션.
+        events_collection: 추천 이벤트 컬렉션.
+    """
+
     def __init__(self, db: Database):
+        """인스턴스를 초기화한다.
+
+        Args:
+            db: MongoDB 데이터베이스 인스턴스.
+        """
         self.db = db
         self.recommendations_collection: Collection = db[
             COLLECTION_PAPER_RECOMMENDATIONS
@@ -61,7 +81,7 @@ class RecommendationRepository:
 
         try:
             self.recommendations_collection.insert_one(log_doc)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log recommendation: {e}")
 
     def log_recommendations_batch(self, log_docs: List[Dict[str, Any]]) -> None:
@@ -72,7 +92,7 @@ class RecommendationRepository:
         try:
             self.recommendations_collection.insert_many(log_docs, ordered=False)
             logger.info(f"Logged {len(log_docs)} recommendations in batch")
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log recommendations batch: {e}")
 
     def get_all_recommendations(
@@ -95,7 +115,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get all recommendations: {e}")
             return 0, []
 
@@ -120,7 +140,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get recommendations by user {user_id}: {e}")
             return 0, []
 
@@ -137,7 +157,7 @@ class RecommendationRepository:
                 },
             )
             return result.modified_count > 0
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to mark recommendation as clicked: {e}")
             return False
 
@@ -170,7 +190,7 @@ class RecommendationRepository:
             )
             return saved_doc
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to save interaction: {e}")
             return None
 
@@ -185,7 +205,7 @@ class RecommendationRepository:
                 .limit(limit)
             )
             return list(cursor)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get user interactions: {e}")
             return []
 
@@ -214,7 +234,7 @@ class RecommendationRepository:
                 f"by user {user_id} in session {session_id}"
             )
             return str(result.inserted_id)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log event: {e}")
             return None
 
@@ -245,7 +265,7 @@ class RecommendationRepository:
             result = self.events_collection.insert_one(event_doc)
             logger.info(f"Logged session context for session {session_id}")
             return str(result.inserted_id)
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to log session context: {e}")
             return None
 
@@ -268,7 +288,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get events for session {session_id}: {e}")
             return 0, []
 
@@ -291,7 +311,7 @@ class RecommendationRepository:
             items = list(cursor)
             return total, items
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to get events for user {user_id}: {e}")
             return 0, []
 
@@ -307,16 +327,12 @@ class RecommendationRepository:
             }
         """
         try:
-            # 1. 최근 30일 활동 수 (user_activities 컬렉션 가정)
-            # 현재 user_activities 컬렉션 접근이 없으므로 events_collection으로 대체하거나 추가 필요
-            # 여기서는 recommendation_events 기준으로 계산
             thirty_days_ago = datetime.utcnow() - timedelta(days=30)
             activity_count = self.events_collection.count_documents({
                 "user_id": user_id,
                 "timestamp": {"$gte": thirty_days_ago}
             })
 
-            # 2. 평균 체류 시간 (detail_view 이벤트의 dwell_time_ms)
             pipeline = [
                 {
                     "$match": {
@@ -335,7 +351,6 @@ class RecommendationRepository:
             avg_dwell_result = list(self.events_collection.aggregate(pipeline))
             avg_dwell_time = (avg_dwell_result[0]["avg_dwell_ms"] / 1000.0) if avg_dwell_result else 0.0
 
-            # 3. 북마크 비율 (북마크 수 / 전체 상호작용 수)
             total_interactions = self.events_collection.count_documents({"user_id": user_id})
             bookmark_count = self.events_collection.count_documents({
                 "user_id": user_id,
@@ -349,7 +364,7 @@ class RecommendationRepository:
                 "bookmark_rate": float(bookmark_rate),
             }
 
-        except Exception as e:
+        except PyMongoError as e:
             logger.error(f"Failed to calculate user context stats for {user_id}: {e}")
             return {
                 "activity_count": 0.0,

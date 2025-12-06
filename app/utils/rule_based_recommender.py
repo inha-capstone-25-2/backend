@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 class RuleBasedRecommender:
     """룰 베이스 추천 시스템"""
 
-    # 점수 가중치
     WEIGHT_INTEREST = 0.4
     WEIGHT_POPULARITY = 0.2
     WEIGHT_RECENCY = 0.1
@@ -58,21 +57,18 @@ class RuleBasedRecommender:
         """
         start_time = time.time()
         
-        # 1. 사용자 관심 카테고리 가져오기
         step_start = time.time()
         user_interests = self._get_user_interests(user, db_postgres)
         logger.info(f"[PERF] Get user interests took {time.time() - step_start:.3f}s")
         if not user_interests:
             logger.info(f"User {user.id} has no interests. Using popular papers.")
 
-        # 2. 사용자 활동 이력 가져오기
         step_start = time.time()
         viewed_paper_ids, activity_categories = self._get_user_activity(
             user.id, db_mongo
         )
         logger.info(f"[PERF] Get user activity took {time.time() - step_start:.3f}s")
 
-        # 3. 후보 논문 가져오기
         step_start = time.time()
         candidate_papers = self._get_candidate_papers(
             db_mongo, user_interests, viewed_paper_ids, candidate_limit
@@ -83,7 +79,6 @@ class RuleBasedRecommender:
             logger.warning(f"No candidate papers found for user {user.id}")
             return []
 
-        # 4. 각 논문에 대해 점수 계산
         step_start = time.time()
         recommendations = []
 
@@ -91,7 +86,6 @@ class RuleBasedRecommender:
             paper_id = str(paper.get("_id"))
             paper_categories = paper.get("categories", [])
 
-            # 각 점수 계산
             interest_score = self.scorer.calculate_interest_score(user_interests, paper)
             popularity_score = self.scorer.calculate_popularity_score(paper)
             recency_score = self.scorer.calculate_recency_score(paper)
@@ -103,7 +97,6 @@ class RuleBasedRecommender:
                 activity_categories,
             )
 
-            # 최종 점수 (가중 평균)
             total_score = (
                 interest_score * self.WEIGHT_INTEREST
                 + popularity_score * self.WEIGHT_POPULARITY
@@ -111,7 +104,6 @@ class RuleBasedRecommender:
                 + personalization_score * self.WEIGHT_PERSONALIZATION
             )
 
-            # 추천 이유 분석
             reasons = self._analyze_recommendation_reasons(
                 interest_score, popularity_score, personalization_score
             )
@@ -133,7 +125,6 @@ class RuleBasedRecommender:
         
         logger.info(f"[PERF] Score calculation took {time.time() - step_start:.3f}s")
 
-        # 5. 점수 기준 정렬
         step_start = time.time()
         recommendations.sort(key=lambda x: x["total_score"], reverse=True)
         

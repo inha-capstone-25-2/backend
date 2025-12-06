@@ -1,3 +1,8 @@
+"""인증 API 라우터 모듈.
+
+회원가입, 로그인, 로그아웃, 계정 삭제 등 인증 관련 엔드포인트를 정의합니다.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session

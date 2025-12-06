@@ -11,6 +11,7 @@ from elasticsearch.exceptions import (
     ConnectionError as ESConnectionError,
     NotFoundError,
     RequestError,
+    ApiError,
 )
 
 from app.core.settings import settings
@@ -120,7 +121,7 @@ class ElasticsearchRepository:
         except RequestError as e:
             logger.error(f"[ES] Invalid search request: {e}")
             raise
-        except Exception as e:
+        except ApiError as e:
             logger.error(f"[ES] Unexpected error during search: {e}")
             raise
 
@@ -212,7 +213,7 @@ class ElasticsearchRepository:
         """
         try:
             return self.es_client.indices.exists(index=self.index_name)
-        except Exception as e:
+        except ApiError as e:
             logger.error(f"[ES] Failed to check index existence: {e}")
             return False
 
@@ -226,7 +227,7 @@ class ElasticsearchRepository:
         try:
             mapping = self.es_client.indices.get_mapping(index=self.index_name)
             return mapping
-        except Exception as e:
+        except ApiError as e:
             logger.error(f"[ES] Failed to get index mapping: {e}")
             return {}
 
@@ -271,7 +272,7 @@ class ElasticsearchRepository:
             logger.info(f"[ES] Successfully created index '{self.index_name}'")
             return True
 
-        except Exception as e:
+        except ApiError as e:
             logger.error(f"[ES] Failed to create index: {e}")
             return False
 
@@ -295,6 +296,6 @@ class ElasticsearchRepository:
             logger.info(f"[ES] Successfully updated mapping for '{self.index_name}'")
             return True
 
-        except Exception as e:
+        except ApiError as e:
             logger.error(f"[ES] Failed to update mapping: {e}")
             return False

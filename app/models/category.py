@@ -1,3 +1,8 @@
+"""카테고리 모델.
+
+PostgreSQL categories, category_names 테이블에 대응하는 SQLAlchemy 모델을 정의합니다.
+"""
+
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional, List
@@ -17,6 +22,21 @@ from app.db.postgres import Base
 
 
 class Category(Base):
+    """카테고리 모델.
+
+    Attributes:
+        id: 카테고리 고유 ID.
+        code: 카테고리 코드 (예: cs.AI).
+        parent_id: 부모 카테고리 ID.
+        depth: 카테고리 깊이.
+        sort_order: 정렬 순서.
+        created_at: 생성 시각.
+        parent: 부모 카테고리.
+        children: 자식 카테고리 목록.
+        names: 다국어 카테고리 이름 목록.
+        interested_users: 이 카테고리를 관심으로 등록한 사용자 목록.
+    """
+
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

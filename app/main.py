@@ -1,3 +1,8 @@
+"""FastAPI 애플리케이션 메인 모듈.
+
+애플리케이션 시작점으로, 라우터 등록, 미들웨어 설정, 스케줄러 초기화 등을 담당합니다.
+"""
+
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI, Request

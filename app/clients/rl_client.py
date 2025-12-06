@@ -34,22 +34,25 @@ def transform_breakdown(raw: Dict[str, float]) -> Dict[str, float]:
 
 
 class RLClient:
-    """
-    RL 추천 서버와 통신하는 HTTP 클라이언트.
+    """RL 추천 서버와 통신하는 HTTP 클라이언트.
 
     GPU 서버의 추천 API를 호출하고 결과를 변환합니다.
-    NLP 서버와 동일한 GPU_SERVER 환경변수를 사용합니다.
+
+    Attributes:
+        base_url: GPU 서버 URL.
+        timeout: 요청 타임아웃 (초).
     """
 
     def __init__(
         self,
         base_url: Optional[str] = None,
-        timeout: float = 10.0,  # GPU 서버 권장: 10초 (첫 요청 시 모델 로딩 포함)
+        timeout: float = 10.0,
     ):
-        """
+        """인스턴스를 초기화한다.
+
         Args:
-            base_url: GPU 서버 URL (기본값: 환경변수 GPU_SERVER)
-            timeout: 요청 타임아웃 (초)
+            base_url: GPU 서버 URL. 기본값은 환경변수 GPU_SERVER.
+            timeout: 요청 타임아웃 (초).
         """
         self.base_url = base_url or getattr(
             settings, "summary_server_url", "http://localhost:8000"
@@ -63,16 +66,15 @@ class RLClient:
         limit: int = 6,
         session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Rule-based 추천 조회.
+        """Rule-based 추천을 조회한다.
 
         Args:
-            user_id: 사용자 ID
-            limit: 추천 개수
-            session_id: 세션 ID
+            user_id: 사용자 ID.
+            limit: 추천 개수.
+            session_id: 세션 ID.
 
         Returns:
-            추천 결과 (recommendations 리스트 포함)
+            recommendations 리스트를 포함한 추천 결과.
         """
         params = {"user_id": user_id, "limit": limit}
         if session_id:
@@ -87,17 +89,16 @@ class RLClient:
         candidate_k: int = 100,
         session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        RL 기반 추천 조회.
+        """RL 기반 추천을 조회한다.
 
         Args:
-            user_id: 사용자 ID
-            limit: 추천 개수
-            candidate_k: 후보군 크기 (기본값 100)
-            session_id: 세션 ID
+            user_id: 사용자 ID.
+            limit: 추천 개수.
+            candidate_k: 후보군 크기.
+            session_id: 세션 ID.
 
         Returns:
-            추천 결과 (recommendations 리스트 포함)
+            recommendations 리스트를 포함한 추천 결과.
         """
         params = {"user_id": user_id, "limit": limit, "candidate_k": candidate_k}
         if session_id:

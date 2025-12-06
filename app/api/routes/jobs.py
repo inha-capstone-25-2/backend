@@ -1,3 +1,8 @@
+"""작업 API 라우터 모듈.
+
+arXiv 데이터 로딩 등 백그라운드 작업 엔드포인트를 정의합니다.
+"""
+
 from fastapi import APIRouter, BackgroundTasks
 from app.loader.arxiv_loader import load_arxiv_data_to_mongodb
 import logging

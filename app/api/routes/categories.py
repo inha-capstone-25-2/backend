@@ -1,29 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+"""카테고리 API 라우터 모듈.
 
-from app.db.postgres import get_db
-from app.models.category import Category, CategoryName
-from app.seed.categories_seed import seed_categories
+카테고리 관련 API 엔드포인트를 정의합니다.
+현재 이 라우터는 빈 상태입니다.
+"""
+
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
-
-@router.post("/seed")
-def seed(force: bool = False, db: Session = Depends(get_db)):
-    existing = db.query(Category).count()
-    if existing > 0 and not force:
-        return {
-            "seeded": False,
-            "reason": "categories already present",
-            "count": existing,
-        }
-    try:
-        seed_categories(db)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"seed failed: {e}")
-    return {
-        "seeded": True,
-        "categories": db.query(Category).count(),
-        "names": db.query(CategoryName).count(),
-        "force": force,
-    }
+# 카테고리 시드는 초기 데이터 설정 시에만 필요하므로
+# run_seed.py 또는 initdb 스크립트를 통해 수행합니다.

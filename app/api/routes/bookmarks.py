@@ -1,3 +1,8 @@
+"""북마크 API 라우터 모듈.
+
+사용자 북마크 CRUD 엔드포인트를 정의합니다.
+"""
+
 from fastapi import APIRouter, Depends, status, Query
 from typing import List
 from pymongo.database import Database
@@ -8,7 +13,6 @@ from app.models.user import User
 from app.schemas.bookmark import (
     BookmarkCreate,
     BookmarkOut,
-    BookmarkUpdate,
     BookmarkListOut,
 )
 from app.utils.mongodb import safe_object_id
@@ -55,28 +59,6 @@ def list_bookmarks(
 
     return BookmarkListOut(items=bookmark_items)
 
-
-@router.put("/{bookmark_id}", response_model=BookmarkOut)
-def update_bookmark(
-    bookmark_id: str,
-    payload: BookmarkUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Database = Depends(get_mongo_db),
-):
-    """북마크 수정 (notes 필드만 수정 가능)."""
-    obj_id = safe_object_id(bookmark_id, "bookmark ID")
-    service = BookmarkService(db)
-
-    result = service.update_bookmark(
-        user=current_user, bookmark_id=obj_id, notes=payload.notes
-    )
-    return BookmarkOut(
-        id=result["id"],
-        user_id=result["user_id"],
-        doi=result["doi"],
-        bookmarked_at=result["bookmarked_at"],
-        notes=result.get("notes"),
-    )
 
 
 @router.delete("/{bookmark_id}", status_code=status.HTTP_204_NO_CONTENT)

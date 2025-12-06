@@ -56,11 +56,11 @@ class TestRecommendationService:
         assert mock_repo.log_recommendations_batch.called
 
         # Verify result structure
-        assert result["user_id"] == sample_user.id
-        assert result["recommendation_type"] == "rule_based"
-        assert result["total_count"] == 1
-        assert len(result["recommendations"]) == 1
-        assert result["recommendations"][0].paper_id == "2301.00001"
+        assert result.user_id == sample_user.id
+        assert result.recommendation_type == "rule_based"
+        assert result.total_count == 1
+        assert len(result.recommendations) == 1
+        assert result.recommendations[0].paper_id == "2301.00001"
 
     @patch("app.services.recommendation_service.RuleBasedRecommender")
     @patch("app.services.recommendation_service.RecommendationRepository")
@@ -122,8 +122,8 @@ class TestRecommendationService:
             user=sample_user, db_postgres=mock_postgres_session, top_k=10
         )
 
-        assert result["total_count"] == 0
-        assert len(result["recommendations"]) == 0
+        assert result.total_count == 0
+        assert len(result.recommendations) == 0
 
     @patch("app.services.recommendation_service.RecommendationRepository")
     def test_get_all_recommendation_logs(self, mock_repo_class, mock_mongo_db):

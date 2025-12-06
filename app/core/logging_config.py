@@ -1,3 +1,8 @@
+"""로깅 설정 모듈.
+
+애플리케이션 전반에서 사용되는 로깅 설정을 정의합니다.
+"""
+
 import logging
 import logging.config
 
@@ -31,7 +36,7 @@ LOGGING_CONFIG = {
             "propagate": False,
         },
         "uvicorn.access": {
-            "level": "INFO",  # <--- 여기서 WARNING -> INFO로 변경
+            "level": "INFO",
             "handlers": ["console"],
             "propagate": False,
         },
@@ -39,5 +44,9 @@ LOGGING_CONFIG = {
 }
 
 
-def setup_logging():
+def setup_logging() -> None:
+    """로깅 설정을 초기화한다.
+
+    LOGGING_CONFIG 딕셔너리를 사용하여 Python 로깅 시스템을 설정합니다.
+    """
     logging.config.dictConfig(LOGGING_CONFIG)

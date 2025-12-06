@@ -1,3 +1,8 @@
+"""논문 API 라우터 모듈.
+
+논문 검색, 조회, 검색 기록 엔드포인트를 정의합니다.
+"""
+
 from fastapi import APIRouter, Query, Depends
 from typing import List
 import logging

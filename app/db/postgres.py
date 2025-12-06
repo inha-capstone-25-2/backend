@@ -1,3 +1,8 @@
+"""PostgreSQL 데이터베이스 연결 설정.
+
+SQLAlchemy를 사용하여 PostgreSQL 연결을 관리합니다.
+"""
+
 from __future__ import annotations
 import logging
 from urllib.parse import quote_plus
@@ -14,6 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 def _postgres_url() -> str:
+    """PostgreSQL 연결 URL을 생성한다.
+
+    Returns:
+        PostgreSQL 연결 URL 문자열.
+    """
     host = settings.db_host
     port = settings.db_port
     user = quote_plus(settings.db_user or "")
@@ -23,6 +33,11 @@ def _postgres_url() -> str:
 
 
 def get_engine():
+    """SQLAlchemy 엔진 싱글톤을 반환한다.
+
+    Returns:
+        SQLAlchemy Engine 인스턴스.
+    """
     global _engine
     if _engine is None:
         url = _postgres_url()
@@ -35,6 +50,11 @@ def get_engine():
 
 
 def _get_sessionmaker():
+    """SQLAlchemy SessionLocal 싱글톤을 반환한다.
+
+    Returns:
+        SessionLocal 클래스.
+    """
     global _SessionLocal
     if _SessionLocal is None:
         _SessionLocal = sessionmaker(
@@ -44,6 +64,11 @@ def _get_sessionmaker():
 
 
 def get_db() -> Session:
+    """FastAPI Dependency Injection용 DB 세션을 반환한다.
+
+    Yields:
+        SQLAlchemy Session 인스턴스.
+    """
     db = _get_sessionmaker()()
     try:
         yield db
@@ -51,13 +76,18 @@ def get_db() -> Session:
         db.close()
 
 
-def init_db():
+def init_db() -> None:
+    """데이터베이스 테이블을 초기화한다.
+
+    Base에 등록된 모든 모델의 테이블을 생성합니다.
+    """
     Base.metadata.create_all(bind=get_engine())
 
 
-def close_postgres():
-    """
-    PostgreSQL 연결 종료
+def close_postgres() -> None:
+    """PostgreSQL 연결을 종료한다.
+
+    애플리케이션 종료 시 호출됩니다.
     """
     global _engine, _SessionLocal
     

@@ -149,7 +149,6 @@ def generate_batch_summaries_task(
             batch_start_time = time.time()
             logger.info(f"{W} [Batch {batch_num}/{total_batches}] Processing {len(batch_papers)} papers...")
             
-            # 1. 배치 내 모든 논문의 PDF 텍스트 추출
             batch_texts = []
             batch_ids = []
             
@@ -183,7 +182,6 @@ def generate_batch_summaries_task(
                 logger.warning(f"{W} [Batch {batch_num}/{total_batches}] No texts to process, skipping...")
                 continue
             
-            # 2. GPU 서버에 배치 요약 요청
             logger.info(
                 f"{W} [Batch {batch_num}/{total_batches}] Sending {len(batch_texts)} texts to GPU server..."
             )
@@ -209,7 +207,6 @@ def generate_batch_summaries_task(
                         errors.append(f"Batch result mismatch for {arxiv_id}")
                     continue
 
-                # 3. MongoDB에 결과 저장
                 for arxiv_id, result in zip(batch_ids, results):
                     summary_en = result.get("summary_en", "")
                     summary_ko = result.get("summary_ko", "")

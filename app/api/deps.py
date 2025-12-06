@@ -1,3 +1,8 @@
+"""FastAPI 의존성 주입 모듈.
+
+API 엔드포인트에서 사용하는 공통 의존성을 정의합니다.
+"""
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -11,8 +16,6 @@ from cachetools import TTLCache
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-# 사용자 정보 캐시
-# Key: (username, token_version)
 user_cache = TTLCache(maxsize=USER_CACHE_MAX_SIZE, ttl=USER_CACHE_TTL_SECONDS)
 
 
@@ -20,6 +23,18 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+    """현재 인증된 사용자를 반환한다.
+
+    Args:
+        token: JWT 액세스 토큰.
+        db: 데이터베이스 세션.
+
+    Returns:
+        인증된 User 객체.
+
+    Raises:
+        HTTPException: 인증 실패 시 401 에러.
+    """
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -29,30 +44,24 @@ def get_current_user(
         payload = jwt.decode(
             token, settings.secret_key, algorithms=[settings.jwt_algorithm]
         )
-        username: str | None = payload.get("sub")  # sub은 username
-        token_ver = payload.get("ver", 0)  # 토큰 버전(없으면 0으로 간주)
+        username: str | None = payload.get("sub")
+        token_ver = payload.get("ver", 0)
         if username is None:
             raise credentials_error
     except JWTError:
         raise credentials_error
 
-    # 1. 캐시 확인
     cache_key = (username, token_ver)
     if cache_key in user_cache:
         return user_cache[cache_key]
 
-    # 2. DB 조회
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise credentials_error
 
-    # 토큰 버전 불일치 시(로그아웃 이후의 오래된 토큰) 인증 실패
     if int(token_ver) != int(getattr(user, "token_version", 0)):
         raise credentials_error
 
-    # 3. 캐시 저장 (세션에서 분리하여 저장)
-    # 주의: 분리된 객체는 지연 로딩된 관계(interests 등)에 접근 시 에러 발생 가능
-    # 현재 로직상 user.id 등 기본 필드만 주로 사용하므로 안전
     db.expunge(user)
     user_cache[cache_key] = user
 

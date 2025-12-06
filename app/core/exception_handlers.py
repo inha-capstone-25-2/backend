@@ -80,15 +80,16 @@ EXCEPTION_CONFIG = {
 
 
 def get_exception_config(exc: Exception) -> Tuple[int, str, str]:
-    """
-    예외 타입에 따른 설정을 반환합니다.
+    """예외 타입에 따른 설정을 반환한다.
+
+    Args:
+        exc: 설정을 조회할 예외 인스턴스.
 
     Returns:
-        Tuple[int, str, str]: (status_code, error_type, log_level)
+        (status_code, error_type, log_level) 튜플.
     """
     for exc_class, config in EXCEPTION_CONFIG.items():
         if isinstance(exc, exc_class):
             return config
 
-    # 기본값
     return (500, "internal_server_error", "error")
