@@ -1,3 +1,8 @@
+"""사용자 관심사 API 라우터 모듈.
+
+사용자 관심사 CRUD 엔드포인트를 정의합니다.
+"""
+
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 

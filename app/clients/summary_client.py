@@ -13,21 +13,25 @@ logger = logging.getLogger(__name__)
 
 
 class SummaryClient:
-    """
-    GPU 요약 서버와 통신하는 HTTP 클라이언트.
+    """GPU 요약 서버와 통신하는 HTTP 클라이언트.
 
     배치 요약 요청 및 헬스 체크를 수행합니다.
+
+    Attributes:
+        base_url: GPU 서버 URL.
+        timeout: 요청 타임아웃 (초).
     """
 
     def __init__(
         self,
         base_url: Optional[str] = None,
-        timeout: int = 300,  # GPU 서버 권장: 긴 텍스트 처리 시간 고려
+        timeout: int = 300,
     ):
-        """
+        """인스턴스를 초기화한다.
+
         Args:
-            base_url: GPU 서버 URL (기본값: 환경변수 SUMMARY_SERVER_URL)
-            timeout: 요청 타임아웃 (초)
+            base_url: GPU 서버 URL. 기본값은 환경변수 GPU_SERVER.
+            timeout: 요청 타임아웃 (초).
         """
         self.base_url = base_url or getattr(
             settings, "summary_server_url", "http://localhost:8000"
@@ -36,17 +40,16 @@ class SummaryClient:
         logger.info(f"[SummaryClient] Initialized with base_url: {self.base_url}")
 
     async def summarize_batch(self, texts: List[str]) -> List[dict]:
-        """
-        배치 텍스트 요약 및 번역 생성.
+        """배치 텍스트 요약 및 번역을 생성한다.
 
         Args:
-            texts: 요약할 텍스트 리스트
+            texts: 요약할 텍스트 리스트.
 
         Returns:
-            요약 결과 리스트 [{"summary_en": ..., "summary_ko": ...}, ...]
+            요약 결과 리스트. 각 항목은 summary_en, summary_ko 키를 포함.
 
         Raises:
-            httpx.HTTPError: HTTP 요청 실패 시
+            httpx.HTTPError: HTTP 요청 실패 시.
         """
         if not texts:
             return []
@@ -59,7 +62,6 @@ class SummaryClient:
                 )
                 response.raise_for_status()
                 data = response.json()
-                # GPU 서버 응답: {"results": [{"summary_en": ..., "summary_ko": ...}, ...]}
                 results = data.get("results", [])
 
                 logger.info(
@@ -78,11 +80,10 @@ class SummaryClient:
             raise
 
     async def health_check(self) -> bool:
-        """
-        GPU 서버 헬스 체크.
+        """GPU 서버 헬스 체크를 수행한다.
 
         Returns:
-            서버가 정상이면 True, 아니면 False
+            서버가 정상이면 True, 아니면 False.
         """
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -104,11 +105,10 @@ _summary_client: Optional[SummaryClient] = None
 
 
 def get_summary_client() -> SummaryClient:
-    """
-    SummaryClient 싱글톤 인스턴스 반환.
+    """SummaryClient 싱글톤 인스턴스를 반환한다.
 
     Returns:
-        SummaryClient 인스턴스
+        SummaryClient 인스턴스.
     """
     global _summary_client
     if _summary_client is None:

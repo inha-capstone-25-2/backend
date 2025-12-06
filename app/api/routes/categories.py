@@ -1,3 +1,8 @@
+"""카테고리 API 라우터 모듈.
+
+카테고리 데이터 시드 엔드포인트를 정의합니다.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 

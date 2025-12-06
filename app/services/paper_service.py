@@ -1,3 +1,8 @@
+"""논문 서비스 모듈.
+
+논문 검색, 상세 조회, 검색 기록 등의 비즈니스 로직을 담당합니다.
+"""
+
 import logging
 from typing import List, Dict, Any
 
@@ -14,7 +19,20 @@ logger = logging.getLogger(__name__)
 
 
 class PaperService:
+    """논문 서비스.
+
+    Attributes:
+        db: MongoDB 데이터베이스 인스턴스.
+        repo: 논문 저장소 인스턴스.
+    """
+
     def __init__(self, db: Database, es_client: Elasticsearch | None = None):
+        """인스턴스를 초기화한다.
+
+        Args:
+            db: MongoDB 데이터베이스 인스턴스.
+            es_client: Elasticsearch 클라이언트 (옵션).
+        """
         self.db = db
         self.repo = PaperRepository(db, es_client)
 
@@ -28,7 +46,6 @@ class PaperService:
     ) -> Dict[str, Any]:
         """논문 검색 및 기록 저장 (캐싱 제거됨)"""
 
-        # 1. 검색 수행 (캐싱 없이 직접 호출)
         result = self.repo.search_papers(
             q=q,
             categories=categories,
@@ -37,7 +54,6 @@ class PaperService:
             sort_by=sort_by,
         )
 
-        # 2. 검색 기록 및 활동 로그 저장
         if q or categories:
             self.repo.save_search_history(
                 user_id=user.id,
@@ -70,13 +86,11 @@ class PaperService:
     def get_paper_detail(self, user: User, paper_id: str) -> Dict[str, Any]:
         """논문 상세 조회 및 활동 로그"""
 
-        # 1. 논문 조회 및 조회수 증가
         doc = self.repo.get_paper_and_increment_view(paper_id)
 
         if not doc:
             raise ResourceNotFoundException("Paper", paper_id)
 
-        # 2. 활동 로그 기록
         log_activity(db=self.db, user_id=user.id, activity_type="view", doi=paper_id)
 
         return doc

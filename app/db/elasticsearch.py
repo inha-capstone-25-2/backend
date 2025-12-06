@@ -45,7 +45,6 @@ def get_elasticsearch_client() -> Elasticsearch:
                 verify_certs=settings.es_use_ssl,
             )
         else:
-            # 인증 없음
             _es_client = Elasticsearch(
                 hosts=[host],
                 verify_certs=settings.es_use_ssl,
@@ -91,7 +90,6 @@ def get_es() -> Generator[Elasticsearch, None, None]:
         yield client
     except ESConnectionError as e:
         logger.error(f"[ES] Dependency injection failed: {e}")
-        # Fallback을 위해 None을 yield
         yield None
 
 

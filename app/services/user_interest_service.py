@@ -41,14 +41,11 @@ class UserInterestService:
             ValidationException: 빈 리스트인 경우
             ResourceNotFoundException: 존재하지 않는 카테고리인 경우
         """
-        # 1. 중복 제거
         codes = list(dict.fromkeys(category_codes))
 
-        # 2. 빈 리스트 검증
         if not codes:
             raise ValidationException("empty category_codes")
 
-        # 3. 카테고리 존재 확인
         categories = self.repo.find_categories_by_codes(codes)
         found_codes = {c.code for c in categories}
         missing = [c for c in codes if c not in found_codes]
@@ -58,21 +55,18 @@ class UserInterestService:
                 "Category", f"categories not found: {missing}"
             )
 
-        # 4. 이미 존재하는 관심사 확인
         category_ids = [c.id for c in categories]
         existing = self.repo.find_user_interests_by_user_and_categories(
             user.id, category_ids
         )
         existing_ids = {e.category_id for e in existing}
 
-        # 5. 새로운 관심사만 추가
         added_count = 0
         for category in categories:
             if category.id not in existing_ids:
                 self.repo.create_user_interest(user.id, category.id)
                 added_count += 1
 
-        # 6. 커밋
         self.db.commit()
 
         return {
@@ -126,26 +120,20 @@ class UserInterestService:
         Raises:
             ValidationException: 빈 리스트인 경우
         """
-        # 1. 중복 제거
         target_codes = list(dict.fromkeys(codes))
 
-        # 2. 빈 리스트 검증
         if not target_codes:
             raise ValidationException("empty codes")
 
-        # 3. 카테고리 조회
         categories = self.repo.find_categories_by_codes(target_codes)
         found_map = {c.code: c for c in categories}
         missing = [c for c in target_codes if c not in found_map]
 
-        # 4. 삭제 수행
         category_ids = [c.id for c in found_map.values()]
         deleted = self.repo.delete_user_interests(user.id, category_ids)
 
-        # 5. 커밋
         self.db.commit()
 
-        # 6. 남은 관심사 조회
         remaining_categories = self.repo.list_user_interests(user.id)
         remaining_items = []
         for category in remaining_categories:

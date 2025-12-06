@@ -1,3 +1,8 @@
+"""북마크 저장소 모듈.
+
+사용자 북마크의 CRUD 연산을 담당합니다.
+"""
+
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -14,25 +19,62 @@ logger = logging.getLogger(__name__)
 
 
 class BookmarkRepository:
+    """북마크 저장소.
+
+    Attributes:
+        db: MongoDB 데이터베이스 인스턴스.
+        bookmarks_collection: 북마크 컬렉션.
+        papers_collection: 논문 컬렉션.
+    """
+
     def __init__(self, db: Database):
+        """인스턴스를 초기화한다.
+
+        Args:
+            db: MongoDB 데이터베이스 인스턴스.
+        """
         self.db = db
         self.bookmarks_collection: Collection = db[COLLECTION_BOOKMARKS]
         self.papers_collection: Collection = db[settings.mongo_collection]
 
     def paper_exists(self, doi: str) -> bool:
-        """논문 존재 여부 확인"""
+        """논문 존재 여부를 확인한다.
+
+        Args:
+            doi: 논문 ID.
+
+        Returns:
+            논문이 존재하면 True.
+        """
         doc = self.papers_collection.find_one({"_id": doi}, {"_id": 1})
         return doc is not None
 
     def find_by_user_and_doi(self, user_id: int, doi: str) -> Dict[str, Any] | None:
-        """사용자 ID와 DOI로 북마크 조회"""
+        """사용자 ID와 DOI로 북마크를 조회한다.
+
+        Args:
+            user_id: 사용자 ID.
+            doi: 논문 ID.
+
+        Returns:
+            북마크 문서 또는 None.
+        """
         doc = self.bookmarks_collection.find_one({"user_id": user_id, "doi": doi})
         return doc
 
     def create_bookmark(
         self, user_id: int, doi: str, notes: str | None
     ) -> Dict[str, Any]:
-        """북마크 생성"""
+        """북마크를 생성한다.
+
+        Args:
+            user_id: 사용자 ID.
+            doi: 논문 ID.
+            notes: 북마크 메모.
+
+        Returns:
+            생성된 북마크 문서.
+        """
         doc = {
             "user_id": user_id,
             "doi": doi,
@@ -47,7 +89,15 @@ class BookmarkRepository:
     def list_bookmarks(
         self, user_id: int, doi: str | None = None
     ) -> List[Dict[str, Any]]:
-        """북마크 목록 조회"""
+        """북마크 목록을 조회한다.
+
+        Args:
+            user_id: 사용자 ID.
+            doi: 논문 ID 필터.
+
+        Returns:
+            북마크 문서 리스트.
+        """
         query = {"user_id": user_id}
         if doi:
             query["doi"] = doi
@@ -63,7 +113,16 @@ class BookmarkRepository:
     def update_bookmark(
         self, bookmark_id: ObjectId, user_id: int, notes: str | None
     ) -> Dict[str, Any] | None:
-        """북마크 수정"""
+        """북마크를 수정한다.
+
+        Args:
+            bookmark_id: 북마크 ID.
+            user_id: 사용자 ID.
+            notes: 업데이트할 메모.
+
+        Returns:
+            업데이트된 북마크 문서 또는 None.
+        """
         result = self.bookmarks_collection.find_one_and_update(
             {"_id": bookmark_id, "user_id": user_id},
             {"$set": {"notes": notes, "bookmarked_at": datetime.utcnow()}},
@@ -78,7 +137,15 @@ class BookmarkRepository:
     def delete_bookmark(
         self, bookmark_id: ObjectId, user_id: int
     ) -> Dict[str, Any] | None:
-        """북마크 삭제 (삭제 전 문서 반환)"""
+        """북마크를 삭제한다.
+
+        Args:
+            bookmark_id: 북마크 ID.
+            user_id: 사용자 ID.
+
+        Returns:
+            삭제된 북마크 문서 또는 None.
+        """
         doc = self.bookmarks_collection.find_one(
             {"_id": bookmark_id, "user_id": user_id}
         )

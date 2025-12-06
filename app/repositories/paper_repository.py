@@ -73,7 +73,6 @@ class PaperRepository:
         실패하거나 비활성화된 경우 MongoDB Text Search를 사용합니다.
         """
         
-        # 1. Elasticsearch 검색 시도
         if self.es_repo is not None:
             try:
                 logger.info("[PaperRepo] Attempting Elasticsearch search")
@@ -89,7 +88,6 @@ class PaperRepository:
                 )
                 # Fallback to MongoDB (아래에서 처리)
         
-        # 2. MongoDB Text Search Fallback
         logger.info("[PaperRepo] Using MongoDB Text Search")
         return self._search_with_mongodb(q, categories, page, page_size, sort_by)
 
@@ -151,10 +149,6 @@ class PaperRepository:
         }
 
         if q:
-            # Text Search 최적화: Two-Step 전략
-            # 1. Text Search + Category Filter로 후보군 조회 (Step 1)
-            # 2. 후보군에 대해 정렬 및 상세 정보 조회 (Step 2)
-            
             try:
                 start_time = time.time()
 

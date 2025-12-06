@@ -1,3 +1,8 @@
+"""북마크 API 라우터 모듈.
+
+사용자 북마크 CRUD 엔드포인트를 정의합니다.
+"""
+
 from fastapi import APIRouter, Depends, status, Query
 from typing import List
 from pymongo.database import Database

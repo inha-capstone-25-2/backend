@@ -77,7 +77,6 @@ def seed_recommendation_events(db: Database) -> int:
         if not papers:
             continue
         
-        # 1. Session Context 이벤트
         all_candidate_ids = [p["paper_id"] for p in papers]
         candidates_features = {p["paper_id"]: p["features"] for p in papers}
         candidates_scores = {p["paper_id"]: p["score"] for p in papers}
@@ -98,7 +97,6 @@ def seed_recommendation_events(db: Database) -> int:
         }
         events.append(session_context_event)
         
-        # 2. Expose 이벤트 (6개)
         for idx, paper_id in enumerate(final_display):
             expose_event = {
                 "user_id": user_id,
@@ -110,8 +108,6 @@ def seed_recommendation_events(db: Database) -> int:
             }
             events.append(expose_event)
         
-        # 3. 사용자 행동 이벤트 (확률적)
-        # 30% 확률로 첫 번째 논문 클릭
         if random.random() < 0.3 and final_display:
             clicked_paper = final_display[0]
             click_time = recommended_at + timedelta(seconds=random.randint(5, 60))

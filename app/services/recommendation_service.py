@@ -1,3 +1,8 @@
+"""추천 서비스 모듈.
+
+사용자 맞춤 논문 추천의 비즈니스 로직을 담당합니다.
+"""
+
 import logging
 import time
 from datetime import datetime
@@ -17,7 +22,19 @@ logger = logging.getLogger(__name__)
 
 
 class RecommendationService:
+    """추천 서비스.
+
+    Attributes:
+        db_mongo: MongoDB 데이터베이스 인스턴스.
+        repo: 추천 저장소 인스턴스.
+    """
+
     def __init__(self, db_mongo: Database):
+        """인스턴스를 초기화한다.
+
+        Args:
+            db_mongo: MongoDB 데이터베이스 인스턴스.
+        """
         self.db_mongo = db_mongo
         self.repo = RecommendationRepository(db_mongo)
 
@@ -29,15 +46,12 @@ class RecommendationService:
         start_time = time.time()
         logger.info(f"Generating recommendations for user {user.id}")
 
-        # 0. session_id 생성 (동일 추천 세션 그룹화용)
         import uuid
         session_id = str(uuid.uuid4())
         logger.info(f"Generated session_id: {session_id}")
 
-        # 1. 추천 생성 (전체 후보군 조회)
         step_start = time.time()
         recommender = RuleBasedRecommender()
-        # top_k=None으로 호출하여 전체 후보군(50개)을 받아옴
         all_recommendations = recommender.recommend(
             user=user,
             db_postgres=db_postgres,
@@ -47,34 +61,27 @@ class RecommendationService:
         )
         logger.info(f"[PERF] Recommender.recommend took {time.time() - step_start:.3f}s")
 
-        # 전체 후보군 ID 리스트 (RL 학습용)
         all_candidate_ids = [rec.get("paper_id") for rec in all_recommendations]
         
-        # 전체 후보군 특징 벡터 딕셔너리 (RL 학습용)
-        # ML 팀 요구: paper_id를 키로, feature breakdown을 값으로
         candidates_features_dict = {
             rec.get("paper_id"): rec.get("breakdown", {}) 
             for rec in all_recommendations
         }
         
-        # 전체 후보군 총점 딕셔너리 (RL 학습용)
         candidates_scores_dict = {
             rec.get("paper_id"): rec.get("total_score", 0.0)
             for rec in all_recommendations
         }
 
-        # 상위 k개만 선택하여 사용자에게 반환
         recommendations = all_recommendations[:top_k]
         
-        # 최종 추천된 6개 논문 ID 리스트 (RL Action)
         final_display = [rec.get("paper_id") for rec in recommendations]
 
-        # 2. 추천 로깅 (배치 처리) - 상위 k개만 로깅
         step_start = time.time()
         log_docs = []
         for rec in recommendations:
             log_doc = {
-                "session_id": session_id,  # session_id 추가
+                "session_id": session_id,
                 "user_id": user.id,
                 "paper_id": rec.get("paper_id"),
                 "recommendation_type": "rule_based",
@@ -91,11 +98,9 @@ class RecommendationService:
             }
             log_docs.append(log_doc)
         
-        # 배치로 한 번에 로깅
         self.repo.log_recommendations_batch(log_docs)
         logger.info(f"[PERF] Batch logging took {time.time() - step_start:.3f}s")
 
-        # 2.5 세션 컨텍스트 로깅 (RL 메타데이터 1번만 저장)
         step_start = time.time()
         self.repo.log_session_context(
             user_id=user.id,
@@ -109,7 +114,6 @@ class RecommendationService:
         )
         logger.info(f"[PERF] Session context logging took {time.time() - step_start:.3f}s")
 
-        # 2.6 Expose 이벤트 로깅 (개별 position만 저장)
         step_start = time.time()
         for idx, rec in enumerate(recommendations):
             self.repo.log_event(
@@ -117,11 +121,10 @@ class RecommendationService:
                 paper_id=rec.get("paper_id"),
                 activity_type=ActivityType.EXPOSE.value,
                 session_id=session_id,
-                metadata={"position": idx}  # position만 저장
+                metadata={"position": idx}
             )
         logger.info(f"[PERF] Expose event logging took {time.time() - step_start:.3f}s")
 
-        # 3. 응답 생성
         step_start = time.time()
         recommendation_items = []
         for rec in recommendations:
@@ -129,7 +132,6 @@ class RecommendationService:
             serialize_object_id(paper)
             paper["id"] = paper.pop("_id")
 
-            # summary 필드를 Summary 객체로 변환
             summary_data = paper.get("summary")
             summary_obj = Summary(**summary_data) if summary_data else None
 
@@ -155,7 +157,7 @@ class RecommendationService:
 
         return {
             "user_id": user.id,
-            "session_id": session_id,  # session_id 추가
+            "session_id": session_id,
             "recommendation_type": "rule_based",
             "recommendations": recommendation_items,
             "total_count": len(recommendation_items),

@@ -24,14 +24,15 @@ from app.core.settings import settings
 logger = logging.getLogger(__name__)
 
 def get_index_definitions(papers_collection_name: str) -> dict:
-    """
-    컬렉션별 인덱스 정의를 반환합니다.
-    
+    """컬렉션별 인덱스 정의를 반환한다.
+
+    Args:
+        papers_collection_name: papers 컬렉션 이름.
+
     Returns:
-        dict: {collection_name: [IndexModel, ...]}
+        컬렉션 이름을 키로, IndexModel 리스트를 값으로 하는 딕셔너리.
     """
     return {
-        # 1. Search History (TTL)
         COLLECTION_SEARCH_HISTORY: [
             IndexModel(
                 [("searched_at", ASCENDING)],
@@ -40,21 +41,18 @@ def get_index_definitions(papers_collection_name: str) -> dict:
             )
         ],
 
-        # 2. User Activities (TTL + 추천 조회 최적화)
         COLLECTION_USER_ACTIVITIES: [
             IndexModel(
                 [("timestamp", ASCENDING)],
                 name="ttl_timestamp",
                 expireAfterSeconds=TTL_USER_ACTIVITIES_SECONDS,
             ),
-            # 사용자별 활동 조회 최적화 (추천 시스템용)
             IndexModel(
                 [("user_id", ASCENDING), ("activity_type", ASCENDING), ("timestamp", DESCENDING)],
                 name="user_activity_type_timestamp_idx",
             ),
         ],
 
-        # 3. Recommendation Interactions (TTL)
         COLLECTION_RECOMMENDATION_INTERACTIONS: [
             IndexModel(
                 [("created_at", ASCENDING)],
@@ -63,7 +61,6 @@ def get_index_definitions(papers_collection_name: str) -> dict:
             )
         ],
 
-        # 4. Recommendation Events (RL Data)
         COLLECTION_RECOMMENDATION_EVENTS: [
             # 사용자별 조회 (최신순)
             IndexModel(
@@ -88,7 +85,6 @@ def get_index_definitions(papers_collection_name: str) -> dict:
             ),
         ],
 
-        # 5. Papers (검색은 Elasticsearch 사용)
         papers_collection_name: [
             # summary.ko 인덱스: 요약되지 않은 논문 조회 최적화
             # sparse=False로 설정하여 null 값도 인덱스에 포함 (null 조회 쿼리 최적화)
@@ -116,13 +112,13 @@ def get_index_definitions(papers_collection_name: str) -> dict:
 
 
 def ensure_indexes(db: Database, skip_papers: bool = False) -> None:
-    """
-    정의된 모든 인덱스를 생성합니다.
+    """정의된 모든 인덱스를 생성한다.
+
     이미 존재하는 인덱스는 건너뜁니다 (멱등성 보장).
-    
+
     Args:
-        db: MongoDB Database 인스턴스
-        skip_papers: True일 경우 papers 컬렉션 인덱스 생성을 스킵 (기본값: False)
+        db: MongoDB Database 인스턴스.
+        skip_papers: True일 경우 papers 컬렉션 인덱스 생성을 스킵.
     """
     logger.info("Starting MongoDB index creation...")
     
