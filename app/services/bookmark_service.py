@@ -77,28 +77,6 @@ class BookmarkService:
         """
         return self.repo.list_bookmarks(user.id, doi)
 
-    def update_bookmark(
-        self, user: User, bookmark_id: ObjectId, notes: str | None
-    ) -> Dict[str, Any] | None:
-        """북마크를 수정한다.
-
-        Args:
-            user: 사용자 객체.
-            bookmark_id: 북마크 ID.
-            notes: 업데이트할 메모.
-
-        Returns:
-            업데이트된 북마크 문서.
-
-        Raises:
-            ResourceNotFoundException: 북마크가 존재하지 않는 경우.
-        """
-        result = self.repo.update_bookmark(bookmark_id, user.id, notes)
-
-        if not result:
-            raise ResourceNotFoundException("Bookmark", str(bookmark_id))
-
-        return result
 
     def delete_bookmark(self, user: User, bookmark_id: ObjectId) -> None:
         """북마크를 삭제한다.

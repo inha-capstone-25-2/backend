@@ -31,13 +31,6 @@ class BookmarkOut(BaseModel):
     notes: Optional[str] = None
 
 
-class BookmarkUpdate(BaseModel):
-    """
-    북마크 수정 요청 모델.
-    """
-
-    notes: Optional[str] = None
-
 
 class BookmarkListOut(BaseModel):
     """
