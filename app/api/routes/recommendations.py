@@ -264,10 +264,10 @@ async def record_recommendation_interaction(
     if rec["user_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="이 추천에 접근할 권한이 없습니다")
     
-    action_type = "bookmark" if interaction_data.is_bookmarked else "view"
+    action_type = "bookmark" if interaction_data.bookmarked else "view"
     logger.info(
         "[RL] 📊 Interaction event: user_id=%d, recommendation_id=%s, action=%s, dwell_time=%s",
-        current_user.id, recommendation_id, action_type, interaction_data.dwell_time
+        current_user.id, recommendation_id, action_type, interaction_data.dwell_time_seconds
     )
     
     service = RecommendationService(db_mongo)
@@ -289,7 +289,7 @@ async def record_recommendation_interaction(
     
     logger.info(
         "[RL] 📤 Sending interaction to GPU server: user_id=%d, paper_id=%s, action=%s, dwell_time=%s",
-        current_user.id, paper_id, action_type, interaction_data.dwell_time
+        current_user.id, paper_id, action_type, interaction_data.dwell_time_seconds
     )
     
     rl_client = get_rl_client()
@@ -298,7 +298,7 @@ async def record_recommendation_interaction(
         paper_id=paper_id,
         action_type=action_type,
         recommendation_id=session_id,
-        dwell_time=interaction_data.dwell_time,
+        dwell_time=interaction_data.dwell_time_seconds,
     )
     
     if gpu_response.get("ok") is False:
