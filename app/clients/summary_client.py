@@ -2,19 +2,18 @@
 GPU 요약 서버 HTTP 클라이언트.
 
 별도의 GPU 서버로 요약 요청을 전송하고 결과를 수신합니다.
-Exponential backoff 재시도 로직이 포함되어 504/502/503/429 에러 및 타임아웃을 처리합니다.
+tenacity를 사용한 Exponential backoff 재시도 로직이 포함되어 
+504/502/503/429 에러 및 타임아웃을 처리합니다.
 """
 
 import logging
 from typing import List, Optional
 import httpx
 from tenacity import (
-    retry,
+    AsyncRetrying,
     stop_after_attempt,
-    wait_exponential,
-    wait_random,
+    wait_exponential_jitter,
     retry_if_exception_type,
-    retry_if_result,
     before_sleep_log,
     RetryError,
 )
@@ -26,11 +25,6 @@ logger = logging.getLogger(__name__)
 
 # 재시도 가능한 HTTP 상태 코드 (프록시/로드밸런서 타임아웃, 서버 과부하)
 RETRYABLE_STATUS_CODES = {502, 503, 504, 429}
-
-
-def _is_retryable_response(response: httpx.Response) -> bool:
-    """재시도 가능한 HTTP 응답인지 확인한다."""
-    return response.status_code in RETRYABLE_STATUS_CODES
 
 
 class SummaryClient:
@@ -70,7 +64,7 @@ class SummaryClient:
         )
 
     async def _do_summarize_request(self, texts: List[str]) -> List[dict]:
-        """실제 HTTP 요청을 수행한다 (재시도 로직 없음).
+        """실제 HTTP 요청을 수행한다.
 
         Args:
             texts: 요약할 텍스트 리스트.
@@ -89,7 +83,7 @@ class SummaryClient:
                 json={"texts": texts},
             )
             
-            # 재시도 가능한 상태 코드면 예외 발생
+            # 재시도 가능한 상태 코드면 예외 발생 (tenacity가 재시도)
             if response.status_code in RETRYABLE_STATUS_CODES:
                 raise SummaryServerException(
                     f"Retryable HTTP error",
@@ -101,7 +95,7 @@ class SummaryClient:
             return data.get("results", [])
 
     async def summarize_batch(self, texts: List[str]) -> List[dict]:
-        """배치 텍스트 요약 및 번역을 생성한다 (exponential backoff 재시도 포함).
+        """배치 텍스트 요약 및 번역을 생성한다 (tenacity exponential backoff 재시도 포함).
 
         Args:
             texts: 요약할 텍스트 리스트.
@@ -117,85 +111,62 @@ class SummaryClient:
         if not texts:
             return []
 
-        attempt = 0
-        last_exception = None
+        try:
+            # tenacity AsyncRetrying을 사용한 재시도
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(self.max_attempts),
+                wait=wait_exponential_jitter(
+                    initial=self.initial_delay,
+                    max=self.max_delay,
+                    jitter=self.max_delay * 0.25,  # 최대 25% jitter
+                ),
+                retry=retry_if_exception_type((
+                    httpx.TimeoutException,
+                    SummaryServerException,
+                )),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+                reraise=True,
+            ):
+                with attempt:
+                    results = await self._do_summarize_request(texts)
+                    
+                    attempt_num = attempt.retry_state.attempt_number
+                    logger.info(
+                        f"[SummaryClient] Successfully summarized {len(results)} texts"
+                        + (f" (attempt {attempt_num})" if attempt_num > 1 else "")
+                    )
+                    return results
 
-        while attempt < self.max_attempts:
-            attempt += 1
-            try:
-                results = await self._do_summarize_request(texts)
-                
-                logger.info(
-                    f"[SummaryClient] Successfully summarized {len(results)} texts"
-                    + (f" (attempt {attempt})" if attempt > 1 else "")
+        except RetryError as e:
+            # 모든 재시도 실패
+            last_exception = e.last_attempt.exception()
+            if isinstance(last_exception, httpx.TimeoutException):
+                logger.error(
+                    f"[SummaryClient] All {self.max_attempts} attempts failed due to timeout"
                 )
-                return results
-
-            except httpx.TimeoutException as e:
-                last_exception = e
-                if attempt < self.max_attempts:
-                    # Exponential backoff with jitter
-                    delay = min(
-                        self.initial_delay * (2 ** (attempt - 1)),
-                        self.max_delay
-                    )
-                    # Add jitter (±25%)
-                    import random
-                    jitter = delay * 0.25 * (2 * random.random() - 1)
-                    delay = max(0.1, delay + jitter)
-                    
-                    logger.warning(
-                        f"[SummaryClient] Timeout on attempt {attempt}/{self.max_attempts}, "
-                        f"retrying in {delay:.1f}s..."
-                    )
-                    import asyncio
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(
-                        f"[SummaryClient] All {self.max_attempts} attempts failed due to timeout"
-                    )
-                    raise GPUTimeoutException(
-                        f"GPU server timeout after {self.max_attempts} attempts",
-                        timeout=self.timeout
-                    ) from e
-
-            except SummaryServerException as e:
-                last_exception = e
-                if attempt < self.max_attempts:
-                    delay = min(
-                        self.initial_delay * (2 ** (attempt - 1)),
-                        self.max_delay
-                    )
-                    import random
-                    jitter = delay * 0.25 * (2 * random.random() - 1)
-                    delay = max(0.1, delay + jitter)
-                    
-                    logger.warning(
-                        f"[SummaryClient] Server error (status {e.status_code}) on attempt "
-                        f"{attempt}/{self.max_attempts}, retrying in {delay:.1f}s..."
-                    )
-                    import asyncio
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(
-                        f"[SummaryClient] All {self.max_attempts} attempts failed "
-                        f"with status {e.status_code}"
-                    )
-                    raise
-
-            except httpx.HTTPError as e:
-                # 재시도 불가능한 HTTP 에러 (4xx 등)
-                logger.error(f"[SummaryClient] Non-retryable HTTP error: {e}")
+                raise GPUTimeoutException(
+                    f"GPU server timeout after {self.max_attempts} attempts",
+                    timeout=self.timeout
+                ) from last_exception
+            elif isinstance(last_exception, SummaryServerException):
+                logger.error(
+                    f"[SummaryClient] All {self.max_attempts} attempts failed "
+                    f"with status {last_exception.status_code}"
+                )
+                raise last_exception
+            else:
                 raise
 
-            except Exception as e:
-                logger.error(f"[SummaryClient] Unexpected error: {e}")
-                raise
+        except httpx.HTTPError as e:
+            # 재시도 불가능한 HTTP 에러 (4xx 등)
+            logger.error(f"[SummaryClient] Non-retryable HTTP error: {e}")
+            raise
 
-        # Should not reach here, but just in case
-        if last_exception:
-            raise last_exception
-        return []
+        except Exception as e:
+            logger.error(f"[SummaryClient] Unexpected error: {e}")
+            raise
+
+        return []  # Should not reach here
 
     async def health_check(self) -> bool:
         """GPU 서버 헬스 체크를 수행한다.
