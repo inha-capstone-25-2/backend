@@ -155,6 +155,7 @@ class ElasticsearchRepository:
                         "query": q,
                         "fields": [
                             "title^3",  # title에 가중치 3
+                            "keywords^2.5",  # keywords에 가중치 2.5
                             "authors^2",  # authors에 가중치 2
                             "summary.en",  # 영문 요약
                         ],
