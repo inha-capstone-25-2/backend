@@ -279,9 +279,6 @@ class ElasticsearchRepository:
     def update_mapping(self) -> bool:
         """
         인덱스 매핑을 업데이트합니다 (새로운 필드 추가 등).
-        
-        Note: 기존 필드의 타입은 변경할 수 없으므로, 
-              이미 존재하는 필드는 건너뜁니다.
         """
         try:
             if not self.check_index_exists():
