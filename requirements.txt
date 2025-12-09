@@ -23,6 +23,7 @@ ujson
 # Summary Server (GPU) dependencies
 redis>=4.0.0
 celery>=5.2.0
+tenacity>=8.0.0
 
 # PDF Text Extraction
 PyMuPDF>=1.23.0

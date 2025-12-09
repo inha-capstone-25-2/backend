@@ -2,12 +2,13 @@
 요약 생성 Celery 태스크.
 
 배치 요약 생성을 비동기로 처리합니다.
+배치 실패 시 작은 배치로 분할하여 재시도합니다.
 """
 
 import logging
 import time
 import asyncio
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from app.celery import celery_app
 from app.db.mongodb import db_manager
 from app.core.settings import settings
@@ -16,6 +17,196 @@ from app.pipeline.pdf_extractor import fetch_arxiv_pdf_text_sync
 from pymongo.errors import PyMongoError
 
 logger = logging.getLogger(__name__)
+
+
+def _process_batch_with_retry(
+    summary_client,
+    batch_texts: List[str],
+    batch_ids: List[str],
+    collection,
+    retry_batch_size: int,
+    worker_prefix: str,
+    batch_info: str,
+) -> Tuple[int, int, List[str]]:
+    """배치 요약을 처리하고, 실패 시 작은 배치로 분할하여 재시도한다.
+
+    Args:
+        summary_client: SummaryClient 인스턴스
+        batch_texts: 요약할 텍스트 리스트
+        batch_ids: 논문 ID 리스트
+        collection: MongoDB 컬렉션
+        retry_batch_size: 재시도 시 배치 크기
+        worker_prefix: 로깅용 워커 프리픽스
+        batch_info: 로깅용 배치 정보
+
+    Returns:
+        (성공 개수, 실패 개수, 에러 메시지 리스트) 튜플
+    """
+    from app.core.exceptions import SummaryServerException, GPUTimeoutException
+    
+    success_count = 0
+    failed_count = 0
+    errors = []
+
+    try:
+        # 첫 번째 시도: 전체 배치 처리
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            results = loop.run_until_complete(
+                summary_client.summarize_batch(batch_texts)
+            )
+        finally:
+            loop.close()
+
+        if not results or len(results) != len(batch_ids):
+            logger.error(
+                f"{worker_prefix} [{batch_info}] "
+                f"Result count mismatch: expected {len(batch_ids)}, got {len(results) if results else 0}"
+            )
+            failed_count += len(batch_ids)
+            for arxiv_id in batch_ids:
+                errors.append(f"Batch result mismatch for {arxiv_id}")
+            return success_count, failed_count, errors
+
+        # 결과 저장
+        for arxiv_id, result in zip(batch_ids, results):
+            summary_en = result.get("summary_en", "")
+            summary_ko = result.get("summary_ko", "")
+
+            update_result = collection.update_one(
+                {"_id": arxiv_id},
+                {"$set": {"summary.en": summary_en, "summary.ko": summary_ko}},
+            )
+
+            if update_result.modified_count > 0:
+                success_count += 1
+            else:
+                failed_count += 1
+                errors.append(f"Failed to update {arxiv_id}")
+
+        return success_count, failed_count, errors
+
+    except (SummaryServerException, GPUTimeoutException) as e:
+        # 배치 전체 실패 시 작은 배치로 분할하여 재시도
+        logger.warning(
+            f"{worker_prefix} [{batch_info}] Batch failed ({type(e).__name__}), "
+            f"retrying with smaller batches of {retry_batch_size}..."
+        )
+        
+        return _retry_with_smaller_batches(
+            summary_client=summary_client,
+            batch_texts=batch_texts,
+            batch_ids=batch_ids,
+            collection=collection,
+            retry_batch_size=retry_batch_size,
+            worker_prefix=worker_prefix,
+            batch_info=batch_info,
+        )
+
+    except Exception as e:
+        # 기타 예외 (재시도 없이 실패 처리)
+        logger.error(f"{worker_prefix} [{batch_info}] Unexpected error: {e}")
+        failed_count = len(batch_ids)
+        for arxiv_id in batch_ids:
+            errors.append(f"GPU error for {arxiv_id}: {str(e)}")
+        return 0, failed_count, errors
+
+
+def _retry_with_smaller_batches(
+    summary_client,
+    batch_texts: List[str],
+    batch_ids: List[str],
+    collection,
+    retry_batch_size: int,
+    worker_prefix: str,
+    batch_info: str,
+) -> Tuple[int, int, List[str]]:
+    """작은 배치로 분할하여 재시도한다.
+
+    Args:
+        summary_client: SummaryClient 인스턴스
+        batch_texts: 요약할 텍스트 리스트
+        batch_ids: 논문 ID 리스트
+        collection: MongoDB 컬렉션
+        retry_batch_size: 재시도 배치 크기
+        worker_prefix: 로깅용 워커 프리픽스
+        batch_info: 로깅용 배치 정보
+
+    Returns:
+        (성공 개수, 실패 개수, 에러 메시지 리스트) 튜플
+    """
+    success_count = 0
+    failed_count = 0
+    errors = []
+    
+    total_mini_batches = (len(batch_ids) + retry_batch_size - 1) // retry_batch_size
+
+    for i in range(0, len(batch_ids), retry_batch_size):
+        mini_batch_texts = batch_texts[i:i + retry_batch_size]
+        mini_batch_ids = batch_ids[i:i + retry_batch_size]
+        mini_batch_num = i // retry_batch_size + 1
+        
+        logger.info(
+            f"{worker_prefix} [{batch_info}] Retry mini-batch {mini_batch_num}/{total_mini_batches} "
+            f"({len(mini_batch_ids)} papers)..."
+        )
+
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                results = loop.run_until_complete(
+                    summary_client.summarize_batch(mini_batch_texts)
+                )
+            finally:
+                loop.close()
+
+            if not results or len(results) != len(mini_batch_ids):
+                logger.error(
+                    f"{worker_prefix} [{batch_info}] Mini-batch {mini_batch_num} "
+                    f"result mismatch"
+                )
+                failed_count += len(mini_batch_ids)
+                for arxiv_id in mini_batch_ids:
+                    errors.append(f"Mini-batch result mismatch for {arxiv_id}")
+                continue
+
+            for arxiv_id, result in zip(mini_batch_ids, results):
+                summary_en = result.get("summary_en", "")
+                summary_ko = result.get("summary_ko", "")
+
+                update_result = collection.update_one(
+                    {"_id": arxiv_id},
+                    {"$set": {"summary.en": summary_en, "summary.ko": summary_ko}},
+                )
+
+                if update_result.modified_count > 0:
+                    success_count += 1
+                else:
+                    failed_count += 1
+                    errors.append(f"Failed to update {arxiv_id}")
+
+            logger.info(
+                f"{worker_prefix} [{batch_info}] Mini-batch {mini_batch_num} ✓ "
+                f"completed {len(mini_batch_ids)} papers"
+            )
+            
+            # 미니 배치 간 짧은 딜레이
+            if mini_batch_num < total_mini_batches:
+                time.sleep(0.5)
+
+        except Exception as e:
+            logger.error(
+                f"{worker_prefix} [{batch_info}] Mini-batch {mini_batch_num} failed: {e}"
+            )
+            failed_count += len(mini_batch_ids)
+            for arxiv_id in mini_batch_ids:
+                errors.append(f"Mini-batch GPU error for {arxiv_id}: {str(e)}")
+
+    return success_count, failed_count, errors
 
 
 @celery_app.task(bind=True, name="summary_tasks.generate_batch_summaries")
@@ -129,15 +320,19 @@ def generate_batch_summaries_task(
 
         # GPU 클라이언트 초기화
         from app.clients.summary_client import SummaryClient
-        summary_client = SummaryClient(timeout=600)  # 10분 타임아웃
+        from app.core.exceptions import SummaryServerException, GPUTimeoutException
+        
+        summary_client = SummaryClient(timeout=settings.summary_request_timeout)
         logger.info(f"{W} GPU Server URL: {summary_client.base_url}")
 
         success_count = 0
         failed_count = 0
         errors = []
         
-        # 배치 크기 설정 (GPU 서버 최적화를 위해 50개씩 처리)
-        BATCH_SIZE = 50
+        # 배치 크기 설정 (settings에서 로드, 기본값 30)
+        BATCH_SIZE = settings.summary_batch_size
+        BATCH_DELAY = settings.summary_batch_delay  # 배치 간 딜레이 (기본 1초)
+        RETRY_BATCH_SIZE = settings.summary_retry_batch_size  # 재시도 배치 크기 (기본 4)
 
         # 논문을 배치 단위로 처리 (PDF 추출 → GPU 요약 → DB 저장)
         for batch_start in range(0, len(papers), BATCH_SIZE):
@@ -186,55 +381,33 @@ def generate_batch_summaries_task(
                 f"{W} [Batch {batch_num}/{total_batches}] Sending {len(batch_texts)} texts to GPU server..."
             )
             
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-                try:
-                    results = loop.run_until_complete(
-                        summary_client.summarize_batch(batch_texts)
-                    )
-                finally:
-                    loop.close()
+            # 배치 요약 처리 (실패 시 작은 배치로 재시도)
+            batch_success, batch_failed, batch_errors = _process_batch_with_retry(
+                summary_client=summary_client,
+                batch_texts=batch_texts,
+                batch_ids=batch_ids,
+                collection=collection,
+                retry_batch_size=RETRY_BATCH_SIZE,
+                worker_prefix=W,
+                batch_info=f"Batch {batch_num}/{total_batches}",
+            )
+            
+            success_count += batch_success
+            failed_count += batch_failed
+            errors.extend(batch_errors)
 
-                if not results or len(results) != len(batch_ids):
-                    logger.error(
-                        f"{W} [Batch {batch_num}/{total_batches}] "
-                        f"Result count mismatch: expected {len(batch_ids)}, got {len(results) if results else 0}"
-                    )
-                    failed_count += len(batch_ids)
-                    for arxiv_id in batch_ids:
-                        errors.append(f"Batch result mismatch for {arxiv_id}")
-                    continue
-
-                for arxiv_id, result in zip(batch_ids, results):
-                    summary_en = result.get("summary_en", "")
-                    summary_ko = result.get("summary_ko", "")
-
-                    update_result = collection.update_one(
-                        {"_id": arxiv_id},
-                        {"$set": {"summary.en": summary_en, "summary.ko": summary_ko}},
-                    )
-
-                    if update_result.modified_count > 0:
-                        success_count += 1
-                    else:
-                        failed_count += 1
-                        errors.append(f"Failed to update {arxiv_id}")
-
-                batch_duration = time.time() - batch_start_time
-                avg_per_paper = batch_duration / len(batch_ids)
+            batch_duration = time.time() - batch_start_time
+            if batch_success > 0:
+                avg_per_paper = batch_duration / batch_success
                 logger.info(
-                    f"{W} [Batch {batch_num}/{total_batches}] ✓ Completed {len(batch_ids)} papers "
+                    f"{W} [Batch {batch_num}/{total_batches}] ✓ Completed {batch_success} papers "
                     f"in {batch_duration:.1f}s (avg: {avg_per_paper:.1f}s/paper)"
                 )
-
-            except Exception as e:
-                failed_count += len(batch_ids)
-                error_msg = f"Batch {batch_num} GPU error: {str(e)}"
-                logger.error(f"{W} [Batch {batch_num}/{total_batches}] {error_msg}")
-                for arxiv_id in batch_ids:
-                    errors.append(f"GPU error for {arxiv_id}: {str(e)}")
+            
+            # 배치 간 딜레이 (GPU 서버 큐잉 여유 확보)
+            if batch_num < total_batches:
+                logger.debug(f"{W} Waiting {BATCH_DELAY}s before next batch...")
+                time.sleep(BATCH_DELAY)
 
             # 진행률 업데이트
             self.update_state(

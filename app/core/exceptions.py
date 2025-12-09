@@ -122,3 +122,37 @@ class ForbiddenException(AppException):
 
     def __init__(self, message: str = "Forbidden"):
         super().__init__(message)
+
+
+class SummaryServerException(AppException):
+    """GPU 요약 서버 관련 예외.
+
+    Args:
+        message: 예외 메시지.
+        status_code: HTTP 상태 코드.
+    """
+
+    def __init__(
+        self, message: str = "Summary server error", status_code: int | None = None
+    ):
+        self.status_code = status_code
+        if status_code:
+            message = f"{message} (status: {status_code})"
+        super().__init__(message)
+
+
+class GPUTimeoutException(SummaryServerException):
+    """GPU 서버 타임아웃 예외.
+
+    Args:
+        message: 예외 메시지.
+        timeout: 타임아웃 값 (초).
+    """
+
+    def __init__(
+        self, message: str = "GPU server timeout", timeout: float | None = None
+    ):
+        self.timeout = timeout
+        if timeout:
+            message = f"{message} after {timeout}s"
+        super().__init__(message)

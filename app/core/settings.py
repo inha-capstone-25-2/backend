@@ -121,6 +121,29 @@ class Settings(BaseSettings):
         default="http://localhost:8000", validation_alias="GPU_SERVER"
     )
 
+    # GPU 요약 서버 재시도 설정
+    summary_request_timeout: int = Field(
+        default=600, validation_alias="SUMMARY_REQUEST_TIMEOUT"
+    )
+    summary_retry_max_attempts: int = Field(
+        default=5, validation_alias="SUMMARY_RETRY_MAX_ATTEMPTS"
+    )
+    summary_retry_initial_delay: float = Field(
+        default=2.0, validation_alias="SUMMARY_RETRY_INITIAL_DELAY"
+    )
+    summary_retry_max_delay: float = Field(
+        default=60.0, validation_alias="SUMMARY_RETRY_MAX_DELAY"
+    )
+    summary_batch_size: int = Field(
+        default=30, validation_alias="SUMMARY_BATCH_SIZE"
+    )
+    summary_batch_delay: float = Field(
+        default=1.0, validation_alias="SUMMARY_BATCH_DELAY"
+    )
+    summary_retry_batch_size: int = Field(
+        default=4, validation_alias="SUMMARY_RETRY_BATCH_SIZE"
+    )
+
     redis_host: str = Field(default="localhost", validation_alias="REDIS_HOST")
     redis_port: int = Field(default=6379, validation_alias="REDIS_PORT")
     redis_db: int = Field(default=0, validation_alias="REDIS_DB")
