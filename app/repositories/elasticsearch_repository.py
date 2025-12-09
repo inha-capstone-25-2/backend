@@ -192,7 +192,7 @@ class ElasticsearchRepository:
         """
         if sort_by == "view_count":
             return [
-                {"view_count": {"order": "desc"}},
+                {"view_count": {"order": "desc", "missing": "_last"}},
                 {"update_date": {"order": "desc"}},
             ]
         elif sort_by == "update_date":
