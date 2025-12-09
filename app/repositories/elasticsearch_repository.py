@@ -279,21 +279,46 @@ class ElasticsearchRepository:
     def update_mapping(self) -> bool:
         """
         인덱스 매핑을 업데이트합니다 (새로운 필드 추가 등).
+        
+        Note: 기존 필드의 타입은 변경할 수 없으므로, 
+              이미 존재하는 필드는 건너뜁니다.
         """
         try:
             if not self.check_index_exists():
                 return self.create_index_if_not_exists()
 
-            # 추가할 필드 정의
-            mapping = {
-                "properties": {
-                    "view_count": {"type": "long"},
-                    "bookmark_count": {"type": "long"},
-                }
+            # 현재 매핑 조회
+            current_mapping = self.get_index_mapping()
+            existing_properties = (
+                current_mapping
+                .get(self.index_name, {})
+                .get("mappings", {})
+                .get("properties", {})
+            )
+
+            # 추가할 필드 정의 (기존 필드와 호환되는 타입 사용)
+            new_fields = {
+                "view_count": {"type": "integer"},
+                "bookmark_count": {"type": "integer"},
+                "update_date": {"type": "date"},
             }
 
+            # 이미 존재하는 필드는 제외
+            fields_to_add = {
+                k: v for k, v in new_fields.items() 
+                if k not in existing_properties
+            }
+
+            if not fields_to_add:
+                logger.info(f"[ES] No new fields to add for '{self.index_name}'")
+                return True
+
+            mapping = {"properties": fields_to_add}
             self.es_client.indices.put_mapping(index=self.index_name, body=mapping)
-            logger.info(f"[ES] Successfully updated mapping for '{self.index_name}'")
+            logger.info(
+                f"[ES] Successfully added fields {list(fields_to_add.keys())} "
+                f"to '{self.index_name}'"
+            )
             return True
 
         except ApiError as e:

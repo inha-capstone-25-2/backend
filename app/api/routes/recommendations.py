@@ -50,7 +50,8 @@ def get_recommendations(
         user=current_user, db_postgres=db_postgres, top_k=top_k
     )
 
-    return RecommendationResponse(**result)
+    # service.get_recommendations()가 이미 RecommendationResponse 객체를 반환함
+    return result
 
 
 @router.get("/rl")
