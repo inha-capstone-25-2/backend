@@ -2,14 +2,29 @@
 GPU 요약 서버 HTTP 클라이언트.
 
 별도의 GPU 서버로 요약 요청을 전송하고 결과를 수신합니다.
+tenacity를 사용한 Exponential backoff 재시도 로직이 포함되어 
+504/502/503/429 에러 및 타임아웃을 처리합니다.
 """
 
 import logging
 from typing import List, Optional
 import httpx
+from tenacity import (
+    AsyncRetrying,
+    stop_after_attempt,
+    wait_exponential_jitter,
+    retry_if_exception_type,
+    before_sleep_log,
+    RetryError,
+)
 from app.core.settings import settings
+from app.core.exceptions import SummaryServerException, GPUTimeoutException
 
 logger = logging.getLogger(__name__)
+
+
+# 재시도 가능한 HTTP 상태 코드 (프록시/로드밸런서 타임아웃, 서버 과부하)
+RETRYABLE_STATUS_CODES = {502, 503, 504, 429}
 
 
 class SummaryClient:
@@ -37,10 +52,50 @@ class SummaryClient:
             settings, "summary_server_url", "http://localhost:8000"
         )
         self.timeout = timeout
-        logger.info(f"[SummaryClient] Initialized with base_url: {self.base_url}")
+        
+        # 재시도 설정 (settings에서 로드)
+        self.max_attempts = getattr(settings, "summary_retry_max_attempts", 5)
+        self.initial_delay = getattr(settings, "summary_retry_initial_delay", 2.0)
+        self.max_delay = getattr(settings, "summary_retry_max_delay", 60.0)
+        
+        logger.info(
+            f"[SummaryClient] Initialized with base_url: {self.base_url}, "
+            f"timeout: {self.timeout}s, max_retries: {self.max_attempts}"
+        )
+
+    async def _do_summarize_request(self, texts: List[str]) -> List[dict]:
+        """실제 HTTP 요청을 수행한다.
+
+        Args:
+            texts: 요약할 텍스트 리스트.
+
+        Returns:
+            요약 결과 리스트.
+
+        Raises:
+            httpx.TimeoutException: 타임아웃 발생 시.
+            SummaryServerException: 재시도 가능한 HTTP 에러 발생 시.
+            httpx.HTTPError: 기타 HTTP 에러 발생 시.
+        """
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                f"{self.base_url}/summarize/batch",
+                json={"texts": texts},
+            )
+            
+            # 재시도 가능한 상태 코드면 예외 발생 (tenacity가 재시도)
+            if response.status_code in RETRYABLE_STATUS_CODES:
+                raise SummaryServerException(
+                    f"Retryable HTTP error",
+                    status_code=response.status_code
+                )
+            
+            response.raise_for_status()
+            data = response.json()
+            return data.get("results", [])
 
     async def summarize_batch(self, texts: List[str]) -> List[dict]:
-        """배치 텍스트 요약 및 번역을 생성한다.
+        """배치 텍스트 요약 및 번역을 생성한다 (tenacity exponential backoff 재시도 포함).
 
         Args:
             texts: 요약할 텍스트 리스트.
@@ -49,35 +104,69 @@ class SummaryClient:
             요약 결과 리스트. 각 항목은 summary_en, summary_ko 키를 포함.
 
         Raises:
-            httpx.HTTPError: HTTP 요청 실패 시.
+            GPUTimeoutException: 모든 재시도 후에도 타임아웃 발생 시.
+            SummaryServerException: 모든 재시도 후에도 서버 에러 발생 시.
+            httpx.HTTPError: 재시도 불가능한 HTTP 요청 실패 시.
         """
         if not texts:
             return []
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/summarize/batch",
-                    json={"texts": texts},
-                )
-                response.raise_for_status()
-                data = response.json()
-                results = data.get("results", [])
+            # tenacity AsyncRetrying을 사용한 재시도
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(self.max_attempts),
+                wait=wait_exponential_jitter(
+                    initial=self.initial_delay,
+                    max=self.max_delay,
+                    jitter=self.max_delay * 0.25,  # 최대 25% jitter
+                ),
+                retry=retry_if_exception_type((
+                    httpx.TimeoutException,
+                    SummaryServerException,
+                )),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+                reraise=True,
+            ):
+                with attempt:
+                    results = await self._do_summarize_request(texts)
+                    
+                    attempt_num = attempt.retry_state.attempt_number
+                    logger.info(
+                        f"[SummaryClient] Successfully summarized {len(results)} texts"
+                        + (f" (attempt {attempt_num})" if attempt_num > 1 else "")
+                    )
+                    return results
 
-                logger.info(
-                    f"[SummaryClient] Successfully summarized {len(results)} texts"
+        except RetryError as e:
+            # 모든 재시도 실패
+            last_exception = e.last_attempt.exception()
+            if isinstance(last_exception, httpx.TimeoutException):
+                logger.error(
+                    f"[SummaryClient] All {self.max_attempts} attempts failed due to timeout"
                 )
-                return results
+                raise GPUTimeoutException(
+                    f"GPU server timeout after {self.max_attempts} attempts",
+                    timeout=self.timeout
+                ) from last_exception
+            elif isinstance(last_exception, SummaryServerException):
+                logger.error(
+                    f"[SummaryClient] All {self.max_attempts} attempts failed "
+                    f"with status {last_exception.status_code}"
+                )
+                raise last_exception
+            else:
+                raise
 
-        except httpx.TimeoutException as e:
-            logger.error(f"[SummaryClient] Timeout error: {e}")
-            raise
         except httpx.HTTPError as e:
-            logger.error(f"[SummaryClient] HTTP error: {e}")
+            # 재시도 불가능한 HTTP 에러 (4xx 등)
+            logger.error(f"[SummaryClient] Non-retryable HTTP error: {e}")
             raise
+
         except Exception as e:
             logger.error(f"[SummaryClient] Unexpected error: {e}")
             raise
+
+        return []  # Should not reach here
 
     async def health_check(self) -> bool:
         """GPU 서버 헬스 체크를 수행한다.
