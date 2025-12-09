@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from pymongo.database import Database
+from bson import ObjectId
 
 from app.repositories.recommendation_repository import RecommendationRepository
 from app.utils.rule_based_recommender import RuleBasedRecommender
@@ -90,7 +91,6 @@ class RecommendationService:
 
         recommendations = all_recommendations[:top_k]
         
-        # 미리 ObjectId 생성
         import bson
         for rec in recommendations:
             rec["_id"] = bson.ObjectId()
@@ -101,7 +101,7 @@ class RecommendationService:
         log_docs = []
         for rec in recommendations:
             log_doc = {
-                "_id": rec["_id"],  # 미리 생성한 ID 사용
+                "_id": rec["_id"],
                 "session_id": session_id,
                 "user_id": user.id,
                 "paper_id": rec.get("paper_id"),
@@ -227,9 +227,28 @@ class RecommendationService:
 
     def record_click(self, recommendation_id: str, user_id: int) -> Dict[str, Any]:
         """클릭 기록"""
+        # 1. 추천 로그 조회
+        try:
+            rec = self.repo.recommendations_collection.find_one({"_id": ObjectId(recommendation_id)})
+        except Exception:
+            rec = None
+
+        if not rec:
+            return {"success": False, "clicked_at": None}
+
         success = self.repo.mark_as_clicked(recommendation_id)
         if success:
             logger.info("Marked recommendation %s as clicked by user %d", recommendation_id, user_id)
+            
+            # 2. 이벤트 로깅
+            self.repo.log_event(
+                user_id=user_id,
+                paper_id=rec["paper_id"],
+                activity_type=ActivityType.CLICK.value,
+                session_id=rec.get("session_id", recommendation_id),
+                metadata={"recommendation_id": recommendation_id}
+            )
+
         return {
             "success": success,
             "clicked_at": datetime.utcnow().isoformat() if success else None,
