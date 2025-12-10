@@ -147,6 +147,7 @@ class PaperRepository:
             "categories": 1,
             "update_date": 1,
             "view_count": 1,
+            "journal_ref": 1,
         }
 
         if q:

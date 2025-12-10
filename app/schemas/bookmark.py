@@ -28,6 +28,7 @@ class BookmarkOut(BaseModel):
     user_id: int
     doi: str
     bookmarked_at: datetime
+    journal_ref: Optional[str] = None
     notes: Optional[str] = None
 
 

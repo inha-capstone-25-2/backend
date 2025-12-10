@@ -168,6 +168,7 @@ class RecommendationService:
                 view_count=paper.get("view_count", 0),
                 bookmark_count=paper.get("bookmark_count", 0),
                 update_date=paper.get("update_date"),
+                journal_ref=paper.get("journal_ref"),
                 total_score=rec["total_score"],
                 breakdown=ScoreBreakdown(**rec["breakdown"]),
                 reasons=rec["reasons"],

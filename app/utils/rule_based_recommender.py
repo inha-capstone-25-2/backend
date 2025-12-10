@@ -218,6 +218,8 @@ class RuleBasedRecommender:
             "update_date": 1,
             "difficulty_level": 1,
             "authors": 1,
+            "authors": 1,
+            "journal_ref": 1,
             # abstract는 크기가 크므로 제외 (응답 시 필요하지 않음)
         }
 

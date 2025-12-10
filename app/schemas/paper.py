@@ -31,6 +31,7 @@ class PaperListItem(BaseModel):
     categories: Optional[List[str]] = None
     update_date: Optional[str] = None
     view_count: Optional[int] = 0
+    journal_ref: Optional[str] = None
 
 
 class Paper(BaseModel):

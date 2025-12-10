@@ -102,7 +102,36 @@ class BookmarkRepository:
         if doi:
             query["doi"] = doi
 
-        cursor = self.bookmarks_collection.find(query).sort("bookmarked_at", -1)
+        pipeline = [
+            {"$match": query},
+            {"$sort": {"bookmarked_at": -1}},
+            {
+                "$lookup": {
+                    "from": self.papers_collection.name,
+                    "localField": "doi",
+                    "foreignField": "_id",
+                    "as": "paper_info",
+                }
+            },
+            {
+                "$unwind": {
+                    "path": "$paper_info",
+                    "preserveNullAndEmptyArrays": True,
+                }
+            },
+            {
+                "$project": {
+                    "_id": 1,
+                    "user_id": 1,
+                    "doi": 1,
+                    "bookmarked_at": 1,
+                    "notes": 1,
+                    "journal_ref": "$paper_info.journal_ref",
+                }
+            },
+        ]
+
+        cursor = self.bookmarks_collection.aggregate(pipeline)
         items = []
         for doc in cursor:
             transform_id_field(doc)

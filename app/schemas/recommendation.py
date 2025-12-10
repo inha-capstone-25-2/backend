@@ -32,6 +32,7 @@ class RecommendationItem(BaseModel):
     view_count: int = Field(0, description="조회 수")
     bookmark_count: int = Field(0, description="북마크 수")
     update_date: Optional[str] = Field(None, description="최종 수정일")
+    journal_ref: Optional[str] = Field(None, description="저널 정보")
 
     total_score: float = Field(..., description="총점")
     breakdown: ScoreBreakdown = Field(..., description="점수 분해")
