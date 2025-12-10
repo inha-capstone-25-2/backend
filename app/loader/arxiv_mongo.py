@@ -64,6 +64,12 @@ def stream_and_insert_data(
                 "authors": data.get("authors"),
                 "categories": codes,
                 "update_date": data.get("update_date"),
+                "journal_ref": data.get("journal-ref"),
+                "report_no": data.get("report-no"),
+                "doi": data.get("doi"),
+                "license": data.get("license"),
+                "versions": data.get("versions"),
+                "authors_parsed": data.get("authors_parsed"),
             }
             
             # summary는 있는 경우만 추가

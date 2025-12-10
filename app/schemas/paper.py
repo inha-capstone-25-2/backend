@@ -50,6 +50,14 @@ class Paper(BaseModel):
     update_date: Optional[str] = None
     view_count: Optional[int] = 0
 
+    # Extended Metadata
+    journal_ref: Optional[str] = None
+    report_no: Optional[str] = None
+    doi: Optional[str] = None
+    license: Optional[str] = None
+    versions: Optional[List[dict]] = None
+    authors_parsed: Optional[List[List[str]]] = None
+
 
 class PaperSearchResponse(BaseModel):
     """
