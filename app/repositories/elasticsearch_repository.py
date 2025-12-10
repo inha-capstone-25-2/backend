@@ -86,6 +86,7 @@ class ElasticsearchRepository:
                     "categories",
                     "update_date",
                     "view_count",
+                    "journal_ref",
                 ],
                 track_total_hits=True,  # 정확한 total 계산
             )
@@ -260,6 +261,7 @@ class ElasticsearchRepository:
                     "update_date": {"type": "date"},
                     "view_count": {"type": "integer"},
                     "bookmark_count": {"type": "integer"},
+                    "journal_ref": {"type": "text"},
                 }
             }
 
@@ -299,6 +301,7 @@ class ElasticsearchRepository:
                 "view_count": {"type": "integer"},
                 "bookmark_count": {"type": "integer"},
                 "update_date": {"type": "date"},
+                "journal_ref": {"type": "text"},
             }
 
             # 이미 존재하는 필드는 제외
