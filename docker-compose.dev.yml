@@ -33,7 +33,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: celery_worker_dev
-    command: celery -A app.celery worker --loglevel=info
+    command: celery -A app.celery worker --loglevel=info --concurrency=2
     env_file:
       - env/dev/.env
     environment:

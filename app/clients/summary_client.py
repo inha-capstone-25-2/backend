@@ -201,5 +201,7 @@ def get_summary_client() -> SummaryClient:
     """
     global _summary_client
     if _summary_client is None:
-        _summary_client = SummaryClient()
+        _summary_client = SummaryClient(
+            timeout=settings.summary_request_timeout
+        )
     return _summary_client
