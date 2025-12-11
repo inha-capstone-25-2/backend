@@ -135,13 +135,13 @@ class Settings(BaseSettings):
         default=60.0, validation_alias="SUMMARY_RETRY_MAX_DELAY"
     )
     summary_batch_size: int = Field(
-        default=30, validation_alias="SUMMARY_BATCH_SIZE"
+        default=10, validation_alias="SUMMARY_BATCH_SIZE"
     )
     summary_batch_delay: float = Field(
         default=1.0, validation_alias="SUMMARY_BATCH_DELAY"
     )
     summary_retry_batch_size: int = Field(
-        default=4, validation_alias="SUMMARY_RETRY_BATCH_SIZE"
+        default=1, validation_alias="SUMMARY_RETRY_BATCH_SIZE"
     )
 
     redis_host: str = Field(default="localhost", validation_alias="REDIS_HOST")
