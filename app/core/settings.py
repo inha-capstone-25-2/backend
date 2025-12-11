@@ -135,7 +135,7 @@ class Settings(BaseSettings):
         default=60.0, validation_alias="SUMMARY_RETRY_MAX_DELAY"
     )
     summary_batch_size: int = Field(
-        default=10, validation_alias="SUMMARY_BATCH_SIZE"
+        default=5, validation_alias="SUMMARY_BATCH_SIZE"
     )
     summary_batch_delay: float = Field(
         default=1.0, validation_alias="SUMMARY_BATCH_DELAY"
