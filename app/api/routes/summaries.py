@@ -16,9 +16,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/summaries", tags=["summaries"])
 
 
-# --- Request/Response Schemas ---
-
-
 class BatchSummaryRequest(BaseModel):
     """배치 요약 요청 스키마"""
 
@@ -47,9 +44,6 @@ class JobStatusResponse(BaseModel):
     error: Optional[str] = None
 
 
-# --- API Endpoints ---
-
-
 @router.post("/batch", response_model=BatchSummaryStartResponse, status_code=202)
 async def create_batch_summaries(request: BatchSummaryRequest):
     """
@@ -71,10 +65,9 @@ async def create_batch_summaries(request: BatchSummaryRequest):
     from app.celery import celery_app
     from celery import group
     
-    # paper_ids가 None이면 빈 리스트 (모든 논문 처리)
     paper_ids = request.paper_ids if request.paper_ids else []
     
-    # Celery 설정에서 워커 수 가져오기
+    # Celery 워커 수 가져오기
     num_chunks = celery_app.conf.get('worker_concurrency', 1) or 1
 
     logger.info(
@@ -85,14 +78,14 @@ async def create_batch_summaries(request: BatchSummaryRequest):
 
     # 모든 논문을 처리하는 경우, 여러 태스크로 분할하여 병렬 실행
     if num_chunks > 1 and not paper_ids:
-        # 각 청크별 태스크 생성 (chunk_index를 전달하여 각자 다른 범위 처리)
+        # 각 청크별 태스크 생성
         tasks = []
         for i in range(num_chunks):
             task = generate_batch_summaries_task.s(
-                paper_ids,  # 빈 리스트
+                paper_ids,
                 request.force,
-                i,  # chunk_index
-                num_chunks  # total_chunks
+                i,
+                num_chunks
             )
             tasks.append(task)
         
@@ -105,7 +98,7 @@ async def create_batch_summaries(request: BatchSummaryRequest):
         return BatchSummaryStartResponse(
             job_id=job_id,
             status="pending",
-            total_papers=0,  # 전체
+            total_papers=0,
             message=f"모든 논문의 요약 생성 작업이 {num_chunks}개 워커로 시작되었습니다",
         )
     else:

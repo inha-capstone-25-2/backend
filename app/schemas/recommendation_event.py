@@ -13,25 +13,23 @@ from enum import Enum
 
 class ActivityType(str, Enum):
     """이벤트 유형"""
-    SESSION_CONTEXT = "session_context"  # 세션 컨텍스트 (RL 메타데이터)
-    EXPOSE = "expose"  # 추천 노출
-    CLICK = "click"  # 클릭
-    BOOKMARK = "bookmark"  # 북마크
-    DETAIL_VIEW = "detail_view"  # 상세 페이지 조회
-    CLOSE = "close"  # 페이지 닫기
+    SESSION_CONTEXT = "session_context"
+    EXPOSE = "expose"
+    CLICK = "click"
+    BOOKMARK = "bookmark"
+    DETAIL_VIEW = "detail_view"
+    CLOSE = "close"
 
 
 class EventMetadata(BaseModel):
     """이벤트 메타데이터"""
-    # expose 시
     candidates: Optional[List[str]] = Field(None, description="전체 추천 후보군 (paper_id 리스트)")
     position: Optional[int] = Field(None, ge=0, description="추천 리스트 내 위치 (0-based)")
     
-    # detail_view, close 시
     dwell_time_ms: Optional[int] = Field(None, ge=0, description="체류 시간 (밀리초)")
     
     class Config:
-        extra = "allow"  # 추가 필드 허용
+        extra = "allow"
 
 
 class RecommendationEventCreate(BaseModel):

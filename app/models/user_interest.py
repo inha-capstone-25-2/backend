@@ -29,7 +29,6 @@ class UserInterest(Base):
         nullable=False,
     )
 
-    # 역방향 관계(선택적 사용)
     user: Mapped["User"] = relationship(
         "User",
         back_populates="interests",

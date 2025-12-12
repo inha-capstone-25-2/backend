@@ -7,9 +7,6 @@ arXiv 논문의 텍스트를 정리하고 요약을 위한 전처리를 수행�
 from typing import Dict
 
 
-
-
-
 def build_raw_text(doc: Dict) -> str:
     """
     MongoDB 문서에서 원문 텍스트 추출.
@@ -23,7 +20,6 @@ def build_raw_text(doc: Dict) -> str:
     Returns:
         Abstract 텍스트
     """
-    # summary.en 필드 사용 (Abstract)
     abstract = ""
     if "summary" in doc and isinstance(doc["summary"], dict):
         abstract = doc["summary"].get("en") or ""

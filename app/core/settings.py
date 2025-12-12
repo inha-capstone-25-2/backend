@@ -121,7 +121,6 @@ class Settings(BaseSettings):
         default="http://localhost:8000", validation_alias="GPU_SERVER"
     )
 
-    # GPU 요약 서버 재시도 설정
     summary_request_timeout: int = Field(
         default=600, validation_alias="SUMMARY_REQUEST_TIMEOUT"
     )
@@ -147,9 +146,6 @@ class Settings(BaseSettings):
     redis_host: str = Field(default="localhost", validation_alias="REDIS_HOST")
     redis_port: int = Field(default=6379, validation_alias="REDIS_PORT")
     redis_db: int = Field(default=0, validation_alias="REDIS_DB")
-
-
-
 
 
     secret_key: str = Field(default="change-me-in-prod", validation_alias="SECRET_KEY")

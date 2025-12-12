@@ -66,7 +66,6 @@ def create_error_response(
     )
 
 
-# 예외 타입별 상태 코드 및 에러 타입 매핑
 EXCEPTION_CONFIG = {
     DatabaseException: (500, "database_error", "error"),
     ResourceNotFoundException: (404, "resource_not_found", "warning"),

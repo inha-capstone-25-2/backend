@@ -76,5 +76,4 @@ def get_paper(
     """논문 상세 정보 조회."""
     service = PaperService(db)
 
-    # Service raises ResourceNotFoundException if not found
     return service.get_paper_detail(user=current_user, paper_id=paper_id)

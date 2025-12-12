@@ -25,10 +25,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# 난이도 레벨
 DIFFICULTY_LEVELS = ["beginner", "intermediate", "advanced"]
 
-# 키워드 풀 (arXiv 관련)
 KEYWORD_POOL = [
     "machine learning",
     "deep learning",
@@ -72,10 +70,9 @@ def generate_embedding_vector(dim: int = None) -> list[float]:
     if dim is None:
         dim = random.randint(300, 500)
 
-    # 평균 0, 표준편차 1인 정규분포에서 샘플링
     vector = np.random.randn(dim)
 
-    # L2 정규화 (단위 벡터로 변환)
+    # L2 정규화
     norm = np.linalg.norm(vector)
     if norm > 0:
         vector = vector / norm
@@ -115,7 +112,6 @@ def enrich_papers(db: Database, batch_size: int = 100) -> int:
 
     collection = db[settings.mongo_collection]
 
-    # 컬렉션 존재 확인
     if settings.mongo_collection not in db.list_collection_names():
         logger.warning(
             f"Collection '{settings.mongo_collection}' does not exist. Skipping enrichment."
@@ -129,7 +125,6 @@ def enrich_papers(db: Database, batch_size: int = 100) -> int:
 
     logger.info(f"Found {total_count} papers to enrich.")
 
-    # 배치 업데이트 준비
     operations = []
     cursor = collection.find({}, {"_id": 1})
 
@@ -138,7 +133,6 @@ def enrich_papers(db: Database, batch_size: int = 100) -> int:
     for doc in cursor:
         paper_id = doc["_id"]
 
-        # Enrichment 데이터 생성
         enrichment_data = {
             "bookmark_count": random.randint(0, 500),
             "view_count": random.randint(0, 10000),
@@ -149,7 +143,6 @@ def enrich_papers(db: Database, batch_size: int = 100) -> int:
 
         operations.append(UpdateOne({"_id": paper_id}, {"$set": enrichment_data}))
 
-        # 배치 실행
         if len(operations) >= batch_size:
             try:
                 result = collection.bulk_write(operations, ordered=False)
@@ -161,7 +154,6 @@ def enrich_papers(db: Database, batch_size: int = 100) -> int:
 
             operations.clear()
 
-    # 남은 배치 처리
     if operations:
         try:
             result = collection.bulk_write(operations, ordered=False)

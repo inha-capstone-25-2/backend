@@ -6,7 +6,6 @@ from app.models.category import Category, CategoryName
 from app.db.postgres import get_db
 
 CATEGORY_SEED: List[Dict] = [
-    # 상위 분류 예시
     {
         "code": "physics",
         "depth": 1,
@@ -55,7 +54,6 @@ CATEGORY_SEED: List[Dict] = [
         "depth": 1,
         "names": {"en": "Nonlinear Sciences", "ko": "비선형 과학"},
     },
-    # ---------------- physics / astro-ph / cond-mat ----------------
     {
         "code": "acc-phys",
         "parent": "physics",
@@ -416,7 +414,6 @@ CATEGORY_SEED: List[Dict] = [
             "ko": "대기·해양 과학 (구 분류)",
         },
     },
-    # ---------------- Computer Science (cs) ----------------
     {
         "code": "cs",
         "depth": 1,
@@ -692,10 +689,6 @@ CATEGORY_SEED: List[Dict] = [
             "ko": "계산 언어학 (구 분류)",
         },
     },
-    #
-    # 나머지 math / q-bio / q-fin / econ / stat / eess / nlin 항목도
-    # 동일 패턴으로 추가하면 된다.
-    #
 ]
 
 
@@ -730,7 +723,7 @@ def seed_categories(db: Session) -> None:
                 sort_order=0,
             )
             db.add(cat)
-            db.flush()  # id 생성
+            db.flush()
             existing_by_code[code] = cat
         else:
             cat.parent_id = parent_obj.id if parent_obj else None
@@ -778,16 +771,14 @@ def seed_categories_from_codes(codes: list[str]) -> None:
 
         for code in codes:
             if code in existing_by_code:
-                continue  # 이미 존재하면 스킵
+                continue
 
-            # CATEGORY_SEED에서 찾기
             seed_item = next(
                 (item for item in CATEGORY_SEED if item["code"] == code), None
             )
             if seed_item:
                 _create_category_from_seed(db, seed_item, existing_by_code)
             else:
-                # 기본 생성: 부모 없음, 깊이 1, 이름: 영어=코드, ko=빈칸
                 cat = Category(
                     code=code,
                     parent_id=None,
@@ -817,15 +808,14 @@ def _create_category_from_seed(
     parent_obj = None
     parent_code = item.get("parent")
     if parent_code:
-        parent_obj = existing_by_code.get(parent_code)  # 수정: parentCode → parent_code
+        parent_obj = existing_by_code.get(parent_code)
         if not parent_obj:
-            # 부모가 없으면 재귀 생성 (단순화)
             parent_seed = next(
                 (s for s in CATEGORY_SEED if s["code"] == parent_code), None
-            )  # 수정
+            )
             if parent_seed:
                 _create_category_from_seed(db, parent_seed, existing_by_code)
-                parent_obj = existing_by_code.get(parent_code)  # 수정
+                parent_obj = existing_by_code.get(parent_code)
 
     cat = Category(
         code=code,

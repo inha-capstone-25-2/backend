@@ -31,7 +31,6 @@ class PaperRepository:
         self.history_collection: Collection = db[COLLECTION_SEARCH_HISTORY]
         self.activities_collection: Collection = db[COLLECTION_USER_ACTIVITIES]
         
-        # Elasticsearch Repository (옵션널)
         self.es_repo: ElasticsearchRepository | None = None
         if es_client is not None:
             self.es_repo = ElasticsearchRepository(es_client)
@@ -87,8 +86,7 @@ class PaperRepository:
                     f"[PaperRepo] Elasticsearch search failed: {e}. "
                     "Falling back to MongoDB"
                 )
-                # Fallback to MongoDB (아래에서 처리)
-        
+
         logger.info("[PaperRepo] Using MongoDB Text Search")
         return self._search_with_mongodb(q, categories, page, page_size, sort_by)
 
@@ -104,7 +102,6 @@ class PaperRepository:
         if self.es_repo is None:
             raise ValueError("Elasticsearch repository not initialized")
         
-        # Elasticsearch 검색 실행
         es_result = self.es_repo.search_papers(
             q=q,
             categories=categories,
@@ -113,7 +110,6 @@ class PaperRepository:
             sort_by=sort_by,
         )
         
-        # 결과 변환
         items = es_result["items"]
         total = es_result["total"]
         is_approximate = es_result.get("is_approximate", False)
@@ -132,13 +128,11 @@ class PaperRepository:
     ) -> Dict[str, Any]:
         """MongoDB Text Search를 사용한 검색 (기존 로직)"""
 
-        # 공통 변수 초기화
         skip = (page - 1) * page_size
         items = []
         total = 0
         is_approximate = False
 
-        # Projection 설정
         projection = {
             "_id": 1,
             "id": 1,
@@ -154,8 +148,6 @@ class PaperRepository:
             try:
                 start_time = time.time()
 
-                # Step 1: 후보군 조회 (Text Search Score)
-                # 쿼리에 categories를 포함시켜 MongoDB가 검색 범위를 좁히도록 유도
                 text_query = {"$text": {"$search": q}}
                 if categories:
                     text_query["categories"] = {"$in": categories}
@@ -174,16 +166,13 @@ class PaperRepository:
                 if not candidates:
                     return self._build_search_response(page, page_size, 0, [], False)
 
-                # Step 2: 데이터 조회 및 정렬
                 step2_start = time.time()
                 candidate_ids = [c["_id"] for c in candidates]
                 filter_query = {"_id": {"$in": candidate_ids}}
 
-                # MongoDB에서 정렬 (인덱스 활용!)
                 sort_field = self._get_sort_field(sort_by)
                 docs_cursor = self.papers_collection.find(filter_query, projection).sort(sort_field)
                 
-                # Step 3: 결과 조합
                 final_items = []
                 
                 for doc in docs_cursor:
@@ -196,7 +185,6 @@ class PaperRepository:
                 total = len(final_items)
                 is_approximate = True
 
-                # Step 4: 페이징
                 items = final_items[skip : skip + page_size]
                 
                 total_time = time.time() - start_time
@@ -207,7 +195,6 @@ class PaperRepository:
                 raise DatabaseException("Search operation failed")
 
         else:
-            # 일반 쿼리 (카테고리만 있거나 전체 조회)
             query = {}
             if categories:
                 query["categories"] = {"$in": categories}
@@ -246,7 +233,6 @@ class PaperRepository:
         items = []
         for doc in cursor:
             transform_id_field(doc)
-            # Pydantic 모델 호환성을 위한 기본값 처리
             doc.setdefault("user_id", None)
             doc.setdefault("filters", None)
             doc.setdefault("result_count", None)
@@ -258,7 +244,6 @@ class PaperRepository:
         """내가 본 논문 조회 (Aggregation)"""
         query = {"user_id": user_id, "activity_type": "view"}
 
-        # Aggregation Pipeline
         pipeline = [
             {"$match": query},
             {"$sort": {"timestamp": -1}},
@@ -270,7 +255,6 @@ class PaperRepository:
 
         viewed_papers = list(self.activities_collection.aggregate(pipeline))
 
-        # Count Pipeline
         count_pipeline = [
             {"$match": query},
             {"$group": {"_id": "$doi"}},
@@ -279,7 +263,6 @@ class PaperRepository:
         count_result = list(self.activities_collection.aggregate(count_pipeline))
         total = count_result[0]["total"] if count_result else 0
 
-        # 논문 상세 정보 조회
         paper_ids = [item["_id"] for item in viewed_papers if item["_id"]]
         items = []
 
@@ -318,7 +301,6 @@ class PaperRepository:
 
         return doc
 
-    # --- Helper Methods ---
 
     def _get_sort_field(self, sort_by: str):
         if sort_by == "view_count":

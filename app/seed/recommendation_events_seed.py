@@ -30,7 +30,6 @@ def seed_recommendation_events(db: Database) -> int:
     Returns:
         생성된 events 개수
     """
-    # papers 컬렉션에서 실제 논문 ID들 샘플링
     papers_coll = db[settings.mongo_collection]
     paper_ids = list(papers_coll.find({}, {"_id": 1}).limit(500))
     
@@ -38,10 +37,8 @@ def seed_recommendation_events(db: Database) -> int:
         logger.error("❌ No papers found. Please load papers first.")
         return 0
     
-    # paper_recommendations에서 세션 정보 가져오기
     recommendations_coll = db[COLLECTION_PAPER_RECOMMENDATIONS]
     
-    # 세션별로 그룹화
     pipeline = [
         {"$group": {
             "_id": "$session_id",
@@ -53,7 +50,7 @@ def seed_recommendation_events(db: Database) -> int:
                 "features": "$features"
             }}
         }},
-        {"$limit": 50}  # 50개 세션만
+        {"$limit": 50}
     ]
     
     sessions = list(recommendations_coll.aggregate(pipeline))
@@ -112,7 +109,6 @@ def seed_recommendation_events(db: Database) -> int:
             clicked_paper = final_display[0]
             click_time = recommended_at + timedelta(seconds=random.randint(5, 60))
             
-            # Click 이벤트
             click_event = {
                 "user_id": user_id,
                 "paper_id": clicked_paper,
@@ -123,8 +119,7 @@ def seed_recommendation_events(db: Database) -> int:
             }
             events.append(click_event)
             
-            # Detail View 이벤트 (클릭 후 체류)
-            dwell_time_ms = random.randint(10000, 120000)  # 10초~2분
+            dwell_time_ms = random.randint(10000, 120000)
             detail_view_event = {
                 "user_id": user_id,
                 "paper_id": clicked_paper,
@@ -135,7 +130,6 @@ def seed_recommendation_events(db: Database) -> int:
             }
             events.append(detail_view_event)
             
-            # 20% 확률로 북마크
             if random.random() < 0.2:
                 bookmark_time = click_time + timedelta(seconds=random.randint(10, 60))
                 bookmark_event = {
@@ -148,7 +142,6 @@ def seed_recommendation_events(db: Database) -> int:
                 }
                 events.append(bookmark_event)
             
-            # Close 이벤트
             close_time = click_time + timedelta(milliseconds=dwell_time_ms)
             close_event = {
                 "user_id": user_id,
@@ -160,7 +153,6 @@ def seed_recommendation_events(db: Database) -> int:
             }
             events.append(close_event)
     
-    # Bulk insert
     if events:
         result = events_coll.insert_many(events, ordered=False)
         logger.info(f"✅ Total {len(result.inserted_ids)} recommendation events created!")

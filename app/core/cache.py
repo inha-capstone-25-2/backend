@@ -39,7 +39,6 @@ def create_search_cache_key(
         >>> create_search_cache_key("machine learning", ["cs.AI"], 1, "relevance")
         'search:a1b2c3d4...'
     """
-    # 캐시 키 구성 요소 정규화
     key_data = {
         "q": q or "",
         "categories": sorted(categories) if categories else [],
@@ -47,7 +46,6 @@ def create_search_cache_key(
         "sort_by": sort_by,
     }
 
-    # JSON 직렬화 후 MD5 해시
     key_string = json.dumps(key_data, sort_keys=True)
     hash_key = hashlib.md5(key_string.encode()).hexdigest()
 

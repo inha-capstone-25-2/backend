@@ -121,7 +121,6 @@ def serialize_doc_for_api(doc: Dict[str, Any]) -> Dict[str, Any]:
     if "_id" in doc:
         doc["id"] = str(doc["_id"])
 
-    # 일반적인 ObjectId 필드들 자동 변환
     for field in ["paper_id", "user_id", "category_id", "bookmark_id"]:
         if field in doc and isinstance(doc[field], ObjectId):
             doc[field] = str(doc[field])

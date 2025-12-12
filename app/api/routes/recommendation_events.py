@@ -32,7 +32,7 @@ def create_event(
     사용자의 추천 관련 행동(expose, click, bookmark 등)을 기록합니다.
     RL 모델의 reward 계산에 사용됩니다.
     """
-    # 권한 검증: 본인의 이벤트만 기록 가능
+    # 본인의 이벤트만 기록 가능
     if event_data.user_id != current_user.id:
         raise HTTPException(
             status_code=403, 
@@ -56,7 +56,6 @@ def create_event(
     # 저장된 문서 조회
     if event_id:
         try:
-            # event_id는 문자열이므로 ObjectId로 변환하여 조회
             event_doc = db_mongo["recommendation_events"].find_one({"_id": ObjectId(event_id)})
             if event_doc:
                 serialize_object_id(event_doc)
@@ -87,7 +86,6 @@ def get_session_events(
     repo = RecommendationRepository(db_mongo)
     total, items = repo.get_events_by_session(session_id, page, page_size)
     
-    # 변환
     formatted_items = []
     for item in items:
         serialize_object_id(item)
@@ -120,7 +118,6 @@ def get_user_events(
     repo = RecommendationRepository(db_mongo)
     total, items = repo.get_events_by_user(user_id, page, page_size)
     
-    # 변환
     formatted_items = []
     for item in items:
         serialize_object_id(item)

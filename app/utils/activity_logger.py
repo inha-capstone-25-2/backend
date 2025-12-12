@@ -53,7 +53,6 @@ def log_activity(
         "timestamp": datetime.utcnow(),
     }
 
-    # doi가 있으면 문자열 그대로 저장
     if doi:
         activity_doc["doi"] = doi
 
@@ -62,4 +61,3 @@ def log_activity(
         logger.debug(f"Activity logged: {activity_type} for user {user_id}")
     except Exception as e:
         logger.error(f"Failed to log activity: {e}")
-        # 활동 로그 실패는 주요 기능에 영향 주지 않음

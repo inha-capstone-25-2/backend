@@ -87,12 +87,11 @@ def get_index_definitions(papers_collection_name: str) -> dict:
 
         papers_collection_name: [
             # summary.ko 인덱스: 요약되지 않은 논문 조회 최적화
-            # sparse=False로 설정하여 null 값도 인덱스에 포함 (null 조회 쿼리 최적화)
             IndexModel(
                 [("summary.ko", ASCENDING)],
                 name="summary_ko_idx",
             ),
-            # update_date 인덱스: 최신 논문 조회 최적화 (sort by update_date DESC)
+            # update_date 인덱스: 최신 논문 조회 최적화
             IndexModel(
                 [("update_date", DESCENDING)],
                 name="update_date_desc_idx",
@@ -125,14 +124,12 @@ def ensure_indexes(db: Database, skip_papers: bool = False) -> None:
     definitions = get_index_definitions(settings.mongo_collection)
     
     for collection_name, indexes in definitions.items():
-        # papers 컬렉션 스킵 (데이터 적재 후 생성)
         if skip_papers and collection_name == settings.mongo_collection:
             logger.info(f"Skipping index creation for {collection_name} (will be created after data load)")
             continue
             
         try:
             collection = db[collection_name]
-            # 인덱스 생성 (create_indexes는 여러 개를 한 번에 생성)
             result = collection.create_indexes(indexes)
             logger.info(f"Indexes created for {collection_name}: {result}")
         except Exception as e:
@@ -169,14 +166,11 @@ def sync_indexes(db: Database, skip_papers: bool = False, dry_run: bool = False)
         
         collection = db[collection_name]
         
-        # 코드에 정의된 인덱스 이름들
         defined_names = {idx.document.get("name") for idx in defined_indexes}
         
-        # DB에 존재하는 인덱스 이름들 (_id 제외)
         existing_indexes = collection.index_information()
         existing_names = {name for name in existing_indexes.keys() if name != "_id_"}
         
-        # 삭제할 인덱스: DB에만 있고 코드에는 없는 것
         to_drop = existing_names - defined_names
         for idx_name in to_drop:
             logger.info(f"[{collection_name}] Dropping deprecated index: {idx_name}")
@@ -200,7 +194,6 @@ def sync_indexes(db: Database, skip_papers: bool = False, dry_run: bool = False)
                     except Exception as e:
                         logger.error(f"Failed to create index {idx_name}: {e}")
         
-        # 변경 없는 인덱스
         unchanged = defined_names & existing_names
         for idx_name in unchanged:
             result["unchanged"].append(f"{collection_name}.{idx_name}")

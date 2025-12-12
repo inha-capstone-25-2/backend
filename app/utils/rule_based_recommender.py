@@ -39,8 +39,8 @@ class RuleBasedRecommender:
         user: User,
         db_postgres: Session,
         db_mongo: Database,
-        top_k: int = None,  # None이면 전체 반환
-        candidate_limit: int = 50,  # 100 -> 50으로 축소
+        top_k: int = None,
+        candidate_limit: int = 50,
     ) -> List[Dict[str, Any]]:
         """
         룰 베이스 추천 실행.
@@ -128,7 +128,6 @@ class RuleBasedRecommender:
         step_start = time.time()
         recommendations.sort(key=lambda x: x["total_score"], reverse=True)
         
-        # top_k가 지정된 경우에만 슬라이싱 (None이면 전체 반환)
         if top_k is not None:
             results = recommendations[:top_k]
         else:
@@ -144,9 +143,6 @@ class RuleBasedRecommender:
         from app.models.category import Category
         from app.models.user_interest import UserInterest
 
-        # user.interests를 직접 사용하면 DetachedInstanceError 발생
-        # (캐시된 User 객체는 세션에서 분리되어 있음)
-        # 따라서 UserInterest를 직접 쿼리
         user_interest_objs = (
             db.query(UserInterest).filter(UserInterest.user_id == user.id).all()
         )
@@ -167,16 +163,15 @@ class RuleBasedRecommender:
         Returns:
             (viewed_paper_ids, activity_categories)
         """
-        # Projection: 필요한 필드만 선택
         activities = (
             db[COLLECTION_USER_ACTIVITIES]
             .find(
                 {"user_id": user_id, "activity_type": "view"},
-                {"doi": 1, "metadata.categories": 1},  # 필요한 필드만
+                {"doi": 1, "metadata.categories": 1},
             )
             .sort("timestamp", -1)
             .limit(50)
-        )  # 최근 50개만
+        )
 
         viewed_paper_ids = []
         activity_categories = []
@@ -186,7 +181,6 @@ class RuleBasedRecommender:
             if doi:
                 viewed_paper_ids.append(str(doi))
 
-            # metadata에 카테고리 정보가 있을 수 있음
             metadata = activity.get("metadata", {})
             categories = metadata.get("categories", [])
             activity_categories.extend(categories)
@@ -207,7 +201,6 @@ class RuleBasedRecommender:
         """
         collection = db[settings.mongo_collection]
 
-        # Projection: 필요한 필드만 선택 (abstract 제외하여 성능 개선)
         projection = {
             "_id": 1,
             "title": 1,
@@ -220,14 +213,9 @@ class RuleBasedRecommender:
             "authors": 1,
             "authors": 1,
             "journal_ref": 1,
-            # abstract는 크기가 크므로 제외 (응답 시 필요하지 않음)
         }
 
-        # 최적화된 쿼리: 하나의 쿼리로 통합
-        # 관심사가 있으면 관심사 기반, 없으면 인기 논문만
         if user_interests:
-            # 관심사 카테고리에 해당하는 논문을 인기도 순으로 정렬
-            # 인덱스 활용: categories 인덱스 + view_count/bookmark_count 복합 인덱스
             candidates = list(
                 collection.find(
                     {"categories": {"$in": user_interests}},
@@ -237,7 +225,6 @@ class RuleBasedRecommender:
                 .limit(limit)
             )
         else:
-            # 관심사가 없으면 전체에서 인기 논문만
             candidates = list(
                 collection.find(
                     {},

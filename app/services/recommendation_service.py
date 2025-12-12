@@ -193,7 +193,6 @@ class RecommendationService:
         """전체 추천 로그 조회"""
         logger.info("Getting all recommendation logs (page=%d, page_size=%d)", page, page_size)
 
-        # Repository에서 데이터 조회
         total, items = self.repo.get_all_recommendations(page, page_size)
 
         formatted_items = [self._format_recommendation_log(item) for item in items]
@@ -228,7 +227,6 @@ class RecommendationService:
 
     def record_click(self, recommendation_id: str, user_id: int) -> Dict[str, Any]:
         """클릭 기록"""
-        # 1. 추천 로그 조회
         try:
             rec = self.repo.recommendations_collection.find_one({"_id": ObjectId(recommendation_id)})
         except Exception:
@@ -241,7 +239,6 @@ class RecommendationService:
         if success:
             logger.info("Marked recommendation %s as clicked by user %d", recommendation_id, user_id)
             
-            # 2. 이벤트 로깅
             self.repo.log_event(
                 user_id=user_id,
                 paper_id=rec["paper_id"],
@@ -267,7 +264,6 @@ class RecommendationService:
             serialize_object_id(saved_doc)
             saved_doc["id"] = saved_doc.pop("_id")
             
-            # datetime을 ISO 문자열로 변환
             for field in ["created_at", "updated_at"]:
                 if field in saved_doc and hasattr(saved_doc[field], "isoformat"):
                     saved_doc[field] = saved_doc[field].isoformat()

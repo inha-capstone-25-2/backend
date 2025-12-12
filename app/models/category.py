@@ -72,7 +72,6 @@ class Category(Base):
         cascade="all, delete-orphan",
     )
 
-    # 이 카테고리를 관심으로 등록한 사용자 관계
     interested_users: Mapped[List["UserInterest"]] = relationship(
         "UserInterest",
         back_populates="category",

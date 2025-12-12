@@ -29,7 +29,7 @@ def transform_breakdown(raw: Dict[str, float]) -> Dict[str, float]:
         "interest_score": raw.get("keyword", 0.0) + raw.get("category", 0.0),
         "popularity_score": raw.get("popularity", 0.0),
         "recency_score": raw.get("recency", 0.0),
-        "personalization_score": 0.0,  # 향후 RL 기반 점수 추가 가능
+        "personalization_score": 0.0,
     }
 
 
@@ -154,7 +154,6 @@ class RLClient:
                 response.raise_for_status()
                 data = response.json()
 
-                # breakdown 변환
                 if "recommendations" in data:
                     for rec in data["recommendations"]:
                         if "breakdown" in rec:
@@ -253,7 +252,6 @@ class RLClient:
             return {"ok": False, "error": str(e)}
 
 
-# 싱글톤 인스턴스
 _rl_client: Optional[RLClient] = None
 
 

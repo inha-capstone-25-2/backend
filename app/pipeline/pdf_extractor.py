@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 # arXiv PDF URL 패턴
 ARXIV_PDF_URL = "https://arxiv.org/pdf/{arxiv_id}.pdf"
 
-# HTTP 클라이언트 설정
-HTTP_TIMEOUT = 30.0  # 30초 타임아웃
+HTTP_TIMEOUT = 30.0
 
 
 async def fetch_arxiv_pdf_text(arxiv_id: str) -> Optional[str]:
@@ -39,7 +38,7 @@ async def fetch_arxiv_pdf_text(arxiv_id: str) -> Optional[str]:
             response = await client.get(pdf_url)
             response.raise_for_status()
 
-            # PDF 바이트를 메모리에서 처리 (디스크 I/O 없음)
+            # PDF 바이트를 메모리에서 처리
             pdf_bytes = response.content
             text = extract_text_from_pdf_bytes(pdf_bytes)
 
@@ -74,23 +73,20 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
         추출된 텍스트
     """
     try:
-        # 메모리 스트림에서 PDF 열기 (디스크 저장 없음)
+        # 메모리 스트림에서 PDF 열기
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
         text_parts = []
         for page_num in range(len(doc)):
             page = doc.load_page(page_num)
-            # "text" 옵션: 텍스트만 추출 (이미지, 테이블 무시)
             page_text = page.get_text("text")
             if page_text.strip():
                 text_parts.append(page_text)
         
         doc.close()
 
-        # 페이지별 텍스트를 줄바꿈으로 결합
         full_text = "\n".join(text_parts)
         
-        # 후처리: 불필요한 공백 정리
         full_text = _clean_pdf_text(full_text)
 
         return full_text
@@ -114,13 +110,13 @@ def _clean_pdf_text(text: str) -> str:
     """
     import re
 
-    # 줄 끝 하이픈 제거 (단어 분할)
+    # 줄 끝 하이픈 제거
     text = re.sub(r"-\n", "", text)
 
     # 연속 줄바꿈을 단락 구분자로 변환
     text = re.sub(r"\n{3,}", "\n\n", text)
 
-    # 단일 줄바꿈을 공백으로 (문장 연결)
+    # 단일 줄바꿈을 공백으로
     text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)
 
     # 중복 공백 제거
@@ -152,13 +148,11 @@ def fetch_arxiv_pdf_text_sync(arxiv_id: str) -> Optional[str]:
             response = requests.get(pdf_url, timeout=HTTP_TIMEOUT, allow_redirects=True)
             response.raise_for_status()
 
-            # PDF 바이트에서 텍스트 추출 (공통 함수 사용)
             pdf_bytes = response.content
             text = extract_text_from_pdf_bytes(pdf_bytes)
 
             if text:
                 logger.info(f"[PDFExtractor] Extracted {len(text)} chars from {arxiv_id}")
-                # 추출된 텍스트가 너무 짧으면 내용 확인 (디버깅용)
                 if len(text) < 500:
                     logger.warning(f"[PDFExtractor] Short text preview: {text[:200]}...")
             return text
@@ -166,7 +160,7 @@ def fetch_arxiv_pdf_text_sync(arxiv_id: str) -> Optional[str]:
         except requests.Timeout:
             logger.warning(f"[PDFExtractor] Timeout for {arxiv_id}, attempt {attempt + 1}/{max_retries}")
             if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)  # 지수 백오프: 1초, 2초, 4초
+                time.sleep(2 ** attempt)  # 지수 백오프
             continue
         except requests.HTTPError as e:
             logger.error(f"[PDFExtractor] HTTP error for {arxiv_id}: {e}")

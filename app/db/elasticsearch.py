@@ -13,7 +13,6 @@ from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Elasticsearch 클라이언트 인스턴스
 _es_client: Elasticsearch | None = None
 
 
@@ -33,11 +32,9 @@ def get_elasticsearch_client() -> Elasticsearch:
         host_url = settings.es_host
         port = settings.es_port
         
-        # Elasticsearch 연결 정보 구성
         scheme = "https" if settings.es_use_ssl else "http"
         host = f"{scheme}://{host_url}:{port}"
         
-        # 인증 정보가 있는 경우
         if settings.es_user and settings.es_password:
             _es_client = Elasticsearch(
                 hosts=[host],
@@ -50,7 +47,6 @@ def get_elasticsearch_client() -> Elasticsearch:
                 verify_certs=settings.es_use_ssl,
             )
         
-        # 연결 확인
         try:
             if not _es_client.ping():
                 logger.error(f"[ES] Failed to ping Elasticsearch at {host}")
@@ -65,7 +61,6 @@ def get_elasticsearch_client() -> Elasticsearch:
             
             logger.info(f"[ES] Successfully connected to Elasticsearch at {host}")
             
-            # 클러스터 정보 로깅
             info = _es_client.info()
             logger.info(f"[ES] Cluster name: {info.get('cluster_name', 'unknown')}")
             logger.info(f"[ES] Version: {info.get('version', {}).get('number', 'unknown')}")
@@ -147,12 +142,10 @@ def init_elasticsearch() -> None:
     """
     try:
         client = get_elasticsearch_client()
-        # 순환 참조 방지를 위해 함수 내부에서 import
         from app.repositories.elasticsearch_repository import ElasticsearchRepository
         
         repo = ElasticsearchRepository(client)
         repo.update_mapping()
         
     except (ESConnectionError, ApiError) as e:
-        # ES 초기화 실패가 앱 구동을 막지 않도록 로그만 남김
         logger.error(f"[ES] Initialization failed: {e}")

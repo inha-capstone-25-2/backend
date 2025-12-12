@@ -35,7 +35,6 @@ def seed_activities(db: Database) -> int:
     Returns:
         생성된 activities 개수
     """
-    # papers 컬렉션에서 실제 논문 ID들 샘플링
     papers_coll = db[settings.mongo_collection]
     paper_ids = list(papers_coll.find({}, {"_id": 1}).limit(1000))
 
@@ -47,7 +46,6 @@ def seed_activities(db: Database) -> int:
 
     activities_coll = db[COLLECTION_USER_ACTIVITIES]
 
-    # 기존 activities 개수 확인
     existing_count = activities_coll.count_documents({})
     logger.info(f"Existing activities: {existing_count}")
 
@@ -55,21 +53,17 @@ def seed_activities(db: Database) -> int:
     now = datetime.utcnow()
 
     for i in range(NUM_ACTIVITIES):
-        # 랜덤 사용자 ID (1~500)
         user_id = random.randint(1, 500)
 
-        # 랜덤 activity_type
         activity_type = random.choice(ACTIVITY_TYPES)
 
-        # 랜덤 timestamp (최근 3개월)
         days_ago = random.randint(0, 90)
         timestamp = now - timedelta(days=days_ago, hours=random.randint(0, 23))
 
-        # doi (activity_type이 "view", "bookmark", "unbookmark"일 때)
         doi = None
         if activity_type in ["view", "bookmark", "unbookmark"]:
             paper = random.choice(paper_ids)
-            doi = paper["_id"]  # _id가 arXiv ID (문자열)
+            doi = paper["_id"]
 
         activity = {
             "user_id": user_id,
@@ -78,9 +72,8 @@ def seed_activities(db: Database) -> int:
         }
 
         if doi:
-            activity["doi"] = doi  # 문자열 그대로 저장
+            activity["doi"] = doi
 
-        # metadata (선택적)
         if activity_type == "search":
             activity["metadata"] = {
                 "query": random.choice(
@@ -93,7 +86,6 @@ def seed_activities(db: Database) -> int:
         if (i + 1) % 200 == 0:
             logger.info(f"Generated {i + 1}/{NUM_ACTIVITIES} activities...")
 
-    # Bulk insert
     if activities:
         result = activities_coll.insert_many(activities, ordered=False)
         logger.info(f"✅ Total {len(result.inserted_ids)} activities created!")

@@ -15,7 +15,7 @@ def load_env() -> None:
     이미 설정된 환경변수는 덮어쓰지 않습니다.
     """
     app_env = os.getenv("APP_ENV", "local")
-    base_dir = Path(__file__).resolve().parents[2]  # 프로젝트 루트
+    base_dir = Path(__file__).resolve().parents[2]
     env_path = base_dir / "env" / app_env / ".env"
     if env_path.is_file():
         load_dotenv(env_path, override=False)

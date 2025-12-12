@@ -50,7 +50,6 @@ def get_recommendations(
         user=current_user, db_postgres=db_postgres, top_k=top_k
     )
 
-    # service.get_recommendations()가 이미 RecommendationResponse 객체를 반환함
     return result
 
 
@@ -185,7 +184,7 @@ async def record_recommendation_click(
     clicked_at 시각을 기록합니다.
     GPU 서버에도 상호작용 로그를 전송합니다.
     """
-    # 먼저 추천 정보 조회
+    # 추천 정보 조회
     recommendations_coll = db_mongo["paper_recommendations"]
     try:
         rec_oid = ObjectId(recommendation_id)
@@ -205,7 +204,7 @@ async def record_recommendation_click(
     if not result["success"]:
         raise HTTPException(status_code=404, detail=f"추천 ID {recommendation_id}를 찾을 수 없습니다")
     
-    # GPU 서버에 상호작용 로그 전송 (RL 학습용)
+    # GPU 서버에 상호작용 로그 전송 - RL 학습용
     if rec:
         paper_id = rec.get("paper_id", "")
         session_id = rec.get("session_id", recommendation_id)
@@ -284,7 +283,7 @@ async def record_recommendation_interaction(
     if not result:
         raise HTTPException(status_code=500, detail="상호작용 데이터 저장에 실패했습니다")
     
-    # GPU 서버에 상호작용 로그 전송 (RL 학습용)
+    # GPU 서버에 상호작용 로그 전송 - RL 학습용
     paper_id = rec["paper_id"]
     session_id = rec.get("session_id", recommendation_id)
     

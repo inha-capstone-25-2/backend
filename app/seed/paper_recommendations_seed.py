@@ -34,7 +34,6 @@ def seed_paper_recommendations(db: Database) -> int:
     Returns:
         생성된 recommendations 개수
     """
-    # papers 컬렉션에서 실제 논문 ID들 샘플링
     papers_coll = db[settings.mongo_collection]
     paper_ids = list(papers_coll.find({}, {"_id": 1}).limit(1000))
 
@@ -46,38 +45,30 @@ def seed_paper_recommendations(db: Database) -> int:
 
     recommendations_coll = db[COLLECTION_PAPER_RECOMMENDATIONS]
 
-    # 기존 recommendations 개수 확인
     existing_count = recommendations_coll.count_documents({})
     logger.info(f"Existing recommendations: {existing_count}")
 
     recommendations = []
     now = datetime.utcnow()
 
-    # 세션 그룹별로 생성 (한 세션에 6개씩)
     num_sessions = NUM_RECOMMENDATIONS // 6
     session_counter = 0
 
     for session_idx in range(num_sessions):
-        # 랜덤 사용자 ID
         user_id = random.randint(1, 500)
         
-        # 세션 ID 생성
         session_id = str(uuid.uuid4())
         
-        # 랜덤 추천 타입
         recommendation_type = random.choice(["rule_based", "rule_based", "rule_based", "rl_based"])  # 75% rule_based
         
-        # 랜덤 timestamp (최근 30일)
         days_ago = random.randint(0, 30)
         recommended_at = now - timedelta(days=days_ago, hours=random.randint(0, 23))
         
-        # 한 세션에 6개 추천
         session_papers = random.sample(paper_ids, 6)
         
         for rank, paper in enumerate(session_papers):
             paper_id = paper["_id"]
             
-            # 룰베이스 점수 생성
             interest_score = round(random.uniform(0.0, 5.0), 2)
             popularity_score = round(random.uniform(0.0, 3.0), 2)
             recency_score = round(random.uniform(0.0, 2.0), 2)
@@ -89,7 +80,6 @@ def seed_paper_recommendations(db: Database) -> int:
                 2
             )
             
-            # 추천 이유
             reasons = []
             if interest_score > 3.0:
                 reasons.append("관심사와 높은 관련성")
@@ -100,7 +90,6 @@ def seed_paper_recommendations(db: Database) -> int:
             if not reasons:
                 reasons.append("다양한 주제의 논문")
             
-            # 클릭 여부 (20% 확률)
             was_clicked = random.random() < 0.2
             
             recommendation = {
@@ -121,7 +110,6 @@ def seed_paper_recommendations(db: Database) -> int:
             }
             
             if was_clicked:
-                # 클릭 시간은 추천 후 몇 분 뒤
                 recommendation["clicked_at"] = recommended_at + timedelta(minutes=random.randint(1, 30))
             
             recommendations.append(recommendation)
@@ -130,7 +118,6 @@ def seed_paper_recommendations(db: Database) -> int:
         if (session_idx + 1) % 10 == 0:
             logger.info(f"Generated {session_counter}/{NUM_RECOMMENDATIONS} recommendations...")
 
-    # Bulk insert
     if recommendations:
         result = recommendations_coll.insert_many(recommendations, ordered=False)
         logger.info(f"✅ Total {len(result.inserted_ids)} recommendations created!")

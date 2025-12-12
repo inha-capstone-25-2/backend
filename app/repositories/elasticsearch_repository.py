@@ -62,16 +62,13 @@ class ElasticsearchRepository:
             RequestError: 잘못된 쿼리 요청
         """
         try:
-            # Query 구성
             query = self._build_query(q, categories)
 
-            # Sort 구성
             sort = self._build_sort(sort_by)
 
-            # Pagination 계산
             from_offset = (page - 1) * page_size
 
-            # Elasticsearch 검색 실행
+            # Elasticsearch 검색
             response = self.es_client.search(
                 index=self.index_name,
                 query=query,
@@ -88,17 +85,15 @@ class ElasticsearchRepository:
                     "view_count",
                     "journal_ref",
                 ],
-                track_total_hits=True,  # 정확한 total 계산
+                track_total_hits=True,
             )
 
-            # 결과 파싱
             hits = response.get("hits", {})
             total = hits.get("total", {}).get("value", 0)
             items = []
 
             for hit in hits.get("hits", []):
                 doc = hit["_source"]
-                # _id를 id로 변환
                 doc["id"] = hit["_id"]
                 items.append(doc)
 
@@ -139,39 +134,34 @@ class ElasticsearchRepository:
         Returns:
             Dict: Elasticsearch query DSL
         """
-        # 기본 쿼리: match_all
         if not q and not categories:
             return {"match_all": {}}
 
-        # Bool query 구성
         must = []
         filter_clauses = []
 
-        # 텍스트 검색
         if q:
-            # Multi-match 쿼리: title, authors 필드 검색
+            # Multi-match
             must.append(
                 {
                     "multi_match": {
                         "query": q,
                         "fields": [
-                            "title^3",  # title에 가중치 3
-                            "keywords^2.5",  # keywords에 가중치 2.5
-                            "authors^2",  # authors에 가중치 2
-                            "summary.en",  # 영문 요약
+                            "title^3",
+                            "keywords^2.5",
+                            "authors^2",
+                            "summary.en",
                         ],
                         "type": "best_fields",
                         "operator": "or",
-                        "fuzziness": "AUTO",  # 오타 허용
+                        "fuzziness": "AUTO",
                     }
                 }
             )
 
-        # 카테고리 필터
         if categories:
             filter_clauses.append({"terms": {"categories": categories}})
 
-        # Bool query 조합
         if must or filter_clauses:
             return {
                 "bool": {
@@ -245,10 +235,9 @@ class ElasticsearchRepository:
                 logger.info(f"[ES] Index '{self.index_name}' already exists")
                 return True
 
-            # 인덱스 매핑 정의
             mapping = {
                 "properties": {
-                    "id": {"type": "keyword"},  # arXiv ID
+                    "id": {"type": "keyword"},
                     "title": {"type": "text", "analyzer": "english"},
                     "authors": {"type": "text", "analyzer": "standard"},
                     "summary": {
@@ -265,7 +254,6 @@ class ElasticsearchRepository:
                 }
             }
 
-            # 인덱스 생성
             self.es_client.indices.create(
                 index=self.index_name,
                 mappings=mapping,
@@ -287,7 +275,6 @@ class ElasticsearchRepository:
             if not self.check_index_exists():
                 return self.create_index_if_not_exists()
 
-            # 현재 매핑 조회
             current_mapping = self.get_index_mapping()
             existing_properties = (
                 current_mapping
@@ -296,7 +283,6 @@ class ElasticsearchRepository:
                 .get("properties", {})
             )
 
-            # 추가할 필드 정의 (기존 필드와 호환되는 타입 사용)
             new_fields = {
                 "view_count": {"type": "integer"},
                 "bookmark_count": {"type": "integer"},
@@ -304,7 +290,6 @@ class ElasticsearchRepository:
                 "journal_ref": {"type": "text"},
             }
 
-            # 이미 존재하는 필드는 제외
             fields_to_add = {
                 k: v for k, v in new_fields.items() 
                 if k not in existing_properties

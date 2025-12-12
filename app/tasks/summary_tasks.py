@@ -49,7 +49,6 @@ def _process_batch_with_retry(
     errors = []
 
     try:
-        # 첫 번째 시도: 전체 배치 처리
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
@@ -70,7 +69,6 @@ def _process_batch_with_retry(
                 errors.append(f"Batch result mismatch for {arxiv_id}")
             return success_count, failed_count, errors
 
-        # 결과 저장
         for arxiv_id, result in zip(batch_ids, results):
             summary_en = result.get("summary_en", "")
             summary_ko = result.get("summary_ko", "")
@@ -89,7 +87,6 @@ def _process_batch_with_retry(
         return success_count, failed_count, errors
 
     except (SummaryServerException, GPUTimeoutException) as e:
-        # 배치 전체 실패 시 작은 배치로 분할하여 재시도
         logger.warning(
             f"{worker_prefix} [{batch_info}] Batch failed ({type(e).__name__}), "
             f"retrying with smaller batches of {retry_batch_size}..."
@@ -106,7 +103,6 @@ def _process_batch_with_retry(
         )
 
     except Exception as e:
-        # 기타 예외 (재시도 없이 실패 처리)
         logger.error(f"{worker_prefix} [{batch_info}] Unexpected error: {e}")
         failed_count = len(batch_ids)
         for arxiv_id in batch_ids:
@@ -194,7 +190,6 @@ def _retry_with_smaller_batches(
                 f"completed {len(mini_batch_ids)} papers"
             )
             
-            # 미니 배치 간 짧은 딜레이
             if mini_batch_num < total_mini_batches:
                 time.sleep(0.5)
 
@@ -232,12 +227,11 @@ def generate_batch_summaries_task(
     """
     start_time = time.time()
     
-    # 워커 식별자 추출 (예: W1, W2, ...)
     worker_name = self.request.hostname or "unknown"
     worker_id = worker_name.split("-")[-1] if "-" in worker_name else "0"
-    W = f"[W{worker_id}][C{chunk_index}]"  # 워커 + 청크 프리픽스
+    W = f"[W{worker_id}][C{chunk_index}]"
     
-    is_all_papers = not paper_ids  # 빈 리스트면 모든 논문
+    is_all_papers = not paper_ids
     logger.info(
         f"{W} Task {self.request.id} started: "
         f"{'ALL papers' if is_all_papers else f'{len(paper_ids)} papers'}, "
@@ -245,7 +239,6 @@ def generate_batch_summaries_task(
     )
 
     try:
-        # Celery Worker는 별도 프로세스이므로 MongoDB 연결 초기화 필요
         if db_manager.db is None:
             logger.info(f"{W} Initializing MongoDB connection...")
             db_manager.connect(skip_indexes=True)
@@ -253,7 +246,6 @@ def generate_batch_summaries_task(
         db = db_manager.get_db()
         collection = db[settings.mongo_collection]
 
-        # MongoDB에서 논문 조회
         logger.info(f"{W} Building query for papers...")
         if is_all_papers:
             query = {}
@@ -266,10 +258,8 @@ def generate_batch_summaries_task(
 
         logger.info(f"{W} Query: {query}")
         
-        # 한 번에 최대 100개만 처리
         batch_limit = 100
         
-        # 최적화: 필요한 필드만 projection으로 가져오기
         projection = {
             "_id": 1,
             "title": 1,
@@ -277,31 +267,24 @@ def generate_batch_summaries_task(
             "authors": 1,
         }
         
-        # 최적화: count_documents는 느리므로, force=True이고 전체 문서일 때는 estimated_document_count 사용
         if is_all_papers and force:
-            # estimated_document_count는 메타데이터 기반으로 매우 빠름
             total_count = collection.estimated_document_count()
             logger.info(f"{W} Estimated total documents: {total_count}")
         elif is_all_papers and not force:
-            # 요약이 없는 문서만 카운트 - 인덱스가 있으면 빠름
-            # 전체 카운트 대신 바로 find로 진행
-            total_count = -1  # 나중에 계산
+            total_count = -1
             logger.info(f"{W} Skipping count for performance, fetching documents directly...")
         else:
             total_count = len(paper_ids)
             logger.info(f"{W} Requested paper count: {total_count}")
         
-        # 청크별 skip/limit 계산 (병렬 처리용)
-        # 각 청크는 batch_limit 개씩 처리하되, 서로 다른 시작점에서 시작
         skip_count = chunk_index * batch_limit
         
         logger.info(f"{W} Chunk {chunk_index}/{total_chunks}: skip={skip_count}, limit={batch_limit}")
         
-        # 문서 조회 (projection 적용, 청크별 skip/limit)
         papers = list(collection.find(query, projection).skip(skip_count).limit(batch_limit))
         
         if total_count == -1:
-            total_count = len(papers)  # 실제 조회된 개수로 대체
+            total_count = len(papers)
             
         total_requested = total_count if is_all_papers else len(paper_ids)
 
@@ -318,7 +301,6 @@ def generate_batch_summaries_task(
                 "errors": [],
             }
 
-        # GPU 클라이언트 초기화
         from app.clients.summary_client import SummaryClient
         from app.core.exceptions import SummaryServerException, GPUTimeoutException
         
@@ -329,12 +311,10 @@ def generate_batch_summaries_task(
         failed_count = 0
         errors = []
         
-        # 배치 크기 설정 (settings에서 로드, 기본값 30)
         BATCH_SIZE = settings.summary_batch_size
-        BATCH_DELAY = settings.summary_batch_delay  # 배치 간 딜레이 (기본 1초)
-        RETRY_BATCH_SIZE = settings.summary_retry_batch_size  # 재시도 배치 크기 (기본 4)
+        BATCH_DELAY = settings.summary_batch_delay
+        RETRY_BATCH_SIZE = settings.summary_retry_batch_size
 
-        # 논문을 배치 단위로 처리 (PDF 추출 → GPU 요약 → DB 저장)
         for batch_start in range(0, len(papers), BATCH_SIZE):
             batch_end = min(batch_start + BATCH_SIZE, len(papers))
             batch_papers = papers[batch_start:batch_end]
@@ -381,7 +361,6 @@ def generate_batch_summaries_task(
                 f"{W} [Batch {batch_num}/{total_batches}] Sending {len(batch_texts)} texts to GPU server..."
             )
             
-            # 배치 요약 처리 (실패 시 작은 배치로 재시도)
             batch_success, batch_failed, batch_errors = _process_batch_with_retry(
                 summary_client=summary_client,
                 batch_texts=batch_texts,
@@ -404,12 +383,10 @@ def generate_batch_summaries_task(
                     f"in {batch_duration:.1f}s (avg: {avg_per_paper:.1f}s/paper)"
                 )
             
-            # 배치 간 딜레이 (GPU 서버 큐잉 여유 확보)
             if batch_num < total_batches:
                 logger.debug(f"{W} Waiting {BATCH_DELAY}s before next batch...")
                 time.sleep(BATCH_DELAY)
 
-            # 진행률 업데이트
             self.update_state(
                 state="PROGRESS",
                 meta={
@@ -429,7 +406,7 @@ def generate_batch_summaries_task(
             "processed": len(papers),
             "success": success_count,
             "failed": failed_count,
-            "errors": errors[:10],  # 최대 10개 에러만 반환
+            "errors": errors[:10],
             "duration_seconds": round(total_duration, 2),
             "avg_seconds_per_paper": round(total_duration / len(papers), 2) if papers else 0,
             "worker": f"W{worker_id}",

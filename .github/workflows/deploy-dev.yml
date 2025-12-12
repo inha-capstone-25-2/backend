@@ -31,7 +31,7 @@ jobs:
           source: "app/**,requirements.txt,Dockerfile,docker-compose.dev.yml,env/dev/.env,run_seed.py"
           target: ${{ secrets.EC2_PATH }}
           overwrite: true
-          debug: true  # 디버그 활성화
+          debug: true
 
       - name: Write kaggle.json on EC2
         uses: appleboy/ssh-action@v1.2.0
@@ -46,7 +46,6 @@ jobs:
             set -e
             cd ${{ secrets.EC2_PATH }}
             mkdir -p .kaggle
-            # kaggle.json 기록 및 권한 설정
             printf '%s' "$KAGGLE_JSON" > .kaggle/kaggle.json
             chmod 600 .kaggle/kaggle.json
             ls -la .kaggle
@@ -73,7 +72,6 @@ jobs:
           script: |
             set -e
             if ! command -v docker >/dev/null 2>&1; then
-              # Ubuntu 예시 (Amazon Linux면 yum 사용)
               if command -v apt-get >/dev/null 2>&1; then
                 sudo apt-get update -y
                 sudo apt-get install -y docker.io docker-compose-plugin

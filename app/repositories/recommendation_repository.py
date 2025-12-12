@@ -75,7 +75,6 @@ class RecommendationRepository:
             "recommended_at": datetime.utcnow(),
         }
         
-        # session_id 추가 (있는 경우에만)
         if session_id:
             log_doc["session_id"] = session_id
 
@@ -100,10 +99,8 @@ class RecommendationRepository:
     ) -> tuple[int, List[Dict[str, Any]]]:
         """전체 추천 로그 조회 (페이지네이션)"""
         try:
-            # 전체 개수 조회
             total = self.recommendations_collection.count_documents({})
 
-            # 페이지네이션 조회 (최신순 정렬)
             skip = (page - 1) * page_size
             cursor = (
                 self.recommendations_collection.find({})
@@ -124,11 +121,9 @@ class RecommendationRepository:
     ) -> tuple[int, List[Dict[str, Any]]]:
         """특정 사용자의 추천 로그 조회 (페이지네이션)"""
         try:
-            # 사용자별 개수 조회
             query = {"user_id": user_id}
             total = self.recommendations_collection.count_documents(query)
 
-            # 페이지네이션 조회 (최신순 정렬)
             skip = (page - 1) * page_size
             cursor = (
                 self.recommendations_collection.find(query)
@@ -174,7 +169,6 @@ class RecommendationRepository:
                 "updated_at": datetime.utcnow(),
             }
 
-            # created_at은 최초 생성시에만
             result = self.interactions_collection.update_one(
                 {"recommendation_id": recommendation_id},
                 {
@@ -184,7 +178,6 @@ class RecommendationRepository:
                 upsert=True,
             )
 
-            # 저장된 문서 조회
             saved_doc = self.interactions_collection.find_one(
                 {"recommendation_id": recommendation_id}
             )
@@ -254,7 +247,7 @@ class RecommendationRepository:
         """
         event_doc = {
             "user_id": user_id,
-            "paper_id": "",  # 세션 컨텍스트는 특정 논문이 아님
+            "paper_id": "",
             "activity_type": "session_context",
             "timestamp": datetime.utcnow(),
             "session_id": session_id,
@@ -280,7 +273,7 @@ class RecommendationRepository:
             skip = (page - 1) * page_size
             cursor = (
                 self.events_collection.find(query)
-                .sort("timestamp", 1)  # 시간순 오름차순
+                .sort("timestamp", 1)
                 .skip(skip)
                 .limit(page_size)
             )
@@ -303,7 +296,7 @@ class RecommendationRepository:
             skip = (page - 1) * page_size
             cursor = (
                 self.events_collection.find(query)
-                .sort("timestamp", -1)  # 최신순 내림차순
+                .sort("timestamp", -1)
                 .skip(skip)
                 .limit(page_size)
             )

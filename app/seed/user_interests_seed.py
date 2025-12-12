@@ -43,7 +43,6 @@ def seed_user_interests(
         logger.warning("⚠️ No categories found. Please run categories_seed.py first.")
         return 0
 
-    # 기존 관심사 조회 (중복 방지)
     existing_interests = {
         (ui.user_id, ui.category_id) for ui in db.query(UserInterest).all()
     }
@@ -51,15 +50,12 @@ def seed_user_interests(
     created_count = 0
 
     for user in users:
-        # 이미 관심사가 있는 사용자는 스킵
         if any(user.id == ui[0] for ui in existing_interests):
             logger.info(f"User '{user.username}' already has interests, skipping...")
             continue
 
-        # 랜덤 개수 결정
         num_interests = random.randint(min_interests, max_interests)
 
-        # 랜덤 카테고리 선택
         selected_categories = random.sample(
             categories, min(num_interests, len(categories))
         )

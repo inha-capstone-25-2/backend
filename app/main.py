@@ -17,11 +17,9 @@ from app.core.logging_config import setup_logging
 
 setup_logging()
 
-# Settings
 from app.core.settings import settings
 from app.core.exceptions import AppException
 
-# 라우터
 from app.api.routes.auth import router as auth_router
 from app.api.routes.jobs import router as jobs_router
 from app.api.routes.papers import router as papers_router
@@ -74,7 +72,6 @@ def _ensure_daily_job():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     try:
         init_db()
     except Exception as e:
@@ -100,7 +97,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
     if scheduler.running:
         scheduler.shutdown(wait=False)
 
@@ -136,7 +132,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# Exception handlers - 중앙화된 유틸리티 사용
 from app.core.exception_handlers import create_error_response, get_exception_config
 
 
@@ -175,7 +170,6 @@ app.add_middleware(
     expose_headers=["Authorization"],
 )
 
-# 라우터 등록
 app.include_router(auth_router)
 app.include_router(jobs_router)
 app.include_router(papers_router)

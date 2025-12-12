@@ -51,7 +51,6 @@ class Paper(BaseModel):
     update_date: Optional[str] = None
     view_count: Optional[int] = 0
 
-    # Extended Metadata
     journal_ref: Optional[str] = None
     report_no: Optional[str] = None
     doi: Optional[str] = None
@@ -87,7 +86,7 @@ class SearchHistoryFilters(BaseModel):
 class SearchHistoryItem(BaseModel):
     """검색 기록 항목"""
 
-    id: str  # _id를 id로 변환
+    id: str
     query: str
     searched_at: datetime
     user_id: Optional[int] = None

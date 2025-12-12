@@ -84,7 +84,7 @@ class UserInterestRepository:
             self.db.query(Category)
             .join(UserInterest, UserInterest.category_id == Category.id)
             .filter(UserInterest.user_id == user_id)
-            .options(joinedload(Category.names))  # N+1 쿼리 방지
+            .options(joinedload(Category.names))
             .order_by(Category.code.asc())
         )
         return query.all()

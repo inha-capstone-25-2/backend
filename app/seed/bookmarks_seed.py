@@ -35,7 +35,6 @@ def seed_bookmarks(db: Database) -> int:
     Returns:
         생성된 bookmarks 개수
     """
-    # papers 컬렉션에서 실제 논문 DOI들 샘플링
     papers_coll = db[settings.mongo_collection]
     paper_dois = list(papers_coll.find({}, {"_id": 1}).limit(1000))
 
@@ -50,7 +49,6 @@ def seed_bookmarks(db: Database) -> int:
 
     bookmarks_coll = db[COLLECTION_BOOKMARKS]
 
-    # 기존 bookmarks 개수 확인
     existing_count = bookmarks_coll.count_documents({})
     logger.info(f"Existing bookmarks: {existing_count}")
 
@@ -58,18 +56,14 @@ def seed_bookmarks(db: Database) -> int:
     now = datetime.utcnow()
 
     for i in range(NUM_BOOKMARKS):
-        # 랜덤 사용자 ID (1~500)
         user_id = random.randint(1, 500)
 
-        # 랜덤 DOI (_id가 이제 arXiv ID)
         paper = random.choice(paper_dois)
-        doi = paper["_id"]  # _id가 arXiv ID (문자열)
+        doi = paper["_id"]
 
-        # 랜덤 bookmarked_at (최근 6개월)
         days_ago = random.randint(0, 180)
         bookmarked_at = now - timedelta(days=days_ago, hours=random.randint(0, 23))
 
-        # notes (50% 확률로 null, 나머지는 문장)
         notes = fake.sentence() if random.random() > 0.5 else None
 
         bookmark = {
@@ -83,7 +77,6 @@ def seed_bookmarks(db: Database) -> int:
         if (i + 1) % 100 == 0:
             logger.info(f"Generated {i + 1}/{NUM_BOOKMARKS} bookmarks...")
 
-    # Bulk insert
     if bookmarks:
         result = bookmarks_coll.insert_many(bookmarks, ordered=False)
         logger.info(f"✅ Total {len(result.inserted_ids)} bookmarks created!")

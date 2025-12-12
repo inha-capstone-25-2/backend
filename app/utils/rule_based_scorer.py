@@ -24,7 +24,7 @@ class RuleBasedScorer:
 
     @staticmethod
     def calculate_interest_score(
-        user_interests: List[str],  # 사용자 관심 카테고리 코드 리스트
+        user_interests: List[str],
         paper: Dict[str, Any],
     ) -> float:
         """
@@ -44,12 +44,9 @@ class RuleBasedScorer:
         paper_title = paper.get("title", "").lower()
 
         for interest_code in user_interests:
-            # 카테고리 직접 매칭 (가장 높은 점수)
             if interest_code in paper_categories:
                 score += 3.0
 
-            # 키워드 매칭 (중간 점수)
-            # 카테고리 코드가 키워드에 포함되어 있을 수 있음
             interest_lower = interest_code.lower()
             for keyword in paper_keywords:
                 if (
@@ -57,9 +54,8 @@ class RuleBasedScorer:
                     or keyword.lower() in interest_lower
                 ):
                     score += 2.0
-                    break  # 중복 가산 방지
+                    break
 
-            # 제목에 카테고리 코드 포함 (낮은 점수)
             if interest_lower in paper_title:
                 score += 1.0
 
@@ -78,11 +74,9 @@ class RuleBasedScorer:
         """
         score = 0.0
 
-        # view_count 가중치
         view_count = paper.get("view_count", 0)
         score += view_count * 0.001
 
-        # bookmark_count 가중치 (북마크가 조회보다 더 강한 관심 표시)
         bookmark_count = paper.get("bookmark_count", 0)
         score += bookmark_count * 0.005
 
@@ -102,22 +96,17 @@ class RuleBasedScorer:
         update_date_str = paper.get("update_date")
 
         if not update_date_str:
-            return 1.0  # 날짜 정보 없으면 기본 점수
+            return 1.0
 
         try:
-            # update_date는 "YYYY-MM-DD" 형식
             update_date = datetime.strptime(update_date_str, "%Y-%m-%d")
             now = datetime.now()
 
-            # 날짜 차이 (일 단위)
             days_old = (now - update_date).days
 
             # 최신일수록 높은 점수
-            # 1년 이내: 10.0 ~ 5.0
-            # 2년 이내: 5.0 ~ 2.0
-            # 그 이상: 1.0
             if days_old < 0:
-                days_old = 0  # 미래 날짜 방어
+                days_old = 0
 
             if days_old <= 365:
                 score = 10.0 - (days_old / 365) * 5.0
@@ -157,13 +146,13 @@ class RuleBasedScorer:
         """
         score = 0.0
 
-        # 이미 본 논문은 추천하지 않음 (큰 감점)
+        # 이미 본 논문은 추천하지 않음
         if paper_id in viewed_paper_ids:
             score -= 10.0
 
-        # 사용자가 자주 본 카테고리와 매칭 (가점)
+        # 사용자가 자주 본 카테고리와 매칭
         for category in paper_categories:
             if category in user_activity_categories:
-                score += 1.0  # 본 적 있는 카테고리면 관심 있다고 판단
+                score += 1.0
 
         return score
