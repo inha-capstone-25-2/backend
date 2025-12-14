@@ -20,7 +20,7 @@ services:
       - ./run_seed.py:/app/run_seed.py
       - ./env:/app/env:ro
     ports:
-      - "80:8000"
+      - "8000:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
