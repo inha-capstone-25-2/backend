@@ -33,6 +33,10 @@ public class PaperService {
 
     public PaperSearchResponse searchPapers(User user, String query, List<String> categories, int page, String sortBy) {
         int pageSize = 10;
+
+        if (page < 1) {
+            page = 1;
+        }
         Pageable pageable = PageRequest.of(page - 1, pageSize, getSort(sortBy));
         
         long total;

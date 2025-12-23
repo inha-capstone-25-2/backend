@@ -33,6 +33,9 @@ public class ActivityService {
     }
     
     public List<UserActivityDto> getRecentActivities(User user, int limit) {
+        if (limit < 1) {
+            limit = 10;
+        }
         List<UserActivity> activities = activityRepository.findRecentViewsByUserId(
                 user.getId(), 
                 PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "timestamp"))
