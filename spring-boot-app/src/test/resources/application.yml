@@ -1,0 +1,31 @@
+spring:
+  cloud:
+    aws:
+      credentials:
+        access-key: test
+        secret-key: test
+      region:
+        static: us-east-1
+      s3:
+        bucket: test-bucket
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  jwt:
+    secret: testSecretKeyForIntegrationTesting1234567890
+    expiration: 60
+  cors:
+    origins: "*"
+  gpu-server:
+    url: http://localhost:8000
+  prod-mongo:
+    host: localhost
+    port: 27017
+    user: root
+    password: password
+    db: arxiv
