@@ -26,18 +26,18 @@ public class BookmarkService {
     @Transactional
     public BookmarkDto createBookmark(User user, BookmarkCreateRequest request) {
         // Check if paper exists
-        Paper paper = paperRepository.findById(request.getDoi())
+        Paper paper = paperRepository.findById(request.doi())
                 .orElseThrow(() -> new RuntimeException("Paper not found"));
 
         // Check if already bookmarked
-        if (bookmarkRepository.findByUserIdAndDoi(user.getId(), request.getDoi()).isPresent()) {
+        if (bookmarkRepository.findByUserIdAndDoi(user.getId(), request.doi()).isPresent()) {
             throw new RuntimeException("Already bookmarked");
         }
 
         Bookmark bookmark = Bookmark.builder()
                 .userId(user.getId())
-                .doi(request.getDoi())
-                .notes(request.getNotes())
+                .doi(request.doi())
+                .notes(request.notes())
                 .bookmarkedAt(LocalDateTime.now())
                 .build();
         
