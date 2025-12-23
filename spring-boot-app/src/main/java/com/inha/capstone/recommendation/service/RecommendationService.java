@@ -29,26 +29,31 @@ public class RecommendationService {
 
         // Log recommendations
         for (RecommendationItem item : items) {
-            RecommendationLog logEntry = RecommendationLog.builder()
-                    .sessionId(sessionId)
-                    .userId(user.getId())
-                    .paperId(item.paperId())
-                    .recommendationType("rule_based")
-                    .score(item.totalScore())
-                    .features(Map.of(
-                            "interest", item.breakdown().interestScore(),
-                            "popularity", item.breakdown().popularityScore()
-                            // Add others
-                    ))
-                    .context(Map.of("reasons", item.reasons()))
-                    .wasClicked(false)
-                    .recommendedAt(LocalDateTime.now())
-                    .build();
-            
-            recommendationRepository.save(logEntry);
-            
-            // Add to result list with populated ID
-            resultItems.add(item.withRecommendationId(logEntry.getId()));
+            try {
+                RecommendationLog logEntry = RecommendationLog.builder()
+                        .sessionId(sessionId)
+                        .userId(user.getId())
+                        .paperId(item.paperId())
+                        .recommendationType("rule_based")
+                        .score(item.totalScore())
+                        .features(Map.of(
+                                "interest", item.breakdown().interestScore(),
+                                "popularity", item.breakdown().popularityScore()
+                                // Add others
+                        ))
+                        .context(Map.of("reasons", item.reasons()))
+                        .wasClicked(false)
+                        .recommendedAt(LocalDateTime.now())
+                        .build();
+                
+                recommendationRepository.save(logEntry);
+                
+                // Add to result list with populated ID
+                resultItems.add(item.withRecommendationId(logEntry.getId()));
+            } catch (Exception e) {
+                log.error("Failed to save recommendation log for user {} and paper {}. Skipping this recommendation.", user.getId(), item.paperId(), e);
+                // Skip adding to resultItems to maintain consistency between shown recommendations and logs
+            }
         }
         
         return RecommendationResponse.builder()
