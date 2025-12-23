@@ -38,8 +38,9 @@ public class RecommendationService {
                         .score(item.totalScore())
                         .features(Map.of(
                                 "interest", item.breakdown().interestScore(),
-                                "popularity", item.breakdown().popularityScore()
-                                // Add others
+                                "popularity", item.breakdown().popularityScore(),
+                                "recency", item.breakdown().recencyScore(),
+                                "personalization", item.breakdown().personalizationScore()
                         ))
                         .context(Map.of("reasons", item.reasons()))
                         .wasClicked(false)
