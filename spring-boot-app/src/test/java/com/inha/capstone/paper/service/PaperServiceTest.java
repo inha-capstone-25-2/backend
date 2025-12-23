@@ -4,23 +4,22 @@ import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.repository.PaperRepository;
 import com.inha.capstone.user.domain.User;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import com.inha.capstone.paper.dto.PaperListItem; // Add import for check
 
 import java.util.Collections;
-import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
+import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
 class PaperServiceTest {
@@ -34,53 +33,60 @@ class PaperServiceTest {
     @InjectMocks
     private PaperService paperService;
 
-    @Test
-    void searchPapers_shouldReturnResults_whenQueryIsProvided() {
-        // Given
-        User user = User.builder().build();
-        String query = "AI";
-        
-        Paper paper = new Paper();
-        paper.setId("1");
-        paper.setTitle("Introduction to AI");
-        
-        when(mongoTemplate.count(any(Query.class), eq(Paper.class))).thenReturn(1L);
-        when(mongoTemplate.find(any(Query.class), eq(Paper.class))).thenReturn(Collections.singletonList(paper));
+    @Nested
+    class SearchPapers {
 
-        // When
-        PaperSearchResponse response = paperService.searchPapers(user, query, null, 1, "relevance");
+        @Test
+        void 키워드_검색_성공() {
+            // given
+            User user = User.builder().build();
+            String query = "AI";
+            
+            Paper paper = new Paper();
+            paper.setId("1");
+            paper.setTitle("Introduction to AI");
+            
+            given(mongoTemplate.count(any(Query.class), eq(Paper.class))).willReturn(1L);
+            given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
 
-        // Then
-        assertNotNull(response);
-        assertEquals(1, response.total());
-        assertEquals(1, response.items().size());
-        assertEquals("Introduction to AI", response.items().get(0).title());
+            // when
+            PaperSearchResponse response = paperService.searchPapers(user, query, null, 1, "relevance");
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.total()).isEqualTo(1);
+            assertThat(response.items()).hasSize(1);
+            assertThat(response.items().get(0).title()).isEqualTo("Introduction to AI");
+        }
     }
     
-    @Test
-    void getPaperDetail_shouldReturnPaperAndIncrementViewCount_whenPaperExists() {
-        // Given
-        User user = User.builder().build();
-        String paperId = "1";
-        
-        Paper paper = new Paper();
-        paper.setId(paperId);
-        paper.setViewCount(10);
-        
-        // Mock findAndModify to return the paper (simulating the atomic update return)
-        when(mongoTemplate.findAndModify(
-                any(Query.class), 
-                any(org.springframework.data.mongodb.core.query.Update.class), 
-                any(org.springframework.data.mongodb.core.FindAndModifyOptions.class), 
-                eq(Paper.class)
-        )).thenReturn(paper);
+    @Nested
+    class GetPaperDetail {
 
-        // When
-        Paper result = paperService.getPaperDetail(user, paperId);
+        @Test
+        void 논문_상세_조회_및_조회수_증가_성공() {
+            // given
+            User user = User.builder().build();
+            String paperId = "1";
+            
+            Paper paper = new Paper();
+            paper.setId(paperId);
+            paper.setViewCount(10);
+            
+            given(mongoTemplate.findAndModify(
+                    any(Query.class), 
+                    any(org.springframework.data.mongodb.core.query.Update.class), 
+                    any(org.springframework.data.mongodb.core.FindAndModifyOptions.class), 
+                    eq(Paper.class)
+            )).willReturn(paper);
 
-        // Then
-        assertNotNull(result);
-        assertEquals(paperId, result.getId());
-        assertEquals(10, result.getViewCount());
+            // when
+            Paper result = paperService.getPaperDetail(user, paperId);
+
+            // then
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(paperId);
+            assertThat(result.getViewCount()).isEqualTo(10);
+        }
     }
 }

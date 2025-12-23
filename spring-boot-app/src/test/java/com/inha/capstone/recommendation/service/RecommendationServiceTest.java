@@ -6,20 +6,21 @@ import com.inha.capstone.recommendation.model.RecommendationLog;
 import com.inha.capstone.recommendation.repository.RecommendationRepository;
 import com.inha.capstone.recommendation.util.RuleBasedRecommender;
 import com.inha.capstone.user.domain.User;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class RecommendationServiceTest {
@@ -33,28 +34,33 @@ class RecommendationServiceTest {
     @InjectMocks
     private RecommendationService recommendationService;
 
-    @Test
-    void getRecommendations_shouldReturnResponse_whenUserProvided() {
-        // Given
-        User user = User.builder().build();
-        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 1L);
+    @Nested
+    class GetRecommendations {
 
-        RecommendationItem item = RecommendationItem.builder()
-                .paperId("paper1")
-                .totalScore(10.0)
-                .breakdown(RecommendationItem.ScoreBreakdown.builder().interestScore(5.0).build())
-                .reasons(Collections.emptyList())
-                .build();
+        @Test
+        void 추천_목록_조회_성공() {
+            // given
+            User user = User.builder().build();
+            ReflectionTestUtils.setField(user, "id", 1L);
 
-        when(recommender.recommend(any(User.class), anyInt(), anyInt()))
-                .thenReturn(Collections.singletonList(item));
+            RecommendationItem item = RecommendationItem.builder()
+                    .paperId("paper1")
+                    .totalScore(10.0)
+                    .breakdown(RecommendationItem.ScoreBreakdown.builder().interestScore(5.0).build())
+                    .reasons(Collections.emptyList())
+                    .build();
 
-        // When
-        RecommendationResponse response = recommendationService.getRecommendations(user, 10);
+            given(recommender.recommend(any(User.class), anyInt(), anyInt()))
+                    .willReturn(Collections.singletonList(item));
 
-        // Then
-        assertNotNull(response);
-        assertEquals(1, response.totalCount());
-        verify(recommendationRepository).save(any(RecommendationLog.class));
+            // when
+            RecommendationResponse response = recommendationService.getRecommendations(user, 10);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.totalCount()).isEqualTo(1);
+            
+            then(recommendationRepository).should().save(any(RecommendationLog.class));
+        }
     }
 }
