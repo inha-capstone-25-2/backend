@@ -1,5 +1,6 @@
 package com.inha.capstone;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,9 @@ class ConnectionIntegrationTest {
     @Autowired
     private ElasticsearchOperations elasticsearchOperations;
 
+    @Autowired
+    private ElasticsearchClient elasticsearchClient;
+
     @Test
     void PostgreSQL_연결_테스트() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
@@ -64,8 +68,7 @@ class ConnectionIntegrationTest {
         assertThat(pong).containsKey("ok");
     }
 
-    @Autowired
-    private co.elastic.clients.elasticsearch.ElasticsearchClient elasticsearchClient;
+
 
     @Test
     void Elasticsearch_연결_테스트() throws java.io.IOException {
