@@ -27,9 +27,6 @@ public class PaperController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "relevance") String sort
     ) {
-        // User is optional for search in original code, but Service method expects it for logging history
-        // If userPrincipal is null, handle it (though AuthenticationPrincipal usually implies authenticated, 
-        // if endpoints are public in SecurityConfig, it might be null)
         User user = userPrincipal != null ? userPrincipal.getUser() : null;
         
         return ResponseEntity.ok(paperService.searchPapers(user, q, categories, page, sort));
@@ -41,12 +38,7 @@ public class PaperController {
             @PathVariable String paperId
     ) {
         User user = userPrincipal != null ? userPrincipal.getUser() : null;
-        // Basic requirement: User needed for activity logging. If not logged in, maybe skip logging or log as anonymous?
-        // Original code enforced user login for get_paper_detail via `deps.get_current_user` usually, 
-        // but let's assume loose coupling for now.
-        
-        // However, if we strictly follow the original `get_paper_detail` signature `user: User`, it implies authentication is required.
-        // If authentication is required, `userPrincipal` won't be null.
+
         
         return ResponseEntity.ok(paperService.getPaperDetail(user, paperId));
     }

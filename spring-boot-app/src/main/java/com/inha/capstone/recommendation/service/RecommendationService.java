@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RecommendationService {
@@ -27,7 +26,6 @@ public class RecommendationService {
         List<RecommendationItem> items = recommender.recommend(user, topK, 50);
         List<RecommendationItem> resultItems = new java.util.ArrayList<>();
 
-        // Log recommendations
         for (RecommendationItem item : items) {
             try {
                 RecommendationLog logEntry = RecommendationLog.builder()
@@ -49,11 +47,8 @@ public class RecommendationService {
                 
                 recommendationRepository.save(logEntry);
                 
-                // Add to result list with populated ID
                 resultItems.add(item.withRecommendationId(logEntry.getId()));
             } catch (Exception e) {
-                log.error("Failed to save recommendation log for user {} and paper {}. Skipping this recommendation.", user.getId(), item.paperId(), e);
-                // Skip adding to resultItems to maintain consistency between shown recommendations and logs
             }
         }
         

@@ -21,8 +21,7 @@ public class RuleBasedScorer {
                 .filter(userInterests::contains)
                 .count();
         
-        // Simple scoring: 1.0 per match, maybe cap it? Python logic checks for intersections.
-        // Assuming Python logic: simply counts or weighted?
+        // Simple scoring: 1.0 per match
         // Let's implement simple intersection count for now.
         return (double) matchCount * 1.5; 
     }

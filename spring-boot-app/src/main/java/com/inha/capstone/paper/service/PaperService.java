@@ -24,14 +24,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaperService {
     private final PaperRepository paperRepository;
     private final MongoTemplate mongoTemplate;
 
-    // TODO: Implement Elasticsearch integration if needed, currently using MongoDB Text Search as fallback logic is primary in Python code
 
     public PaperSearchResponse searchPapers(User user, String query, List<String> categories, int page, String sortBy) {
         int pageSize = 10;
@@ -54,9 +52,6 @@ public class PaperService {
             textQuery.with(pageable);
             papers = mongoTemplate.find(textQuery, Paper.class);
             
-            // Note: MongoDB text search count might be slow or approximate for large datasets
-            // Python implementation used a 2-step approach for meaningful approximation, 
-            // but Spring Data's count should be sufficient for now.
         } else {
             // Category Filter or All
             Query simpleQuery = new Query();
@@ -96,12 +91,7 @@ public class PaperService {
         Query query = new Query(Criteria.where("id").is(paperId));
         Update update = new Update().inc("viewCount", 1);
         
-        // Find and modify returns the object *before* update by default, or *after* if options set.
-        // We want the updated object.
-        // If paper doesn't exist, this returns null? We should probably handle that.
-        // Or we can just use findById separately if we want to throw exception properly, 
-        // but findAndModify is cleaner for atomicity.
-        
+
         Paper paper = mongoTemplate.findAndModify(
             query,
             update,

@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookmarkService {
@@ -23,11 +22,9 @@ public class BookmarkService {
     private final PaperRepository paperRepository;
 
     public BookmarkDto createBookmark(User user, BookmarkCreateRequest request) {
-        // Check if paper exists
         Paper paper = paperRepository.findById(request.doi())
                 .orElseThrow(() -> new RuntimeException("Paper not found"));
 
-        // Check if already bookmarked
         if (bookmarkRepository.findByUserIdAndDoi(user.getId(), request.doi()).isPresent()) {
             throw new RuntimeException("Already bookmarked");
         }

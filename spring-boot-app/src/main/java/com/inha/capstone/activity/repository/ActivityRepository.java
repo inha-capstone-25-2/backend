@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Repository
 public interface ActivityRepository extends MongoRepository<UserActivity, String> {
     
     @Query(value = "{ 'user_id' : ?0, 'activity_type' : 'view' }", sort = "{ 'timestamp' : -1 }")

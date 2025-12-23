@@ -23,10 +23,6 @@ public record RecommendationItem(
     ScoreBreakdown breakdown,
     List<String> reasons
 ) {
-    // Setter needed? Records are immutable. 
-    // If logic needs to set recommendationId after creation, it must use toBuilder() or create new instance.
-    // However, in RecommendationService we did item.setRecommendationId(logEntry.getId());
-    // This will break. We need to handle this.
     
     @Builder
     public record ScoreBreakdown(
@@ -36,7 +32,6 @@ public record RecommendationItem(
         double personalizationScore
     ) {}
     
-    // Helper to create a new record with updated recommendationId
     public RecommendationItem withRecommendationId(String newId) {
         return new RecommendationItem(
             newId, paperId, title, summary, authors, categories, keywords, difficultyLevel, 

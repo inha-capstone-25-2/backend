@@ -6,7 +6,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Repository
 public interface RecommendationRepository extends MongoRepository<RecommendationLog, String> {
     List<RecommendationLog> findByUserIdOrderByRecommendedAtDesc(Long userId);
 }

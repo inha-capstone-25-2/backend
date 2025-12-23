@@ -24,7 +24,6 @@ public class UserActivity {
     @Field("activity_type")
     private String activityType;
     
-    // activity_logger.py uses 'metadata' field which is a dict/map
     private Map<String, Object> metadata;
     
     private LocalDateTime timestamp;
