@@ -9,5 +9,5 @@
 /data/
 /.coverage
 /spring-boot-app/.gradle/
-/spring-boot-app/gradle/
+
 /spring-boot-app/build/
