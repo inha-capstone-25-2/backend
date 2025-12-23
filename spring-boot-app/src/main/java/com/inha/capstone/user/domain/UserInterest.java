@@ -1,6 +1,6 @@
 package com.inha.capstone.user.domain;
 
-import com.inha.capstone.category.domain.Category;
+import com.inha.capstone.category.model.Category;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
