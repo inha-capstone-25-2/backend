@@ -8,11 +8,18 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+    private String getCurrentTime() {
+        return LocalDateTime.now().format(ISO_FORMATTER);
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessException(BusinessException ex) {
@@ -22,7 +29,7 @@ public class GlobalExceptionHandler {
                 "error", errorCode.getStatus().getReasonPhrase(),
                 "message", errorCode.getMessage(),
                 "code", errorCode.getCode(),
-                "timestamp", LocalDateTime.now().toString()
+                "timestamp", getCurrentTime()
         ));
     }
 
@@ -32,7 +39,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                 "error", "Bad Request",
                 "message", ex.getMessage(),
-                "timestamp", LocalDateTime.now().toString()
+                "timestamp", getCurrentTime()
         ));
     }
 
@@ -42,7 +49,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                 "error", "Unauthorized",
                 "message", ex.getMessage(),
-                "timestamp", LocalDateTime.now().toString()
+                "timestamp", getCurrentTime()
         ));
     }
 }
