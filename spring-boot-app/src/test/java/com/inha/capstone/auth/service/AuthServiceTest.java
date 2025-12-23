@@ -5,6 +5,8 @@ import com.inha.capstone.auth.dto.TokenResponse;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
+import com.inha.capstone.common.exception.DuplicateUserException;
+import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.user.domain.User;
 import com.inha.capstone.user.repository.UserRepository;
 import org.junit.jupiter.api.Nested;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -82,8 +85,8 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.register(request))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("이미 사용 중인 이메일입니다.");
+                    .isInstanceOf(DuplicateUserException.class)
+                    .hasMessage(ErrorCode.DUPLICATE_EMAIL.getMessage());
 
             then(userRepository).should().existsByUsername("newuser");
             then(userRepository).should().existsByEmail("existing@example.com");
@@ -101,12 +104,35 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.register(request))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("이미 사용 중인 아이디입니다.");
+                    .isInstanceOf(DuplicateUserException.class)
+                    .hasMessage(ErrorCode.DUPLICATE_USERNAME.getMessage());
 
             then(userRepository).should().existsByUsername("existinguser");
             then(userRepository).should(never()).existsByEmail(anyString());
             then(userRepository).should(never()).save(any(User.class));
+        }
+
+        @Test
+        void 동시성_이슈로_인한_중복_가입_시도_시_예외가_발생한다() {
+            // given
+            UserCreateRequest request = new UserCreateRequest(
+                    "race@example.com", "raceuser", "Race User", "password1234"
+            );
+
+            given(userRepository.existsByUsername("raceuser")).willReturn(false);
+            given(userRepository.existsByEmail("race@example.com")).willReturn(false);
+            given(passwordEncoder.encode("password1234")).willReturn("encodedPassword");
+            
+            // save 호출 시 DataIntegrityViolationException 발생 (Race Condition 상황 가정)
+            given(userRepository.save(any(User.class)))
+                    .willThrow(new DataIntegrityViolationException("Unique constraint violation"));
+
+            // when & then
+            assertThatThrownBy(() -> authService.register(request))
+                    .isInstanceOf(DuplicateUserException.class)
+                    .hasMessage(ErrorCode.ALREADY_REGISTERED_USER.getMessage());
+
+            then(userRepository).should().save(any(User.class));
         }
     }
 

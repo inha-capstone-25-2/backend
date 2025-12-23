@@ -1,13 +1,16 @@
 package com.inha.capstone.auth.service;
 
-import com.inha.capstone.user.domain.User;
 import com.inha.capstone.auth.dto.LoginRequest;
 import com.inha.capstone.auth.dto.TokenResponse;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
-import com.inha.capstone.user.repository.UserRepository;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
+import com.inha.capstone.common.exception.DuplicateUserException;
+import com.inha.capstone.common.exception.ErrorCode;
+import com.inha.capstone.user.domain.User;
+import com.inha.capstone.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,10 +28,10 @@ public class AuthService {
     @Transactional
     public UserResponse register(UserCreateRequest request) {
         if (userRepository.existsByUsername(request.username())) {
-            throw new IllegalArgumentException("이미 사용 중인 아이디입니다.");
+            throw new DuplicateUserException(ErrorCode.DUPLICATE_USERNAME);
         }
         if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw new DuplicateUserException(ErrorCode.DUPLICATE_EMAIL);
         }
 
         User user = User.builder()
@@ -38,7 +41,11 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.password()))
                 .build();
 
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateUserException(ErrorCode.ALREADY_REGISTERED_USER);
+        }
 
         return UserResponse.from(user);
     }
