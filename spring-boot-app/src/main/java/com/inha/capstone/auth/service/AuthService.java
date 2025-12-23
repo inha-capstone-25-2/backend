@@ -67,15 +67,15 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(User user) {
-        User persistentUser = userRepository.findById(user.getId())
+    public void logout(Long userId) {
+        User persistentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         persistentUser.increaseTokenVersion();
     }
 
     @Transactional
-    public void deleteAccount(User user) {
-        User persistentUser = userRepository.findById(user.getId())
+    public void deleteAccount(Long userId) {
+        User persistentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         userRepository.delete(persistentUser);
     }

@@ -123,7 +123,7 @@ class AuthServiceTest {
             given(userRepository.existsByEmail("race@example.com")).willReturn(false);
             given(passwordEncoder.encode("password1234")).willReturn("encodedPassword");
             
-            // save 호출 시 DataIntegrityViolationException 발생 (Race Condition 상황 가정)
+            // save 호출 시 DataIntegrityViolationException 발생
             given(userRepository.save(any(User.class)))
                     .willThrow(new DataIntegrityViolationException("Unique constraint violation"));
 
@@ -243,51 +243,37 @@ class AuthServiceTest {
         @Test
         void 로그아웃_성공() {
             // given
-            User inputUser = User.builder()
-                    .email("test@example.com")
-                    .username("testuser")
-                    .name("Test")
-                    .password("pw")
-                    .build();
-            setUserId(inputUser, 1L);
-
+            Long userId = 1L;
             User persistentUser = User.builder()
                     .email("test@example.com")
                     .username("testuser")
                     .name("Test")
                     .password("pw")
                     .build();
-            setUserId(persistentUser, 1L);
+            // tokenVersion은 기본값(0)일 것임
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(persistentUser));
+            given(userRepository.findById(userId)).willReturn(Optional.of(persistentUser));
 
             // when
-            authService.logout(inputUser);
+            authService.logout(userId);
 
             // then
             assertThat(persistentUser.getTokenVersion()).isEqualTo(1);
-            then(userRepository).should().findById(1L);
+            then(userRepository).should().findById(userId);
         }
 
         @Test
         void 존재하지_않는_사용자_로그아웃_실패() {
             // given
-            User inputUser = User.builder()
-                    .email("test@example.com")
-                    .username("testuser")
-                    .name("Test")
-                    .password("pw")
-                    .build();
-            setUserId(inputUser, 999L);
-
-            given(userRepository.findById(999L)).willReturn(Optional.empty());
+            Long userId = 999L;
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> authService.logout(inputUser))
+            assertThatThrownBy(() -> authService.logout(userId))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("User not found");
 
-            then(userRepository).should().findById(999L);
+            then(userRepository).should().findById(userId);
         }
     }
 
@@ -297,63 +283,37 @@ class AuthServiceTest {
         @Test
         void 계정_삭제_성공() {
             // given
-            User inputUser = User.builder()
-                    .email("test@example.com")
-                    .username("testuser")
-                    .name("Test")
-                    .password("pw")
-                    .build();
-            setUserId(inputUser, 1L);
-
+            Long userId = 1L;
             User persistentUser = User.builder()
                     .email("test@example.com")
                     .username("testuser")
                     .name("Test")
                     .password("pw")
                     .build();
-            setUserId(persistentUser, 1L);
 
-            given(userRepository.findById(1L)).willReturn(Optional.of(persistentUser));
+            given(userRepository.findById(userId)).willReturn(Optional.of(persistentUser));
 
             // when
-            authService.deleteAccount(inputUser);
+            authService.deleteAccount(userId);
 
             // then
-            then(userRepository).should().findById(1L);
+            then(userRepository).should().findById(userId);
             then(userRepository).should().delete(persistentUser);
         }
 
         @Test
         void 존재하지_않는_사용자_계정_삭제_실패() {
             // given
-            User inputUser = User.builder()
-                    .email("test@example.com")
-                    .username("testuser")
-                    .name("Test")
-                    .password("pw")
-                    .build();
-            setUserId(inputUser, 999L);
-
-            given(userRepository.findById(999L)).willReturn(Optional.empty());
+            Long userId = 999L;
+            given(userRepository.findById(userId)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> authService.deleteAccount(inputUser))
+            assertThatThrownBy(() -> authService.deleteAccount(userId))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("User not found");
 
-            then(userRepository).should().findById(999L);
+            then(userRepository).should().findById(userId);
             then(userRepository).should(never()).delete(any(User.class));
-        }
-    }
-
-    // 테스트용 헬퍼 메서드: 리플렉션을 통해 User ID 설정
-    private void setUserId(User user, Long id) {
-        try {
-            var field = User.class.getDeclaredField("id");
-            field.setAccessible(true);
-            field.set(user, id);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set user ID", e);
         }
     }
 }

@@ -42,13 +42,13 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal userPrincipal) {
-        authService.logout(userPrincipal.getUser());
+        authService.logout(userPrincipal.getUser().getId());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @DeleteMapping("/quit")
     public ResponseEntity<Void> quit(@AuthenticationPrincipal UserPrincipal userPrincipal) {
-        authService.deleteAccount(userPrincipal.getUser());
+        authService.deleteAccount(userPrincipal.getUser().getId());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
