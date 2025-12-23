@@ -56,4 +56,31 @@ class PaperServiceTest {
         assertEquals(1, response.items().size());
         assertEquals("Introduction to AI", response.items().get(0).title());
     }
+    
+    @Test
+    void getPaperDetail_shouldReturnPaperAndIncrementViewCount_whenPaperExists() {
+        // Given
+        User user = User.builder().build();
+        String paperId = "1";
+        
+        Paper paper = new Paper();
+        paper.setId(paperId);
+        paper.setViewCount(10);
+        
+        // Mock findAndModify to return the paper (simulating the atomic update return)
+        when(mongoTemplate.findAndModify(
+                any(Query.class), 
+                any(org.springframework.data.mongodb.core.query.Update.class), 
+                any(org.springframework.data.mongodb.core.FindAndModifyOptions.class), 
+                eq(Paper.class)
+        )).thenReturn(paper);
+
+        // When
+        Paper result = paperService.getPaperDetail(user, paperId);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(paperId, result.getId());
+        assertEquals(10, result.getViewCount());
+    }
 }

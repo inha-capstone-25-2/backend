@@ -16,6 +16,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.TextCriteria;
 import org.springframework.data.mongodb.core.query.TextQuery;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -91,12 +92,26 @@ public class PaperService {
     }
 
     public Paper getPaperDetail(User user, String paperId) {
-        Paper paper = paperRepository.findById(paperId)
-                .orElseThrow(() -> new RuntimeException("Paper not found with id: " + paperId)); // Use custom exception later
+        // Atomic increment using MongoTemplate
+        Query query = new Query(Criteria.where("id").is(paperId));
+        Update update = new Update().inc("viewCount", 1);
         
-        // Increment view count
-        paper.setViewCount((paper.getViewCount() == null ? 0 : paper.getViewCount()) + 1);
-        paperRepository.save(paper);
+        // Find and modify returns the object *before* update by default, or *after* if options set.
+        // We want the updated object.
+        // If paper doesn't exist, this returns null? We should probably handle that.
+        // Or we can just use findById separately if we want to throw exception properly, 
+        // but findAndModify is cleaner for atomicity.
+        
+        Paper paper = mongoTemplate.findAndModify(
+            query,
+            update,
+            org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
+            Paper.class
+        );
+
+        if (paper == null) {
+            throw new RuntimeException("Paper not found with id: " + paperId);
+        }
         
         // TODO: Log activity (view)
         
