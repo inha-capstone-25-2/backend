@@ -48,7 +48,7 @@ public class GlobalExceptionHandler {
         log.error("BadCredentialsException: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                 "error", "Unauthorized",
-                "message", ex.getMessage(),
+                "message", "아이디 또는 비밀번호가 올바르지 않습니다.",
                 "timestamp", getCurrentTime()
         ));
     }
