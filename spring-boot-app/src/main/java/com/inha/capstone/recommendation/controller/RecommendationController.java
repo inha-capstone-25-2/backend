@@ -28,6 +28,11 @@ public class RecommendationController {
             // Recommendation usually requires user context
             return ResponseEntity.status(401).build(); 
         }
+        
+        if (topK <= 0 || topK > 100) {
+            return ResponseEntity.badRequest().build();
+        }
+        
         User user = userPrincipal.getUser();
         return ResponseEntity.ok(recommendationService.getRecommendations(user, topK));
     }
