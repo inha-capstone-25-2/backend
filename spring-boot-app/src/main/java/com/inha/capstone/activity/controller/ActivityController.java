@@ -26,6 +26,9 @@ public class ActivityController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(defaultValue = "50") int limit
     ) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(401).build();
+        }
         User user = userPrincipal.getUser();
         return ResponseEntity.ok(activityService.getRecentActivities(user, limit));
     }

@@ -24,6 +24,9 @@ public class BookmarkController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody BookmarkCreateRequest request
     ) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(401).build();
+        }
         User user = userPrincipal.getUser();
         return ResponseEntity.ok(bookmarkService.createBookmark(user, request));
     }
@@ -32,6 +35,9 @@ public class BookmarkController {
     public ResponseEntity<List<BookmarkDto>> getBookmarks(
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(401).build();
+        }
         User user = userPrincipal.getUser();
         return ResponseEntity.ok(bookmarkService.getBookmarks(user));
     }
@@ -41,6 +47,9 @@ public class BookmarkController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable String bookmarkId
     ) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(401).build();
+        }
         User user = userPrincipal.getUser();
         bookmarkService.deleteBookmark(user, bookmarkId);
         return ResponseEntity.ok().build();

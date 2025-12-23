@@ -26,7 +26,7 @@ public class RecommendationController {
     ) {
         if (userPrincipal == null) {
             // Recommendation usually requires user context
-            return ResponseEntity.badRequest().build(); 
+            return ResponseEntity.status(401).build(); 
         }
         User user = userPrincipal.getUser();
         return ResponseEntity.ok(recommendationService.getRecommendations(user, topK));
