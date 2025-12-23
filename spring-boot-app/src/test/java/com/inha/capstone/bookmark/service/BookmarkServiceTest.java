@@ -36,7 +36,7 @@ class BookmarkServiceTest {
     void createBookmark_shouldCreate_whenPaperExists() {
         // Given
         User user = User.builder().build();
-        user.setId(1L);
+        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 1L);
         BookmarkCreateRequest request = BookmarkCreateRequest.builder()
                 .doi("1234.5678")
                 .build();

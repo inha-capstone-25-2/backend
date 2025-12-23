@@ -37,7 +37,7 @@ class RecommendationServiceTest {
     void getRecommendations_shouldReturnResponse_whenUserProvided() {
         // Given
         User user = User.builder().build();
-        user.setId(1L);
+        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 1L);
 
         RecommendationItem item = RecommendationItem.builder()
                 .paperId("paper1")
