@@ -45,6 +45,10 @@ dependencies {
 
     // Test
     testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:mongodb'
+    testImplementation 'org.testcontainers:elasticsearch'
 }
 
 tasks.named('test') {
