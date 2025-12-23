@@ -17,7 +17,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.TextCriteria;
 import org.springframework.data.mongodb.core.query.TextQuery;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,7 +32,6 @@ public class PaperService {
 
     // TODO: Implement Elasticsearch integration if needed, currently using MongoDB Text Search as fallback logic is primary in Python code
 
-    @Transactional(readOnly = true)
     public PaperSearchResponse searchPapers(User user, String query, List<String> categories, int page, String sortBy) {
         int pageSize = 10;
         Pageable pageable = PageRequest.of(page - 1, pageSize, getSort(sortBy));
@@ -92,7 +90,6 @@ public class PaperService {
                 .build();
     }
 
-    @Transactional
     public Paper getPaperDetail(User user, String paperId) {
         Paper paper = paperRepository.findById(paperId)
                 .orElseThrow(() -> new RuntimeException("Paper not found with id: " + paperId)); // Use custom exception later

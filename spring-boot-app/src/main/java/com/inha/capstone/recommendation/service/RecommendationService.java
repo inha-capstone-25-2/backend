@@ -9,8 +9,6 @@ import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +21,6 @@ public class RecommendationService {
     private final RuleBasedRecommender recommender;
     private final RecommendationRepository recommendationRepository;
 
-    @Transactional
     public RecommendationResponse getRecommendations(User user, int topK) {
         String sessionId = UUID.randomUUID().toString();
         

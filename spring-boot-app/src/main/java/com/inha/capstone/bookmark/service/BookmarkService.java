@@ -10,7 +10,6 @@ import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,7 +22,6 @@ public class BookmarkService {
     private final BookmarkRepository bookmarkRepository;
     private final PaperRepository paperRepository;
 
-    @Transactional
     public BookmarkDto createBookmark(User user, BookmarkCreateRequest request) {
         // Check if paper exists
         Paper paper = paperRepository.findById(request.doi())
@@ -48,7 +46,6 @@ public class BookmarkService {
         return convertToDto(saved, paper);
     }
     
-    @Transactional(readOnly = true)
     public List<BookmarkDto> getBookmarks(User user) {
         List<Bookmark> bookmarks = bookmarkRepository.findByUserIdOrderByBookmarkedAtDesc(user.getId());
         
@@ -58,7 +55,6 @@ public class BookmarkService {
         }).collect(Collectors.toList());
     }
     
-    @Transactional
     public void deleteBookmark(User user, String bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new RuntimeException("Bookmark not found"));

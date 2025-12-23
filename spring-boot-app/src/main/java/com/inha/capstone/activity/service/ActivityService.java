@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,7 +21,6 @@ import java.util.stream.Collectors;
 public class ActivityService {
     private final ActivityRepository activityRepository;
 
-    @Transactional
     public void logActivity(User user, String doi, String activityType, Map<String, Object> metadata) {
         UserActivity activity = UserActivity.builder()
                 .userId(user.getId())
@@ -35,7 +33,6 @@ public class ActivityService {
         activityRepository.save(activity);
     }
     
-    @Transactional(readOnly = true)
     public List<UserActivityDto> getRecentActivities(User user, int limit) {
         // Just fetching views as requested by repo query, but let's make it generic if Controller wants all
         // For now, mirroring findRecentViewsByUserId in logic, but let's assume we want a generic get for API
