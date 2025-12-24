@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spring_boot_dev
+    env_file:
+      - ../env/dev/.env
+    environment:
+      APP_ENV: dev
+      REDIS_HOST: redis
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+
+  # Redis
+  redis:
+    image: redis:7
+    container_name: spring_boot_redis_dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: always
+
+volumes:
+  redis_data_dev:
