@@ -46,7 +46,12 @@ class RecommendationServiceTest {
             RecommendationItem item = RecommendationItem.builder()
                     .paperId("paper1")
                     .totalScore(10.0)
-                    .breakdown(RecommendationItem.ScoreBreakdown.builder().interestScore(5.0).build())
+                    .breakdown(RecommendationItem.ScoreBreakdown.builder()
+                            .interestScore(5.0)
+                            .popularityScore(3.0)
+                            .recencyScore(1.0)
+                            .personalizationScore(1.0)
+                            .build())
                     .reasons(Collections.emptyList())
                     .build();
 
