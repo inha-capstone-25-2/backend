@@ -29,10 +29,4 @@ jobs:
         cd spring-boot-app
         ./gradlew test --info
     
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./spring-boot-app/build/reports/jacoco/test/jacocoTestReport.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+
