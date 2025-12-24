@@ -80,6 +80,28 @@ class PaperServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.page()).isEqualTo(1); // Should be corrected to 1
         }
+        @Test
+        void 텍스트_검색_결과가_10000건_이상일_때_isApproximate_True() {
+            // given
+            User user = User.builder().build();
+            String query = "Big Data";
+            long largeTotal = 15000L;
+
+            Paper paper = new Paper();
+            paper.setId("1");
+            paper.setTitle("Big Data Analysis");
+
+            given(mongoTemplate.count(any(Query.class), eq(Paper.class))).willReturn(largeTotal);
+            given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
+
+            // when
+            PaperSearchResponse response = paperService.searchPapers(user, query, null, 1, "relevance");
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.total()).isEqualTo(largeTotal);
+            assertThat(response.isApproximate()).isTrue();
+        }
     }
     
     @Nested

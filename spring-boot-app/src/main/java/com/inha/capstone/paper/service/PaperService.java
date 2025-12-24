@@ -67,9 +67,10 @@ public class PaperService {
             simpleQuery.with(pageable);
             papers = mongoTemplate.find(simpleQuery, Paper.class);
             
-            if (total >= 10000) {
-                isApproximate = true;
-            }
+        }
+
+        if (total >= 10000) {
+            isApproximate = true;
         }
 
         List<PaperListItem> items = papers.stream()
