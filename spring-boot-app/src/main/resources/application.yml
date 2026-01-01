@@ -1,15 +1,17 @@
 spring:
+  config:
+    import: "optional:classpath:secret/application-secret.yml"
   application:
     name: backend
   
   profiles:
-    active: ${APP_ENV:local} # Default profile
+    active: ${APP_ENV:local}
 
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:rsrs}
-    username: ${POSTGRES_USER:root}
-    password: ${POSTGRES_PASSWORD:1234}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:mysql://${mysql.host}:${mysql.port}/${mysql.database}?serverTimezone=UTC&characterEncoding=UTF-8
+    username: ${mysql.user}
+    password: ${mysql.password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -19,40 +21,31 @@ spring:
     
   data:
     mongodb:
-      uri: mongodb://${MONGO_USER:root}:${MONGO_PASSWORD:1234}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DB:arxiv}?authSource=${MONGO_AUTH_SOURCE:admin}
+      uri: mongodb://${mongo.user}:${mongo.password}@${mongo.host}:${mongo.port}/${mongo.db}?authSource=${mongo.auth-source}
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${redis.host:localhost}
       port: 6379
   
   elasticsearch:
-    uris: http://${ES_HOST:localhost}:${ES_PORT:9200}
+    uris: http://${elasticsearch.host}:${elasticsearch.port}
     
-  jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 cloud:
   aws:
     region:
-      static: ${AWS_DEFAULT_REGION:ap-northeast-2}
+      static: ${aws.region}
     s3:
-      bucket: ${S3_BUCKET:inha-capstone-02-arxiv}
+      bucket: ${aws.s3.bucket}
 
 app:
   jwt:
-    secret: ${SECRET_KEY:dev-secret-change-me}
-    expiration: ${ACCESS_TOKEN_EXPIRE_MINUTES:60}
+    secret: ${jwt.secret}
+    expiration: ${jwt.expiration}
   cors:
-    origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:3001}
+    origins: ${cors.origins}
   gpu-server:
-    url: ${GPU_SERVER:http://35.90.139.246:8000}
-  prod-mongo:
-    host: ${PROD_MONGO_HOST:35.86.219.39}
-    port: ${PROD_MONGO_PORT:27017}
-    user: ${PROD_MONGO_USER:rsrs-root}
-    password: ${PROD_MONGO_PASSWORD:KIQu3jebjHNhTEE6mm5tgj2oNjYr7J805k2JLbE0AVo}
-    db: ${PROD_MONGO_DB:arxiv}
+    url: ${gpu-server.url}
+
 
 ---
 spring:

@@ -51,17 +51,21 @@ services:
         condition: service_healthy
 
   # PostgreSQL
-  postgres:
-    image: postgres:15
-    container_name: postgres_local
-    env_file:
-      - env/local/.env
+  # MySQL
+  mysql:
+    image: mysql:8
+    container_name: mysql_local
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: rsrs
+      MYSQL_USER: root
+      MYSQL_PASSWORD: 1234
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -97,6 +101,6 @@ services:
       retries: 30
 
 volumes:
-  pg_data:
+  mysql_data:
   mongo_data:
   redis_data:

@@ -28,40 +28,11 @@ jobs:
           host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "app/**,requirements.txt,Dockerfile,docker-compose.dev.yml,env/dev/.env,run_seed.py"
+          # Copy spring-boot-app and env directories
+          source: "spring-boot-app/**,env/dev/.env"
           target: ${{ secrets.EC2_PATH }}
           overwrite: true
           debug: true
-
-      - name: Write kaggle.json on EC2
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          KAGGLE_JSON: ${{ secrets.KAGGLE_JSON }}
-        with:
-          host: ${{ secrets.EC2_DEV_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          envs: KAGGLE_JSON
-          script: |
-            set -e
-            cd ${{ secrets.EC2_PATH }}
-            mkdir -p .kaggle
-            printf '%s' "$KAGGLE_JSON" > .kaggle/kaggle.json
-            chmod 600 .kaggle/kaggle.json
-            ls -la .kaggle
-
-      - name: Ensure data/.kaggle dirs on EC2
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_DEV_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            set -e
-            cd ${{ secrets.EC2_PATH }}
-            mkdir -p data .kaggle
-            chmod 700 .kaggle
-            ls -la .
 
       - name: Prepare docker on EC2 (install/enable if needed)
         uses: appleboy/ssh-action@v1.2.0
@@ -94,7 +65,13 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            cd ${{ secrets.EC2_PATH }}
+            # Move to the project directory
+            cd ${{ secrets.EC2_PATH }}/spring-boot-app
+            
+            # Ensure permissions
+            chmod +x gradlew
+            
+            # Check for docker compose
             if docker compose version >/dev/null 2>&1; then
               COMPOSE="docker compose"
             elif command -v docker-compose >/dev/null 2>&1; then
@@ -103,16 +80,15 @@ jobs:
               echo "Installing compose plugin..."
               sudo apt-get update -y
               sudo apt-get install -y docker-compose-plugin || true
-              if docker compose version >/dev/null 2>&1; then
-                COMPOSE="docker compose"
-              else
-                curl -L "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-$(uname -s)-$(uname -m)" -o docker-compose
-                chmod +x docker-compose
-                sudo mv docker-compose /usr/local/bin/docker-compose
-                COMPOSE="docker-compose"
-              fi
+              COMPOSE="docker compose"
             fi
+            
             echo "Using: $COMPOSE"
+            
+            # Start services using dev compose file
             sudo $COMPOSE -f docker-compose.dev.yml up -d --build
             sudo $COMPOSE -f docker-compose.dev.yml ps
-            sudo docker logs fastapi_dev --tail=50 || true
+            
+            # Logs (optional, just to verify startup)
+            sudo docker logs spring_boot_dev --tail=50 || true
+            sudo docker logs spring_boot_redis_dev --tail=20 || true

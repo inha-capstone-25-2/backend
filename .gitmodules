@@ -1,5 +1,4 @@
-[submodule "env"]
-	path = env
-	url = git@github.com:inha-capstone-25-2/backend-secret.git
+[submodule "spring-boot-app/src/main/resources/secret"]
+	path = spring-boot-app/src/main/resources/secret
+	url = https://github.com/inha-capstone-25-2/backend-secret.git
 	branch = main
-	ignore = all
