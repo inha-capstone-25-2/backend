@@ -3,8 +3,9 @@ version: '3.8'
 services:
   # MySQL
   mysql:
-    image: mysql:8
+    image: mysql:8.0.44
     container_name: spring_boot_mysql
+    restart: unless-stopped
     ports:
       - "3306:3306"
     environment:
@@ -22,6 +23,7 @@ services:
   mongo:
     image: mongo:6
     container_name: spring_boot_mongo
+    restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
@@ -39,6 +41,7 @@ services:
   redis:
     image: redis:7
     container_name: spring_boot_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -53,6 +56,7 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.29
     container_name: spring_boot_elasticsearch
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
