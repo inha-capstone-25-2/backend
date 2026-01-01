@@ -10,8 +10,6 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=1234
       - MYSQL_DATABASE=rsrs
-      - MYSQL_USER=root
-      - MYSQL_PASSWORD=1234
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
