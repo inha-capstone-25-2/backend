@@ -33,7 +33,6 @@ def _env_files() -> Sequence[Path]:
         base / f".env.{app_env}",
         base / ".env.local",
         base / f".env.{app_env}.local",
-        base / "env" / app_env / ".env",
     ]
     seen = []
     for p in candidates:
