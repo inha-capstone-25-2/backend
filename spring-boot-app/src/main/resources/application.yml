@@ -45,12 +45,7 @@ app:
     origins: ${cors.origins}
   gpu-server:
     url: ${gpu-server.url}
-  prod-mongo:
-    host: ${prod-mongo.host}
-    port: ${prod-mongo.port}
-    user: ${prod-mongo.user}
-    password: ${prod-mongo.password}
-    db: ${prod-mongo.db}
+
 
 ---
 spring:

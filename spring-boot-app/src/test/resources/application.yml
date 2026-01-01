@@ -23,9 +23,4 @@ app:
     origins: "*"
   gpu-server:
     url: http://localhost:8000
-  prod-mongo:
-    host: localhost
-    port: 27017
-    user: root
-    password: password
-    db: arxiv
+
