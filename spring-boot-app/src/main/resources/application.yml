@@ -5,12 +5,12 @@ spring:
     name: backend
   
   profiles:
-    active: ${APP_ENV}
+    active: ${app.env}
 
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}?serverTimezone=UTC&characterEncoding=UTF-8
-    username: ${MYSQL_USER}
-    password: ${MYSQL_PASSWORD}
+    url: jdbc:mysql://${mysql.host}:${mysql.port}/${mysql.database}?serverTimezone=UTC&characterEncoding=UTF-8
+    username: ${mysql.user}
+    password: ${mysql.password}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
@@ -21,13 +21,13 @@ spring:
     
   data:
     mongodb:
-      uri: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_DB}?authSource=${MONGO_AUTH_SOURCE}
+      uri: mongodb://${mongo.user}:${mongo.password}@${mongo.host}:${mongo.port}/${mongo.db}?authSource=${mongo.auth-source}
     redis:
-      host: ${REDIS_HOST}
+      host: ${redis.host:localhost}
       port: 6379
   
   elasticsearch:
-    uris: http://${ES_HOST}:${ES_PORT}
+    uris: http://${elasticsearch.host}:${elasticsearch.port}
     
   jpa:
     properties:
@@ -37,24 +37,24 @@ spring:
 cloud:
   aws:
     region:
-      static: ${AWS_DEFAULT_REGION}
+      static: ${aws.region}
     s3:
-      bucket: ${S3_BUCKET}
+      bucket: ${aws.s3.bucket}
 
 app:
   jwt:
-    secret: ${SECRET_KEY}
-    expiration: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+    secret: ${jwt.secret}
+    expiration: ${jwt.expiration}
   cors:
-    origins: ${CORS_ORIGINS}
+    origins: ${cors.origins}
   gpu-server:
-    url: ${GPU_SERVER}
+    url: ${gpu-server.url}
   prod-mongo:
-    host: ${PROD_MONGO_HOST}
-    port: ${PROD_MONGO_PORT}
-    user: ${PROD_MONGO_USER}
-    password: ${PROD_MONGO_PASSWORD}
-    db: ${PROD_MONGO_DB}
+    host: ${prod-mongo.host}
+    port: ${prod-mongo.port}
+    user: ${prod-mongo.user}
+    password: ${prod-mongo.password}
+    db: ${prod-mongo.db}
 
 ---
 spring:
