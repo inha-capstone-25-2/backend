@@ -46,6 +46,15 @@ app:
   gpu-server:
     url: ${gpu-server.url}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+
 
 ---
 spring:
