@@ -44,12 +44,7 @@ public class UserInterestService {
         // 3. Save new interests
         List<UserInterest> newInterests = validCategories.stream()
                 .filter(category -> !existingCategoryCodes.contains(category.getCode()))
-                .map(category -> {
-                    UserInterest userInterest = new UserInterest();
-                    userInterest.setUser(user);
-                    userInterest.setCategory(category);
-                    return userInterest;
-                })
+                .map(category -> UserInterest.create(user, category))
                 .collect(Collectors.toList());
 
         if (!newInterests.isEmpty()) {
