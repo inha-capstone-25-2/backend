@@ -79,16 +79,16 @@ public class PaperService {
 
         int totalPages = total > 0 ? (int) Math.ceil((double) total / pageSize) : 0;
 
-        return PaperSearchResponse.builder()
-                .page(page)
-                .pageSize(pageSize)
-                .total(total)
-                .totalPages(totalPages)
-                .hasNext(page < totalPages)
-                .hasPrev(page > 1)
-                .isApproximate(isApproximate)
-                .items(items)
-                .build();
+        return new PaperSearchResponse(
+                page,
+                pageSize,
+                total,
+                totalPages,
+                page < totalPages,
+                page > 1,
+                isApproximate,
+                items
+        );
     }
 
     public Paper getPaperDetail(User user, String paperId) {

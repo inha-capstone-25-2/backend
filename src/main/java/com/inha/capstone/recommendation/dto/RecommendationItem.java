@@ -23,18 +23,17 @@ public record RecommendationItem(
     ScoreBreakdown breakdown,
     List<String> reasons
 ) {
-    
-    @Builder
+
     public record ScoreBreakdown(
         double interestScore,
         double popularityScore,
         double recencyScore,
         double personalizationScore
     ) {}
-    
+
     public RecommendationItem withRecommendationId(String newId) {
         return new RecommendationItem(
-            newId, paperId, title, summary, authors, categories, keywords, difficultyLevel, 
+            newId, paperId, title, summary, authors, categories, keywords, difficultyLevel,
             viewCount, bookmarkCount, updateDate, journalRef, totalScore, breakdown, reasons
         );
     }

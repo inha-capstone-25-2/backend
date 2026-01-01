@@ -79,26 +79,30 @@ public class RuleBasedRecommender {
                                 (recencyScore * WEIGHT_RECENCY) +
                                 (personalizationScore * WEIGHT_PERSONALIZATION);
             
-            RecommendationItem.ScoreBreakdown breakdown = RecommendationItem.ScoreBreakdown.builder()
-                    .interestScore(interestScore)
-                    .popularityScore(popularityScore)
-                    .recencyScore(recencyScore)
-                    .personalizationScore(personalizationScore)
-                    .build();
+            RecommendationItem.ScoreBreakdown breakdown = new RecommendationItem.ScoreBreakdown(
+                    interestScore,
+                    popularityScore,
+                    recencyScore,
+                    personalizationScore
+            );
 
-            recommendations.add(RecommendationItem.builder()
-                    .paperId(paper.getId())
-                    .title(paper.getTitle())
-                    .summary(paper.getSummary())
-                    .authors(paper.getAuthors())
-                    .categories(paper.getCategories())
-                    .viewCount(paper.getViewCount() != null ? paper.getViewCount() : 0)
-                    .updateDate(paper.getUpdateDate())
-                    .journalRef(paper.getJournalRef())
-                    .totalScore(totalScore)
-                    .breakdown(breakdown)
-                    .reasons(analyzeReasons(interestScore, popularityScore, personalizationScore))
-                    .build());
+            recommendations.add(new RecommendationItem(
+                    null,
+                    paper.getId(),
+                    paper.getTitle(),
+                    paper.getSummary(),
+                    paper.getAuthors(),
+                    paper.getCategories(),
+                    null,
+                    null,
+                    paper.getViewCount() != null ? paper.getViewCount() : 0,
+                    0,
+                    paper.getUpdateDate(),
+                    paper.getJournalRef(),
+                    totalScore,
+                    breakdown,
+                    analyzeReasons(interestScore, popularityScore, personalizationScore)
+            ));
         }
         
         // 5. Sort by Total Score

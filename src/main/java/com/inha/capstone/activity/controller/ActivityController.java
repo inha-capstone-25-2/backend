@@ -1,6 +1,6 @@
 package com.inha.capstone.activity.controller;
 
-import com.inha.capstone.activity.dto.UserActivityDto;
+import com.inha.capstone.activity.dto.UserActivityResponse;
 import com.inha.capstone.activity.service.ActivityService;
 import com.inha.capstone.auth.security.UserPrincipal;
 import com.inha.capstone.user.domain.User;
@@ -22,7 +22,7 @@ public class ActivityController {
     private final ActivityService activityService;
 
     @GetMapping("/recent")
-    public ResponseEntity<List<UserActivityDto>> getRecentActivities(
+    public ResponseEntity<List<UserActivityResponse>> getRecentActivities(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(defaultValue = "50") int limit
     ) {

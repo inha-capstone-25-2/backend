@@ -52,13 +52,13 @@ public class RecommendationService {
             }
         }
         
-        return RecommendationResponse.builder()
-                .userId(user.getId())
-                .sessionId(sessionId)
-                .recommendationType("rule_based")
-                .recommendations(resultItems)
-                .totalCount(resultItems.size())
-                .timestamp(LocalDateTime.now().toString())
-                .build();
+        return new RecommendationResponse(
+                user.getId(),
+                sessionId,
+                "rule_based",
+                resultItems,
+                resultItems.size(),
+                LocalDateTime.now().toString()
+        );
     }
 }
