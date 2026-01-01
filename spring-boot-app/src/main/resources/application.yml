@@ -5,7 +5,7 @@ spring:
     name: backend
   
   profiles:
-    active: ${app.env}
+    active: ${APP_ENV:local}
 
   datasource:
     url: jdbc:mysql://${mysql.host}:${mysql.port}/${mysql.database}?serverTimezone=UTC&characterEncoding=UTF-8
