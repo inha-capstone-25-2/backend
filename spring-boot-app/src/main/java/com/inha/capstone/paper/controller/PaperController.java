@@ -13,13 +13,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/papers")
+@RequestMapping("/api/papers")
 @RequiredArgsConstructor
 public class PaperController {
 
     private final PaperService paperService;
 
-    @GetMapping("/search")
+    @GetMapping
     public ResponseEntity<PaperSearchResponse> searchPapers(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(required = false) String q,
