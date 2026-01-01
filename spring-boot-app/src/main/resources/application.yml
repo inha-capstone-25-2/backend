@@ -29,10 +29,6 @@ spring:
   elasticsearch:
     uris: http://${elasticsearch.host}:${elasticsearch.port}
     
-  jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
 
 cloud:
   aws:
