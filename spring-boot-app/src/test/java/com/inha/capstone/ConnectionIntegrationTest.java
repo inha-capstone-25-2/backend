@@ -40,7 +40,7 @@ class ConnectionIntegrationTest extends AbstractIntegrationTest {
     private ElasticsearchClient elasticsearchClient;
 
     @Test
-    void PostgreSQL_연결_테스트() throws SQLException {
+    void MySQL_연결_테스트() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
             assertThat(connection.isValid(1)).isTrue();
         }
