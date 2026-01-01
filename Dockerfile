@@ -1,19 +1,34 @@
-FROM python:3.11-slim
+FROM openjdk:17-jdk-slim AS builder
+
+WORKDIR /app
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle .
+COPY settings.gradle .
+COPY src src
+
+RUN chmod +x ./gradlew
+RUN ./gradlew clean build -x test
+
+
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# 필수 패키지 설치 및 의존성 설치
-RUN pip install --no-cache-dir --upgrade pip
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Create a non-root user
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
-# 소스 복사
-COPY app ./app
+# Copy the built jar explicitly and set ownership
+COPY --from=builder --chown=appuser:appgroup /app/build/libs/backend-0.0.1-SNAPSHOT.jar app.jar
 
-EXPOSE 8000
+USER appuser
 
-# 프로덕션: 멀티 워커로 실행(uvicorn[standard] 사용)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

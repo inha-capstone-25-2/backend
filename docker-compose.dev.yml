@@ -5,48 +5,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: fastapi_dev
+    container_name: spring_boot_dev
     env_file:
-      - env/dev/.env
+      - ../env/dev/.env
     environment:
       APP_ENV: dev
-      KAGGLE_CONFIG_DIR: /root/.kaggle
-      DATA_DIR: /app/data
       REDIS_HOST: redis
-    volumes:
-      - ./.kaggle:/root/.kaggle:ro
-      - ./data:/app/data
-      - ./app:/app/app
-      - ./run_seed.py:/app/run_seed.py
-      - ./env:/app/env:ro
     ports:
-      - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: always
-
-  celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: celery_worker_dev
-    command: celery -A app.celery worker --loglevel=info --concurrency=2
-    env_file:
-      - env/dev/.env
-    environment:
-      APP_ENV: dev
-      KAGGLE_CONFIG_DIR: /root/.kaggle
-      DATA_DIR: /app/data
-      REDIS_HOST: redis
-    volumes:
-      - ./.kaggle:/root/.kaggle:ro
-      - ./data:/app/data
-      - ./app:/app/app
-      - ./run_seed.py:/app/run_seed.py
-      - ./env:/app/env:ro
+      - "8080:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -57,11 +23,11 @@ services:
   # Redis
   redis:
     image: redis:7
-    container_name: redis_dev
+    container_name: spring_boot_redis_dev
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data_dev:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -70,4 +36,4 @@ services:
     restart: always
 
 volumes:
-  redis_data:
+  redis_data_dev:

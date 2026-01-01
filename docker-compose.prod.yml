@@ -5,44 +5,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: fastapi_prod
+    container_name: spring_boot_prod
     env_file:
-      - env/prod/.env
+      - ../env/prod/.env
     environment:
       APP_ENV: prod
-      KAGGLE_CONFIG_DIR: /root/.kaggle
-      DATA_DIR: /app/data
       REDIS_HOST: redis
-    volumes:
-      - ./.kaggle:/root/.kaggle:ro
-      - ./data:/app/data
-      - ./env:/app/env:ro
     ports:
-      - "80:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: always
-
-  celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: celery_worker_prod
-    command: celery -A app.celery worker --loglevel=info --concurrency=2
-    env_file:
-      - env/prod/.env
-    environment:
-      APP_ENV: prod
-      KAGGLE_CONFIG_DIR: /root/.kaggle
-      DATA_DIR: /app/data
-      REDIS_HOST: redis
-    volumes:
-      - ./.kaggle:/root/.kaggle:ro
-      - ./data:/app/data
-      - ./env:/app/env:ro
+      - "80:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -53,11 +23,11 @@ services:
   # Redis
   redis:
     image: redis:7
-    container_name: redis_prod
+    container_name: spring_boot_redis_prod
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data_prod:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -66,4 +36,4 @@ services:
     restart: always
 
 volumes:
-  redis_data:
+  redis_data_prod:
