@@ -1,20 +1,21 @@
 version: '3.8'
 
 services:
-  # PostgreSQL
-  postgres:
-    image: postgres:15
-    container_name: spring_boot_postgres
+  # MySQL
+  mysql:
+    image: mysql:8
+    container_name: spring_boot_mysql
     ports:
-      - "5432:5432"
+      - "3306:3306"
     environment:
-      - POSTGRES_USER=root
-      - POSTGRES_PASSWORD=1234
-      - POSTGRES_DB=rsrs
+      - MYSQL_ROOT_PASSWORD=1234
+      - MYSQL_DATABASE=rsrs
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=1234
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root -d rsrs"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -69,7 +70,7 @@ services:
       retries: 5
 
 volumes:
-  postgres_data:
+  mysql_data:
   mongo_data:
   redis_data:
   es_data:
