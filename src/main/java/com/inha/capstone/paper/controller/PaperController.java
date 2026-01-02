@@ -1,8 +1,8 @@
 package com.inha.capstone.paper.controller;
 
 import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
-import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.service.PaperService;
 import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
@@ -37,13 +37,13 @@ public class PaperController {
     }
 
     @GetMapping("/{paperId}")
-    public ResponseEntity<Paper> getPaperDetail(
+    public ResponseEntity<PaperDetailResponse> getPaperDetail(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable String paperId
     ) {
         User user = userPrincipal != null ? userPrincipal.getUser() : null;
 
-        
+
         return ResponseEntity.ok(paperService.getPaperDetail(user, paperId));
     }
 }
