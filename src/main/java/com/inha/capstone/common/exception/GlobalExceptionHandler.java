@@ -21,9 +21,9 @@ public class GlobalExceptionHandler {
         return LocalDateTime.now().format(ISO_FORMATTER);
     }
 
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<Map<String, Object>> handleBusinessException(BusinessException ex) {
-        log.error("BusinessException: {}", ex.getMessage());
+    @ExceptionHandler(CustomException.class)
+    public ResponseEntity<Map<String, Object>> handleCustomException(CustomException ex) {
+        log.error("CustomException: {}", ex.getMessage());
         ErrorCode errorCode = ex.getErrorCode();
         return ResponseEntity.status(errorCode.getStatus()).body(Map.of(
                 "error", errorCode.getStatus().getReasonPhrase(),

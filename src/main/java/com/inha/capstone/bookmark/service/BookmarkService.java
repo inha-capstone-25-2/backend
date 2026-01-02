@@ -4,6 +4,8 @@ import com.inha.capstone.bookmark.dto.BookmarkCreateRequest;
 import com.inha.capstone.bookmark.dto.BookmarkResponse;
 import com.inha.capstone.bookmark.model.Bookmark;
 import com.inha.capstone.bookmark.repository.BookmarkRepository;
+import com.inha.capstone.common.exception.CustomException;
+import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.repository.PaperRepository;
 import com.inha.capstone.user.domain.User;
@@ -22,10 +24,10 @@ public class BookmarkService {
 
     public BookmarkResponse createBookmark(User user, BookmarkCreateRequest request) {
         Paper paper = paperRepository.findById(request.doi())
-                .orElseThrow(() -> new RuntimeException("Paper not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.PAPER_NOT_FOUND));
 
         if (bookmarkRepository.findByUserIdAndDoi(user.getId(), request.doi()).isPresent()) {
-            throw new RuntimeException("Already bookmarked");
+            throw new CustomException(ErrorCode.BOOKMARK_ALREADY_EXISTS);
         }
 
         Bookmark bookmark = Bookmark.builder()
@@ -55,10 +57,10 @@ public class BookmarkService {
 
     public void deleteBookmark(User user, String bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
-                .orElseThrow(() -> new RuntimeException("Bookmark not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.BOOKMARK_NOT_FOUND));
 
         if (!bookmark.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Not authorized");
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
         }
 
         bookmarkRepository.delete(bookmark);

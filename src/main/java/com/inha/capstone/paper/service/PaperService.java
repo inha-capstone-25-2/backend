@@ -1,5 +1,7 @@
 package com.inha.capstone.paper.service;
 
+import com.inha.capstone.common.exception.CustomException;
+import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperListItem;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
@@ -106,7 +108,7 @@ public class PaperService {
         );
 
         if (paper == null) {
-            throw new RuntimeException("Paper not found with id: " + paperId);
+            throw new CustomException(ErrorCode.PAPER_NOT_FOUND);
         }
 
         // TODO: Log activity (view)
