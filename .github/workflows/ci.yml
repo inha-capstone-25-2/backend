@@ -22,11 +22,9 @@ jobs:
         cache: gradle
 
     - name: Grant execute permission for gradlew
-      run: chmod +x spring-boot-app/gradlew
-    
+      run: chmod +x gradlew
+
     - name: Test with Gradle
-      run: |
-        cd spring-boot-app
-        ./gradlew test --info
+      run: ./gradlew test --info
     
 
