@@ -11,7 +11,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout with submodules (SSH Deploy Key)
+      # 서브모듈을 포함하여 체크아웃
+      - name: Checkout with submodules
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -19,26 +20,33 @@ jobs:
           persist-credentials: false
           ssh-key: ${{ secrets.SUBMODULES_SSH_KEY }}
 
+      # 서브모듈 유효성 검증
       - name: Verify secret submodule
-        run: ls -la src/main/resources/secret/application-secret.yml || (echo "secret submodule missing" && exit 1)
-
-      - name: Verify submodule is up to date
         run: |
-          echo "Checking submodule status..."
+          echo "서브모듈 상태 확인 중..."
           git submodule status src/main/resources/secret
           
-          # Check if submodule is initialized and not dirty
+          # 서브모듈 초기화 여부 확인
           if git submodule status src/main/resources/secret | grep -q '^-'; then
-            echo "Error: Submodule is not initialized"
+            echo "❌ 오류: 서브모듈이 초기화되지 않았습니다"
             exit 1
           fi
           
+          # 서브모듈 커밋 버전 확인
           if git submodule status src/main/resources/secret | grep -q '^+'; then
-            echo "Warning: Submodule is not at the committed version"
+            echo "⚠️  경고: 서브모듈이 커밋된 버전과 다릅니다"
             git submodule status src/main/resources/secret
           fi
           
-          echo "Submodule verification passed"
+          # 실제 파일 존재 확인
+          if [ ! -f src/main/resources/secret/application-secret.yml ]; then
+            echo "❌ 오류: application-secret.yml 파일을 찾을 수 없습니다"
+            ls -la src/main/resources/secret/ || true
+            exit 1
+          fi
+          
+          echo "✅ 서브모듈 검증 완료"
+          ls -la src/main/resources/secret/application-secret.yml
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
