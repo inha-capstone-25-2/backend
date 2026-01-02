@@ -1,8 +1,6 @@
-name: CI - Test and Lint
+name: CI with Gradle
 
 on:
-  push:
-    branches: [ develop, main ]
   pull_request:
     branches: [ develop, main ]
 
