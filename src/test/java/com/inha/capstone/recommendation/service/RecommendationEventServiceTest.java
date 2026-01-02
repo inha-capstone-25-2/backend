@@ -1,6 +1,8 @@
 package com.inha.capstone.recommendation.service;
 
-import com.inha.capstone.recommendation.dto.RecommendationEventDto;
+import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
+import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
+import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -33,13 +35,13 @@ class RecommendationEventServiceTest {
     @DisplayName("이벤트 로깅 성공")
     void logEvent_Success() {
         // given
-        RecommendationEventDto.CreateRequest request = RecommendationEventDto.CreateRequest.builder()
-                .userId(1L)
-                .paperId("p123")
-                .activityType("CLICK")
-                .sessionId("sess-1")
-                .metadata(Map.of("duration", 10))
-                .build();
+        RecommendationEventCreateRequest request = new RecommendationEventCreateRequest(
+                1L,
+                "p123",
+                "CLICK",
+                "sess-1",
+                Map.of("duration", 10)
+        );
 
         RecommendationEvent savedEvent = RecommendationEvent.builder()
                 .id("evt-1")
@@ -52,11 +54,11 @@ class RecommendationEventServiceTest {
         given(repository.save(any(RecommendationEvent.class))).willReturn(savedEvent);
 
         // when
-        RecommendationEventDto.Response response = service.logEvent(request);
+        RecommendationEventResponse response = service.logEvent(request);
 
         // then
-        assertThat(response.getId()).isEqualTo("evt-1");
-        assertThat(response.getUserId()).isEqualTo(1L);
+        assertThat(response.id()).isEqualTo("evt-1");
+        assertThat(response.userId()).isEqualTo(1L);
         then(repository).should().save(any(RecommendationEvent.class));
     }
 
@@ -69,9 +71,9 @@ class RecommendationEventServiceTest {
         given(repository.findBySessionId(any(), any(Pageable.class))).willReturn(List.of(event));
 
         // when
-        RecommendationEventDto.EventListResponse response = service.getEventsBySession(sessionId, 1, 10);
+        RecommendationEventListResponse response = service.getEventsBySession(sessionId, 1, 10);
 
         // then
-        assertThat(response.getItems()).hasSize(1);
+        assertThat(response.items()).hasSize(1);
     }
 }

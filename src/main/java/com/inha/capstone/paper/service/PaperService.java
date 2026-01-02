@@ -1,5 +1,6 @@
 package com.inha.capstone.paper.service;
 
+import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperListItem;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.model.Paper;
@@ -91,11 +92,11 @@ public class PaperService {
         );
     }
 
-    public Paper getPaperDetail(User user, String paperId) {
+    public PaperDetailResponse getPaperDetail(User user, String paperId) {
         // Atomic increment using MongoTemplate
         Query query = new Query(Criteria.where("id").is(paperId));
         Update update = new Update().inc("viewCount", 1);
-        
+
 
         Paper paper = mongoTemplate.findAndModify(
             query,
@@ -107,10 +108,10 @@ public class PaperService {
         if (paper == null) {
             throw new RuntimeException("Paper not found with id: " + paperId);
         }
-        
+
         // TODO: Log activity (view)
-        
-        return paper;
+
+        return PaperDetailResponse.from(paper);
     }
 
     private Sort getSort(String sortBy) {

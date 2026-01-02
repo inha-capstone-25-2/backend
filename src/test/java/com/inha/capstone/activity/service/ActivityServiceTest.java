@@ -1,6 +1,6 @@
 package com.inha.capstone.activity.service;
 
-import com.inha.capstone.activity.dto.UserActivityDto;
+import com.inha.capstone.activity.dto.UserActivityResponse;
 import com.inha.capstone.activity.model.UserActivity;
 import com.inha.capstone.activity.repository.ActivityRepository;
 import com.inha.capstone.user.domain.User;
@@ -76,7 +76,7 @@ class ActivityServiceTest {
                     .willReturn(Collections.singletonList(activity));
 
             // when
-            List<UserActivityDto> result = activityService.getRecentActivities(user, limit);
+            List<UserActivityResponse> result = activityService.getRecentActivities(user, limit);
 
             // then
             assertThat(result).hasSize(1);
@@ -107,7 +107,7 @@ class ActivityServiceTest {
                     .willReturn(Collections.singletonList(activity));
 
             // when
-            List<UserActivityDto> result = activityService.getRecentActivities(user, invalidLimit);
+            List<UserActivityResponse> result = activityService.getRecentActivities(user, invalidLimit);
 
             // then
             assertThat(result).hasSize(1);

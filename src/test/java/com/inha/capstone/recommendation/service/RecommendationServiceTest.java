@@ -43,15 +43,14 @@ class RecommendationServiceTest {
             User user = User.builder().build();
             ReflectionTestUtils.setField(user, "id", 1L);
 
+            RecommendationItem.ScoreBreakdown breakdown = new RecommendationItem.ScoreBreakdown(
+                    5.0, 3.0, 1.0, 1.0
+            );
+
             RecommendationItem item = RecommendationItem.builder()
                     .paperId("paper1")
                     .totalScore(10.0)
-                    .breakdown(RecommendationItem.ScoreBreakdown.builder()
-                            .interestScore(5.0)
-                            .popularityScore(3.0)
-                            .recencyScore(1.0)
-                            .personalizationScore(1.0)
-                            .build())
+                    .breakdown(breakdown)
                     .reasons(Collections.emptyList())
                     .build();
 

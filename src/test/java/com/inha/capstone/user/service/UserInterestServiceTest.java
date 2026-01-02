@@ -4,7 +4,8 @@ import com.inha.capstone.category.model.Category;
 import com.inha.capstone.category.repository.CategoryRepository;
 import com.inha.capstone.user.domain.User;
 import com.inha.capstone.user.domain.UserInterest;
-import com.inha.capstone.user.dto.UserInterestDto;
+import com.inha.capstone.user.dto.UserInterestListResponse;
+import com.inha.capstone.user.dto.UserInterestRemovalResponse;
 import com.inha.capstone.user.repository.UserInterestRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,8 +46,10 @@ class UserInterestServiceTest {
         User user = User.builder().username("test").build();
         List<String> codes = List.of("CS.AI", "CS.CV");
 
-        Category c1 = new Category(); c1.setCode("CS.AI");
-        Category c2 = new Category(); c2.setCode("CS.CV");
+        Category c1 = mock(Category.class);
+        given(c1.getCode()).willReturn("CS.AI");
+        Category c2 = mock(Category.class);
+        given(c2.getCode()).willReturn("CS.CV");
         List<Category> foundCategories = List.of(c1, c2);
 
         given(categoryRepository.findByCodeIn(codes)).willReturn(foundCategories);
@@ -84,16 +89,16 @@ class UserInterestServiceTest {
     void listInterests() {
         // given
         User user = User.builder().username("test").build();
-        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 1L);
-        
+        ReflectionTestUtils.setField(user, "id", 1L);
+
         List<String> expectedCodes = List.of("CS.AI");
         given(userInterestRepository.findCategoryCodesByUserId(1L)).willReturn(expectedCodes);
 
         // when
-        UserInterestDto.InterestListResponse response = userInterestService.listInterests(user);
+        UserInterestListResponse response = userInterestService.listInterests(user);
 
         // then
-        assertThat(response.getCategories()).isEqualTo(expectedCodes);
+        assertThat(response.categories()).isEqualTo(expectedCodes);
     }
 
     @Test
@@ -102,22 +107,21 @@ class UserInterestServiceTest {
         // given
         User user = User.builder().username("test").build();
         List<String> codes = List.of("CS.AI");
-        Category c1 = new Category(); c1.setCode("CS.AI");
+        Category c1 = mock(Category.class);
+        given(c1.getCode()).willReturn("CS.AI");
         List<Category> foundCategories = List.of(c1);
 
-        UserInterest ui = new UserInterest();
-        ui.setUser(user);
-        ui.setCategory(c1);
+        UserInterest ui = UserInterest.create(user, c1);
         List<UserInterest> interestsToDelete = List.of(ui);
 
         given(categoryRepository.findByCodeIn(codes)).willReturn(foundCategories);
         given(userInterestRepository.findByUserAndCategoryIn(user, foundCategories)).willReturn(interestsToDelete);
 
         // when
-        UserInterestDto.InterestRemovalResult result = userInterestService.removeInterests(user, codes);
+        UserInterestRemovalResponse result = userInterestService.removeInterests(user, codes);
 
         // then
-        assertThat(result.getRemovedCount()).isEqualTo(1);
+        assertThat(result.removedCount()).isEqualTo(1);
         then(userInterestRepository).should().deleteAll(interestsToDelete);
     }
 }
