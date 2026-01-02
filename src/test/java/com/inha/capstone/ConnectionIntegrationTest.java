@@ -44,14 +44,13 @@ class ConnectionIntegrationTest extends AbstractIntegrationTest {
         // given
         // 데이터베이스 연결 준비
 
-        // when
-        Connection connection = dataSource.getConnection();
-        Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+        // when & then
+        try (Connection connection = dataSource.getConnection()) {
+            Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
 
-        // then
-        assertThat(connection.isValid(1)).isTrue();
-        assertThat(result).isEqualTo(1);
-        connection.close();
+            assertThat(connection.isValid(1)).isTrue();
+            assertThat(result).isEqualTo(1);
+        }
     }
 
     @Test
