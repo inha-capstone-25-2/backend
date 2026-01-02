@@ -14,13 +14,31 @@ jobs:
       - name: Checkout with submodules (SSH Deploy Key)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           submodules: recursive
           persist-credentials: false
           ssh-key: ${{ secrets.SUBMODULES_SSH_KEY }}
 
       - name: Verify secret submodule
         run: ls -la src/main/resources/secret/application-secret.yml || (echo "secret submodule missing" && exit 1)
+
+      - name: Verify submodule is up to date
+        run: |
+          echo "Checking submodule status..."
+          git submodule status src/main/resources/secret
+          
+          # Check if submodule is initialized and not dirty
+          if git submodule status src/main/resources/secret | grep -q '^-'; then
+            echo "Error: Submodule is not initialized"
+            exit 1
+          fi
+          
+          if git submodule status src/main/resources/secret | grep -q '^+'; then
+            echo "Warning: Submodule is not at the committed version"
+            git submodule status src/main/resources/secret
+          fi
+          
+          echo "Submodule verification passed"
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
