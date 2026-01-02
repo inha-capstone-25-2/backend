@@ -28,9 +28,9 @@ jobs:
           host: ${{ secrets.EC2_DEV_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          # Copy spring-boot-app and env directories
-          source: "spring-boot-app/**,env/dev/.env"
-          target: ${{ secrets.EC2_PATH }}
+          # Copy backend and env directories
+          source: "./**,env/dev/.env"
+          target: ${{ secrets.EC2_PATH }}/backend
           overwrite: true
           debug: true
 
@@ -66,7 +66,7 @@ jobs:
           script: |
             set -e
             # Move to the project directory
-            cd ${{ secrets.EC2_PATH }}/spring-boot-app
+            cd ${{ secrets.EC2_PATH }}/backend
             
             # Ensure permissions
             chmod +x gradlew

@@ -5,6 +5,7 @@ import com.inha.capstone.auth.dto.TokenResponse;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
+import com.inha.capstone.common.exception.CustomException;
 import com.inha.capstone.common.exception.DuplicateUserException;
 import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.user.domain.User;
@@ -270,8 +271,8 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.logout(userId))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("User not found");
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
 
             then(userRepository).should().findById(userId);
         }
@@ -309,8 +310,8 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.deleteAccount(userId))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("User not found");
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
 
             then(userRepository).should().findById(userId);
             then(userRepository).should(never()).delete(any(User.class));

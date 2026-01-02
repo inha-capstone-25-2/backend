@@ -3,11 +3,11 @@ package com.inha.capstone.common.exception;
 import lombok.Getter;
 
 @Getter
-public class BusinessException extends RuntimeException {
+public class CustomException extends RuntimeException {
 
     private final ErrorCode errorCode;
 
-    public BusinessException(ErrorCode errorCode) {
+    public CustomException(ErrorCode errorCode) {
         super(errorCode.getMessage());
         this.errorCode = errorCode;
     }

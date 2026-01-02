@@ -1,5 +1,6 @@
 package com.inha.capstone.paper.service;
 
+import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.repository.PaperRepository;
@@ -41,11 +42,12 @@ class PaperServiceTest {
             // given
             User user = User.builder().build();
             String query = "AI";
-            
-            Paper paper = new Paper();
-            paper.setId("1");
-            paper.setTitle("Introduction to AI");
-            
+
+            Paper paper = Paper.builder()
+                    .id("1")
+                    .title("Introduction to AI")
+                    .build();
+
             given(mongoTemplate.count(any(Query.class), eq(Paper.class))).willReturn(1L);
             given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
 
@@ -66,9 +68,10 @@ class PaperServiceTest {
             String query = "AI";
             int invalidPage = 0;
 
-            Paper paper = new Paper();
-            paper.setId("1");
-            paper.setTitle("Introduction to AI");
+            Paper paper = Paper.builder()
+                    .id("1")
+                    .title("Introduction to AI")
+                    .build();
 
             given(mongoTemplate.count(any(Query.class), eq(Paper.class))).willReturn(1L);
             given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
@@ -87,9 +90,10 @@ class PaperServiceTest {
             String query = "Big Data";
             long largeTotal = 15000L;
 
-            Paper paper = new Paper();
-            paper.setId("1");
-            paper.setTitle("Big Data Analysis");
+            Paper paper = Paper.builder()
+                    .id("1")
+                    .title("Big Data Analysis")
+                    .build();
 
             given(mongoTemplate.count(any(Query.class), eq(Paper.class))).willReturn(largeTotal);
             given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
@@ -112,25 +116,27 @@ class PaperServiceTest {
             // given
             User user = User.builder().build();
             String paperId = "1";
-            
-            Paper paper = new Paper();
-            paper.setId(paperId);
-            paper.setViewCount(10);
-            
+
+            Paper paper = Paper.builder()
+                    .id(paperId)
+                    .viewCount(10)
+                    .title("Test Paper")
+                    .build();
+
             given(mongoTemplate.findAndModify(
-                    any(Query.class), 
-                    any(org.springframework.data.mongodb.core.query.Update.class), 
-                    any(org.springframework.data.mongodb.core.FindAndModifyOptions.class), 
+                    any(Query.class),
+                    any(org.springframework.data.mongodb.core.query.Update.class),
+                    any(org.springframework.data.mongodb.core.FindAndModifyOptions.class),
                     eq(Paper.class)
             )).willReturn(paper);
 
             // when
-            Paper result = paperService.getPaperDetail(user, paperId);
+            PaperDetailResponse result = paperService.getPaperDetail(user, paperId);
 
             // then
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(paperId);
-            assertThat(result.getViewCount()).isEqualTo(10);
+            assertThat(result.id()).isEqualTo(paperId);
+            assertThat(result.viewCount()).isEqualTo(10);
         }
     }
 }

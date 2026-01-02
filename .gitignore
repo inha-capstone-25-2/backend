@@ -45,3 +45,6 @@ env/
 
 ### Data ###
 data/
+
+### Claude ###
+.claude

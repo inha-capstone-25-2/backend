@@ -1,5 +1,8 @@
 package com.inha.capstone.paper.service;
 
+import com.inha.capstone.common.exception.CustomException;
+import com.inha.capstone.common.exception.ErrorCode;
+import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperListItem;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.model.Paper;
@@ -79,23 +82,23 @@ public class PaperService {
 
         int totalPages = total > 0 ? (int) Math.ceil((double) total / pageSize) : 0;
 
-        return PaperSearchResponse.builder()
-                .page(page)
-                .pageSize(pageSize)
-                .total(total)
-                .totalPages(totalPages)
-                .hasNext(page < totalPages)
-                .hasPrev(page > 1)
-                .isApproximate(isApproximate)
-                .items(items)
-                .build();
+        return new PaperSearchResponse(
+                page,
+                pageSize,
+                total,
+                totalPages,
+                page < totalPages,
+                page > 1,
+                isApproximate,
+                items
+        );
     }
 
-    public Paper getPaperDetail(User user, String paperId) {
+    public PaperDetailResponse getPaperDetail(User user, String paperId) {
         // Atomic increment using MongoTemplate
         Query query = new Query(Criteria.where("id").is(paperId));
         Update update = new Update().inc("viewCount", 1);
-        
+
 
         Paper paper = mongoTemplate.findAndModify(
             query,
@@ -105,12 +108,12 @@ public class PaperService {
         );
 
         if (paper == null) {
-            throw new RuntimeException("Paper not found with id: " + paperId);
+            throw new CustomException(ErrorCode.PAPER_NOT_FOUND);
         }
-        
+
         // TODO: Log activity (view)
-        
-        return paper;
+
+        return PaperDetailResponse.from(paper);
     }
 
     private Sort getSort(String sortBy) {

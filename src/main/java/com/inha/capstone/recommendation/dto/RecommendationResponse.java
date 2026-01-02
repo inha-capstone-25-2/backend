@@ -1,9 +1,9 @@
 package com.inha.capstone.recommendation.dto;
 
 import lombok.Builder;
+
 import java.util.List;
 
-@Builder
 public record RecommendationResponse(
     Long userId,
     String sessionId,

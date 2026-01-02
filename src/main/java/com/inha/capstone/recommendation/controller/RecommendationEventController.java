@@ -1,14 +1,22 @@
 package com.inha.capstone.recommendation.controller;
 
 import com.inha.capstone.auth.security.UserPrincipal;
-import com.inha.capstone.recommendation.dto.RecommendationEventDto;
+import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
+import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
+import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.service.RecommendationEventService;
 import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/events")
@@ -18,17 +26,16 @@ public class RecommendationEventController {
     private final RecommendationEventService service;
 
     @PostMapping
-    public ResponseEntity<RecommendationEventDto.Response> logEvent(
+    public ResponseEntity<RecommendationEventResponse> logEvent(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody RecommendationEventDto.CreateRequest request
+            @RequestBody RecommendationEventCreateRequest request
     ) {
         if (userPrincipal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         User user = userPrincipal.getUser();
-        
-        // Ensure user logs their own events only
-        if (!user.getId().equals(request.getUserId())) {
+
+        if (!user.getId().equals(request.userId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
@@ -36,7 +43,7 @@ public class RecommendationEventController {
     }
 
     @GetMapping("/session/{sessionId}")
-    public ResponseEntity<RecommendationEventDto.EventListResponse> getSessionEvents(
+    public ResponseEntity<RecommendationEventListResponse> getSessionEvents(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable String sessionId,
             @RequestParam(defaultValue = "1") int page,
@@ -49,7 +56,7 @@ public class RecommendationEventController {
     }
 
     @GetMapping("/users/{userId}")
-    public ResponseEntity<RecommendationEventDto.EventListResponse> getUserEvents(
+    public ResponseEntity<RecommendationEventListResponse> getUserEvents(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long userId,
             @RequestParam(defaultValue = "1") int page,

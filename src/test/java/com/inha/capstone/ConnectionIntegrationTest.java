@@ -41,35 +41,52 @@ class ConnectionIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void MySQL_연결_테스트() throws SQLException {
+        // given
+        // 데이터베이스 연결 준비
+
+        // when & then
         try (Connection connection = dataSource.getConnection()) {
+            Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+
             assertThat(connection.isValid(1)).isTrue();
+            assertThat(result).isEqualTo(1);
         }
-        
-        Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
-        assertThat(result).isEqualTo(1);
     }
 
     @Test
     void Redis_연결_테스트() {
+        // given
         String key = "test:connection";
         String value = "active";
-        
+
+        // when
         redisTemplate.opsForValue().set(key, value);
         Object retrievedStatus = redisTemplate.opsForValue().get(key);
-        
+
+        // then
         assertThat(retrievedStatus).isEqualTo(value);
-        
+
         redisTemplate.delete(key);
     }
 
     @Test
     void MongoDB_연결_테스트() {
+        // given
+        // MongoDB 연결 준비
+
+        // when
         Document pong = mongoTemplate.executeCommand("{ ping: 1 }");
+
+        // then
         assertThat(pong).containsKey("ok");
     }
 
     @Test
     void Elasticsearch_연결_테스트() throws java.io.IOException {
+        // given
+        // Elasticsearch 연결 준비
+
+        // when & then
         assertThat(elasticsearchClient.ping().value()).isTrue();
     }
 }

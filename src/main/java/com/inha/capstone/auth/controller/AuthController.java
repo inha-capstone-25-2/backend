@@ -1,6 +1,7 @@
 package com.inha.capstone.auth.controller;
 
-import com.inha.capstone.auth.dto.*;
+import com.inha.capstone.auth.dto.LoginRequest;
+import com.inha.capstone.auth.dto.TokenResponse;
 import com.inha.capstone.auth.security.UserPrincipal;
 import com.inha.capstone.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -8,7 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")

@@ -1,12 +1,9 @@
 package com.inha.capstone.paper.dto;
 
 import com.inha.capstone.paper.model.Paper;
-import lombok.Builder;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
-@Builder
 public record PaperListItem(
     String id,
     String title,
@@ -17,14 +14,14 @@ public record PaperListItem(
     String journalRef
 ) {
     public static PaperListItem from(Paper paper) {
-        return PaperListItem.builder()
-                .id(paper.getId())
-                .title(paper.getTitle())
-                .authors(paper.getAuthors())
-                .categories(paper.getCategories())
-                .updateDate(paper.getUpdateDate())
-                .viewCount(paper.getViewCount())
-                .journalRef(paper.getJournalRef())
-                .build();
+        return new PaperListItem(
+            paper.getId(),
+            paper.getTitle(),
+            paper.getAuthors(),
+            paper.getCategories(),
+            paper.getUpdateDate(),
+            paper.getViewCount(),
+            paper.getJournalRef()
+        );
     }
 }

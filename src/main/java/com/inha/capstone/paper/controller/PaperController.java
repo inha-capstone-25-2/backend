@@ -1,14 +1,18 @@
 package com.inha.capstone.paper.controller;
 
 import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
-import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.service.PaperService;
 import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -33,13 +37,13 @@ public class PaperController {
     }
 
     @GetMapping("/{paperId}")
-    public ResponseEntity<Paper> getPaperDetail(
+    public ResponseEntity<PaperDetailResponse> getPaperDetail(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable String paperId
     ) {
         User user = userPrincipal != null ? userPrincipal.getUser() : null;
 
-        
+
         return ResponseEntity.ok(paperService.getPaperDetail(user, paperId));
     }
 }

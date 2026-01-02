@@ -1,7 +1,7 @@
 package com.inha.capstone.bookmark.service;
 
 import com.inha.capstone.bookmark.dto.BookmarkCreateRequest;
-import com.inha.capstone.bookmark.dto.BookmarkDto;
+import com.inha.capstone.bookmark.dto.BookmarkResponse;
 import com.inha.capstone.bookmark.model.Bookmark;
 import com.inha.capstone.bookmark.repository.BookmarkRepository;
 import com.inha.capstone.paper.model.Paper;
@@ -42,16 +42,18 @@ class BookmarkServiceTest {
             // given
             User user = User.builder().build();
             ReflectionTestUtils.setField(user, "id", 1L);
-            BookmarkCreateRequest request = BookmarkCreateRequest.builder()
-                    .doi("10.1234/5678")
+            BookmarkCreateRequest request = new BookmarkCreateRequest("10.1234/5678", null);
+
+            Paper paper = Paper.builder()
+                    .id("10.1234/5678")
+                    .title("Test Paper")
                     .build();
-            
-            given(paperRepository.findById("10.1234/5678")).willReturn(Optional.of(new Paper()));
+            given(paperRepository.findById("10.1234/5678")).willReturn(Optional.of(paper));
             given(bookmarkRepository.findByUserIdAndDoi(1L, "10.1234/5678")).willReturn(Optional.empty());
             given(bookmarkRepository.save(any(Bookmark.class))).willAnswer(i -> i.getArguments()[0]);
 
             // when
-            BookmarkDto result = bookmarkService.createBookmark(user, request);
+            BookmarkResponse result = bookmarkService.createBookmark(user, request);
 
             // then
             assertThat(result).isNotNull();
