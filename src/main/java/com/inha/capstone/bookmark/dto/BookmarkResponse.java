@@ -21,10 +21,10 @@ public record BookmarkResponse(
             bookmark.getUserId(),
             bookmark.getDoi(),
             bookmark.getBookmarkedAt(),
-            paper != null ? paper.getJournalRef() : null,
+            paper != null ? paper.getJournalRef() : "Unknown",
             bookmark.getNotes(),
-            paper != null ? paper.getTitle() : "Unknown Paper",
-            paper != null ? paper.getAuthors() : null
+            paper != null ? paper.getTitle() : "Unknown",
+            paper != null ? paper.getAuthors() : "Unknown"
         );
     }
 }
