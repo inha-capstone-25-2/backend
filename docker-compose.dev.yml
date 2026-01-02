@@ -6,8 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: spring_boot_dev
-    env_file:
-      - ../env/dev/.env
     environment:
       APP_ENV: dev
       REDIS_HOST: redis
