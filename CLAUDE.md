@@ -14,7 +14,9 @@
 - **Entity**: JPA Annotation 필수. 무분별한 Getter/Setter/Builder/Data/NoArgsConstructor/AllArgsConstructor 지양. Entity 속성에 따라 유연하게 `BaseEntity` 상속.
 - **DTO**: `record` 사용. `of`(다중)/`from`(단일) 메서드 패턴. `XXXResponse`/`XXXRequest` 네이밍. Entity를 DTO로 변환하는 경우 from 정적 팩토리 메서드 사용.
 - **Controller**: RESTful, `/api` prefix, kebab-case URL. 파라미터와 반환값은 반드시 DTO.
-- **Service**: 예외는 CustomException으로 처리. 
+- **Service**: 예외는 CustomException으로 처리.
+- **Repository**: JpaRepository를 상속하는 경우 Repository 어노테이션 제외.
+- **Test**: 한글 메서드명. given/when/then 패턴 사용. 기능 별로 테스트 그룹화(Nested). Nested 클래스는 한글명.
 
 ## 주요 명령어
 ```bash

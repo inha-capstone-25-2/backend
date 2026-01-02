@@ -5,7 +5,7 @@ import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -13,7 +13,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -31,49 +30,55 @@ class RecommendationEventServiceTest {
     @InjectMocks
     private RecommendationEventService service;
 
-    @Test
-    @DisplayName("이벤트 로깅 성공")
-    void logEvent_Success() {
-        // given
-        RecommendationEventCreateRequest request = new RecommendationEventCreateRequest(
-                1L,
-                "p123",
-                "CLICK",
-                "sess-1",
-                Map.of("duration", 10)
-        );
+    @Nested
+    class 로그_이벤트 {
 
-        RecommendationEvent savedEvent = RecommendationEvent.builder()
-                .id("evt-1")
-                .userId(1L)
-                .paperId("p123")
-                .activityType("CLICK")
-                .sessionId("sess-1")
-                .build();
+        @Test
+        void 이벤트_로깅_성공() {
+            // given
+            RecommendationEventCreateRequest request = new RecommendationEventCreateRequest(
+                    1L,
+                    "p123",
+                    "CLICK",
+                    "sess-1",
+                    Map.of("duration", 10)
+            );
 
-        given(repository.save(any(RecommendationEvent.class))).willReturn(savedEvent);
+            RecommendationEvent savedEvent = RecommendationEvent.builder()
+                    .id("evt-1")
+                    .userId(1L)
+                    .paperId("p123")
+                    .activityType("CLICK")
+                    .sessionId("sess-1")
+                    .build();
 
-        // when
-        RecommendationEventResponse response = service.logEvent(request);
+            given(repository.save(any(RecommendationEvent.class))).willReturn(savedEvent);
 
-        // then
-        assertThat(response.id()).isEqualTo("evt-1");
-        assertThat(response.userId()).isEqualTo(1L);
-        then(repository).should().save(any(RecommendationEvent.class));
+            // when
+            RecommendationEventResponse response = service.logEvent(request);
+
+            // then
+            assertThat(response.id()).isEqualTo("evt-1");
+            assertThat(response.userId()).isEqualTo(1L);
+            then(repository).should().save(any(RecommendationEvent.class));
+        }
     }
 
-    @Test
-    @DisplayName("세션별 이벤트 조회")
-    void getEventsBySession() {
-        // given
-        String sessionId = "sess-1";
-        RecommendationEvent event = RecommendationEvent.builder().sessionId(sessionId).build();
-        given(repository.findBySessionId(any(), any(Pageable.class))).willReturn(List.of(event));
+    @Nested
+    class 세션별_이벤트_조회 {
 
-        // when
-        RecommendationEventListResponse response = service.getEventsBySession(sessionId, 1, 10);
+        @Test
+        void 세션별_이벤트_조회_성공() {
+            // given
+            String sessionId = "sess-1";
+            RecommendationEvent event = RecommendationEvent.builder().sessionId(sessionId).build();
+            given(repository.findBySessionId(any(), any(Pageable.class))).willReturn(List.of(event));
 
-        // then
-        assertThat(response.items()).hasSize(1);
+            // when
+            RecommendationEventListResponse response = service.getEventsBySession(sessionId, 1, 10);
+
+            // then
+            assertThat(response.items()).hasSize(1);
+        }
     }
 }
