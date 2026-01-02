@@ -4,7 +4,7 @@ import java.util.List;
 
 public record RecommendationEventListResponse(
     List<RecommendationEventResponse> items,
-    int total,
+    long total,
     int page,
     int pageSize
 ) {}

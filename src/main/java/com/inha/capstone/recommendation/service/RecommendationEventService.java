@@ -6,6 +6,7 @@ import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -35,23 +36,23 @@ public class RecommendationEventService {
 
     public RecommendationEventListResponse getEventsBySession(String sessionId, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "timestamp"));
-        List<RecommendationEvent> events = repository.findBySessionId(sessionId, pageRequest);
+        Page<RecommendationEvent> eventPage = repository.findBySessionId(sessionId, pageRequest);
 
-        List<RecommendationEventResponse> items = events.stream()
+        List<RecommendationEventResponse> items = eventPage.getContent().stream()
                 .map(RecommendationEventResponse::from)
                 .toList();
 
-        return new RecommendationEventListResponse(items, items.size(), page, pageSize);
+        return new RecommendationEventListResponse(items, eventPage.getTotalElements(), page, pageSize);
     }
 
     public RecommendationEventListResponse getEventsByUser(Long userId, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "timestamp"));
-        List<RecommendationEvent> events = repository.findByUserId(userId, pageRequest);
+        Page<RecommendationEvent> eventPage = repository.findByUserId(userId, pageRequest);
 
-        List<RecommendationEventResponse> items = events.stream()
+        List<RecommendationEventResponse> items = eventPage.getContent().stream()
                 .map(RecommendationEventResponse::from)
                 .toList();
 
-        return new RecommendationEventListResponse(items, items.size(), page, pageSize);
+        return new RecommendationEventListResponse(items, eventPage.getTotalElements(), page, pageSize);
     }
 }

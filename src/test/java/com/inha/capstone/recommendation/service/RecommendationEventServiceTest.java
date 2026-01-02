@@ -11,6 +11,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -72,13 +75,15 @@ class RecommendationEventServiceTest {
             // given
             String sessionId = "sess-1";
             RecommendationEvent event = RecommendationEvent.builder().sessionId(sessionId).build();
-            given(repository.findBySessionId(any(), any(Pageable.class))).willReturn(List.of(event));
+            Page<RecommendationEvent> page = new PageImpl<>(List.of(event), PageRequest.of(0, 10), 1);
+            given(repository.findBySessionId(any(), any(Pageable.class))).willReturn(page);
 
             // when
             RecommendationEventListResponse response = service.getEventsBySession(sessionId, 1, 10);
 
             // then
             assertThat(response.items()).hasSize(1);
+            assertThat(response.total()).isEqualTo(1);
         }
     }
 }
