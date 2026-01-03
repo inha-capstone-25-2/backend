@@ -58,7 +58,7 @@ jobs:
           source: "src,gradle,gradlew,gradlew.bat,build.gradle,settings.gradle,docker-compose.dev.yml,Dockerfile"
           target: ${{ secrets.EC2_PATH }}/backend
           overwrite: true
-          debug: true
+          debug: false
 
       - name: Build & Restart
         uses: appleboy/ssh-action@v1.2.0
