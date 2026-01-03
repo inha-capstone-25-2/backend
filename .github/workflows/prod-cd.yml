@@ -48,6 +48,7 @@ jobs:
           echo "✅ 서브모듈 검증 완료"
           ls -la src/main/resources/secret/application-secret.yml
 
+      # EC2로 파일 전송
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -67,30 +68,16 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            # Move to the project directory
             cd ${{ secrets.EC2_PATH }}/backend
             
-            # Ensure permissions
+            echo "🔧 Gradle 실행 권한 부여..."
             chmod +x gradlew
             
-            # Check for docker compose
-            if docker compose version >/dev/null 2>&1; then
-              COMPOSE="docker compose"
-            elif command -v docker-compose >/dev/null 2>&1; then
-              COMPOSE="docker-compose"
-            else
-              echo "Installing compose plugin..."
-              sudo apt-get update -y
-              sudo apt-get install -y docker-compose-plugin || true
-              COMPOSE="docker compose"
-            fi
+            echo "🛑 기존 컨테이너 중지..."
+            sudo docker compose -f docker-compose.prod.yml down --remove-orphans || true
             
-            echo "Using: $COMPOSE"
+            echo "🏗️ 이미지 빌드 및 컨테이너 시작..."
+            sudo docker compose -f docker-compose.prod.yml up -d --build
             
-            # Start services using prod compose file
-            sudo $COMPOSE -f docker-compose.prod.yml up -d --build
-            sudo $COMPOSE -f docker-compose.prod.yml ps
-            
-            # Logs (optional, just to verify startup)
-            sudo docker logs spring_boot_prod --tail=50 || true
-            sudo docker logs spring_boot_redis_prod --tail=20 || true
+            echo "🧹 사용하지 않는 이미지 정리..."
+            sudo docker image prune -f
