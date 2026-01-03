@@ -1,6 +1,9 @@
 spring:
   config:
-    import: "optional:classpath:secret/application-secret.yml"
+    import:
+      - optional:classpath:secret/application-db.yml
+      - optional:classpath:secret/application-cloud.yml
+      - optional:classpath:secret/application-variables.yml
   application:
     name: backend
   
@@ -8,27 +11,12 @@ spring:
     active: ${APP_ENV:local}
 
   datasource:
-    url: jdbc:mysql://${mysql.host}:${mysql.port}/${mysql.database}?serverTimezone=UTC&characterEncoding=UTF-8
-    username: ${mysql.user}
-    password: ${mysql.password}
-    driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-    
-  data:
-    mongodb:
-      uri: mongodb://${mongo.user}:${mongo.password}@${mongo.host}:${mongo.port}/${mongo.db}?authSource=${mongo.auth-source}
-    redis:
-      host: ${redis.host:localhost}
-      port: 6379
-  
-  elasticsearch:
-    uris: http://${elasticsearch.host}:${elasticsearch.port}
-    
 
 cloud:
   aws:
@@ -36,6 +24,7 @@ cloud:
       static: ${aws.region}
     s3:
       bucket: ${aws.s3.bucket}
+      key: ${aws.s3.key}
 
 app:
   jwt:
