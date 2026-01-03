@@ -54,10 +54,10 @@ jobs:
           host: ${{ secrets.EC2_PROD_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "."
+          source: "src,gradle,gradlew,gradlew.bat,build.gradle,settings.gradle,docker-compose.prod.yml,Dockerfile"
           target: ${{ secrets.EC2_PATH }}/backend
           overwrite: true
-          debug: true
+          debug: false
 
       - name: Prepare docker on EC2 (install/enable if needed)
         uses: appleboy/ssh-action@v1.2.0
