@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  EC2_PATH: /home/ubuntu/app
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -56,7 +59,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           source: "src,gradle,gradlew,gradlew.bat,build.gradle,settings.gradle,docker-compose.prod.yml,Dockerfile"
-          target: ${{ secrets.EC2_PATH }}/backend
+          target: ${{ env.EC2_PATH }}/backend
           overwrite: true
           debug: false
 
@@ -68,7 +71,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            cd ${{ secrets.EC2_PATH }}/backend
+            cd ${{ env.EC2_PATH }}/backend
             
             echo "🔧 Gradle 실행 권한 부여..."
             chmod +x gradlew
