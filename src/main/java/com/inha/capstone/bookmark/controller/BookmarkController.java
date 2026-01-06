@@ -4,7 +4,6 @@ import com.inha.capstone.auth.security.UserPrincipal;
 import com.inha.capstone.bookmark.dto.BookmarkCreateRequest;
 import com.inha.capstone.bookmark.dto.BookmarkResponse;
 import com.inha.capstone.bookmark.service.BookmarkService;
-import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,34 +29,23 @@ public class BookmarkController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody BookmarkCreateRequest request
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(401).build();
-        }
-        User user = userPrincipal.getUser();
-        return ResponseEntity.ok(bookmarkService.createBookmark(user, request));
+        return ResponseEntity.ok(bookmarkService.createBookmark(userPrincipal.getUser(), request));
     }
 
     @GetMapping
     public ResponseEntity<List<BookmarkResponse>> getBookmarks(
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(401).build();
-        }
-        User user = userPrincipal.getUser();
-        return ResponseEntity.ok(bookmarkService.getBookmarks(user));
+        return ResponseEntity.ok(bookmarkService.getBookmarks(userPrincipal.getUser()));
     }
-    
+
     @DeleteMapping("/{bookmarkId}")
     public ResponseEntity<Void> deleteBookmark(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable String bookmarkId
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(401).build();
-        }
-        User user = userPrincipal.getUser();
-        bookmarkService.deleteBookmark(user, bookmarkId);
+        bookmarkService.deleteBookmark(userPrincipal.getUser(), bookmarkId);
         return ResponseEntity.ok().build();
     }
 }
+

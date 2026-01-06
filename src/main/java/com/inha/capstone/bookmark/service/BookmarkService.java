@@ -60,7 +60,7 @@ public class BookmarkService {
                 .orElseThrow(() -> new CustomException(ErrorCode.BOOKMARK_NOT_FOUND));
 
         if (!bookmark.getUserId().equals(user.getId())) {
-            throw new CustomException(ErrorCode.UNAUTHORIZED);
+            throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
         bookmarkRepository.delete(bookmark);

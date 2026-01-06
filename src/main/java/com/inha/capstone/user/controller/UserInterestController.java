@@ -1,7 +1,6 @@
 package com.inha.capstone.user.controller;
 
 import com.inha.capstone.auth.security.UserPrincipal;
-import com.inha.capstone.user.domain.User;
 import com.inha.capstone.user.dto.UserInterestAddRequest;
 import com.inha.capstone.user.dto.UserInterestListResponse;
 import com.inha.capstone.user.dto.UserInterestRemovalResponse;
@@ -32,11 +31,7 @@ public class UserInterestController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody UserInterestAddRequest request
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        User user = userPrincipal.getUser();
-        List<String> result = userInterestService.addInterests(user, request.categoryCodes());
+        List<String> result = userInterestService.addInterests(userPrincipal.getUser(), request.categoryCodes());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
@@ -44,11 +39,7 @@ public class UserInterestController {
     public ResponseEntity<UserInterestListResponse> listInterests(
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        User user = userPrincipal.getUser();
-        return ResponseEntity.ok(userInterestService.listInterests(user));
+        return ResponseEntity.ok(userInterestService.listInterests(userPrincipal.getUser()));
     }
 
     @DeleteMapping
@@ -56,10 +47,7 @@ public class UserInterestController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(name = "codes") List<String> codes
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        User user = userPrincipal.getUser();
-        return ResponseEntity.ok(userInterestService.removeInterests(user, codes));
+        return ResponseEntity.ok(userInterestService.removeInterests(userPrincipal.getUser(), codes));
     }
 }
+

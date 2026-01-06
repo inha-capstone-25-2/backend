@@ -1,10 +1,13 @@
 package com.inha.capstone.recommendation.service;
 
+import com.inha.capstone.common.exception.CustomException;
+import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
 import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
+import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,7 +23,11 @@ public class RecommendationEventService {
 
     private final RecommendationEventRepository repository;
 
-    public RecommendationEventResponse logEvent(RecommendationEventCreateRequest request) {
+    public RecommendationEventResponse logEvent(User user, RecommendationEventCreateRequest request) {
+        if (!user.getId().equals(request.userId())) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
         RecommendationEvent event = RecommendationEvent.builder()
                 .userId(request.userId())
                 .paperId(request.paperId())

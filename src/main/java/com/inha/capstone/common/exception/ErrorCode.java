@@ -22,7 +22,8 @@ public enum ErrorCode {
     BOOKMARK_NOT_FOUND(HttpStatus.NOT_FOUND, "B002", "북마크를 찾을 수 없습니다."),
 
     // Authorization
-    UNAUTHORIZED(HttpStatus.FORBIDDEN, "A001", "접근 권한이 없습니다.");
+    UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "A001", "로그인이 필요합니다."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "A002", "접근 권한이 없습니다.");
 
     private final HttpStatus status;
     private final String code;

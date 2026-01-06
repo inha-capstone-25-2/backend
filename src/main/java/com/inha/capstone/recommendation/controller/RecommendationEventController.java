@@ -5,7 +5,6 @@ import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
 import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.service.RecommendationEventService;
-import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,16 +29,8 @@ public class RecommendationEventController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody RecommendationEventCreateRequest request
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        User user = userPrincipal.getUser();
-
-        if (!user.getId().equals(request.userId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.logEvent(request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.logEvent(userPrincipal.getUser(), request));
     }
 
     @GetMapping("/session/{sessionId}")
@@ -49,9 +40,6 @@ public class RecommendationEventController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int pageSize
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         return ResponseEntity.ok(service.getEventsBySession(sessionId, page, pageSize));
     }
 
@@ -62,9 +50,7 @@ public class RecommendationEventController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int pageSize
     ) {
-        if (userPrincipal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         return ResponseEntity.ok(service.getEventsByUser(userId, page, pageSize));
     }
 }
+
