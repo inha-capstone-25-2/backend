@@ -43,13 +43,13 @@ public class RecommendationEventService {
     public PageResponse<RecommendationEventResponse> getEventsBySession(String sessionId, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "timestamp"));
         Page<RecommendationEvent> eventPage = repository.findBySessionId(sessionId, pageRequest);
-        return PageResponse.from(eventPage, RecommendationEventResponse::from);
+        return PageResponse.of(eventPage, RecommendationEventResponse::from);
     }
 
     public PageResponse<RecommendationEventResponse> getEventsByUser(Long userId, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "timestamp"));
         Page<RecommendationEvent> eventPage = repository.findByUserId(userId, pageRequest);
-        return PageResponse.from(eventPage, RecommendationEventResponse::from);
+        return PageResponse.of(eventPage, RecommendationEventResponse::from);
     }
 }
 

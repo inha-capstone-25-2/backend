@@ -27,7 +27,7 @@ public record PageResponse<T>(
         );
     }
 
-    public static <T, R> PageResponse<R> from(Page<T> page, Function<T, R> mapper) {
+    public static <T, R> PageResponse<R> of(Page<T> page, Function<T, R> mapper) {
         List<R> content = page.getContent().stream()
                 .map(mapper)
                 .toList();

@@ -19,7 +19,7 @@ public record SliceResponse<T>(
         );
     }
 
-    public static <T, R> SliceResponse<R> from(Slice<T> slice, Function<T, R> mapper) {
+    public static <T, R> SliceResponse<R> of(Slice<T> slice, Function<T, R> mapper) {
         List<R> content = slice.getContent().stream()
                 .map(mapper)
                 .toList();
