@@ -1,9 +1,9 @@
 package com.inha.capstone.recommendation.service;
 
+import com.inha.capstone.common.dto.PageResponse;
 import com.inha.capstone.common.exception.CustomException;
 import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
-import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
@@ -120,11 +120,13 @@ class RecommendationEventServiceTest {
             given(repository.findBySessionId(any(), any(Pageable.class))).willReturn(page);
 
             // when
-            RecommendationEventListResponse response = service.getEventsBySession(sessionId, 1, 10);
+            PageResponse<RecommendationEventResponse> response = service.getEventsBySession(sessionId, 1, 10);
 
             // then
-            assertThat(response.items()).hasSize(1);
-            assertThat(response.total()).isEqualTo(1);
+            assertThat(response.content()).hasSize(1);
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.page()).isEqualTo(1);
         }
     }
 }
+

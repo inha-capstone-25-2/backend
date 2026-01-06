@@ -1,8 +1,8 @@
 package com.inha.capstone.recommendation.controller;
 
 import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.common.dto.PageResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
-import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.service.RecommendationEventService;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class RecommendationEventController {
     }
 
     @GetMapping("/session/{sessionId}")
-    public ResponseEntity<RecommendationEventListResponse> getSessionEvents(
+    public ResponseEntity<PageResponse<RecommendationEventResponse>> getSessionEvents(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable String sessionId,
             @RequestParam(defaultValue = "1") int page,
@@ -44,7 +44,7 @@ public class RecommendationEventController {
     }
 
     @GetMapping("/users/{userId}")
-    public ResponseEntity<RecommendationEventListResponse> getUserEvents(
+    public ResponseEntity<PageResponse<RecommendationEventResponse>> getUserEvents(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Long userId,
             @RequestParam(defaultValue = "1") int page,
@@ -53,4 +53,5 @@ public class RecommendationEventController {
         return ResponseEntity.ok(service.getEventsByUser(userId, page, pageSize));
     }
 }
+
 
