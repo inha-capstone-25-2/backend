@@ -1,10 +1,13 @@
 package com.inha.capstone.recommendation.service;
 
+import com.inha.capstone.common.dto.PageResponse;
+import com.inha.capstone.common.exception.CustomException;
+import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
-import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
+import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,7 +15,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +22,11 @@ public class RecommendationEventService {
 
     private final RecommendationEventRepository repository;
 
-    public RecommendationEventResponse logEvent(RecommendationEventCreateRequest request) {
+    public RecommendationEventResponse logEvent(User user, RecommendationEventCreateRequest request) {
+        if (!user.getId().equals(request.userId())) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
         RecommendationEvent event = RecommendationEvent.builder()
                 .userId(request.userId())
                 .paperId(request.paperId())
@@ -34,25 +40,16 @@ public class RecommendationEventService {
         return RecommendationEventResponse.from(saved);
     }
 
-    public RecommendationEventListResponse getEventsBySession(String sessionId, int page, int pageSize) {
+    public PageResponse<RecommendationEventResponse> getEventsBySession(String sessionId, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "timestamp"));
         Page<RecommendationEvent> eventPage = repository.findBySessionId(sessionId, pageRequest);
-
-        List<RecommendationEventResponse> items = eventPage.getContent().stream()
-                .map(RecommendationEventResponse::from)
-                .toList();
-
-        return new RecommendationEventListResponse(items, eventPage.getTotalElements(), page, pageSize);
+        return PageResponse.of(eventPage, RecommendationEventResponse::from);
     }
 
-    public RecommendationEventListResponse getEventsByUser(Long userId, int page, int pageSize) {
+    public PageResponse<RecommendationEventResponse> getEventsByUser(Long userId, int page, int pageSize) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Direction.DESC, "timestamp"));
         Page<RecommendationEvent> eventPage = repository.findByUserId(userId, pageRequest);
-
-        List<RecommendationEventResponse> items = eventPage.getContent().stream()
-                .map(RecommendationEventResponse::from)
-                .toList();
-
-        return new RecommendationEventListResponse(items, eventPage.getTotalElements(), page, pageSize);
+        return PageResponse.of(eventPage, RecommendationEventResponse::from);
     }
 }
+

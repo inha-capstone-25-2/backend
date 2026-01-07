@@ -6,7 +6,6 @@ import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
 import com.inha.capstone.common.exception.CustomException;
-import com.inha.capstone.common.exception.DuplicateUserException;
 import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.user.domain.User;
 import com.inha.capstone.user.repository.UserRepository;
@@ -29,10 +28,10 @@ public class AuthService {
     @Transactional
     public UserResponse register(UserCreateRequest request) {
         if (userRepository.existsByUsername(request.username())) {
-            throw new DuplicateUserException(ErrorCode.DUPLICATE_USERNAME);
+            throw new CustomException(ErrorCode.DUPLICATE_USERNAME);
         }
         if (userRepository.existsByEmail(request.email())) {
-            throw new DuplicateUserException(ErrorCode.DUPLICATE_EMAIL);
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
         User user = User.builder()
@@ -45,7 +44,7 @@ public class AuthService {
         try {
             userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
-            throw new DuplicateUserException(ErrorCode.ALREADY_REGISTERED_USER);
+            throw new CustomException(ErrorCode.ALREADY_REGISTERED_USER);
         }
 
         return UserResponse.from(user);

@@ -1,10 +1,13 @@
 package com.inha.capstone.recommendation.service;
 
+import com.inha.capstone.common.dto.PageResponse;
+import com.inha.capstone.common.exception.CustomException;
+import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
-import com.inha.capstone.recommendation.dto.RecommendationEventListResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
+import com.inha.capstone.user.domain.User;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,14 +18,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class RecommendationEventServiceTest {
@@ -39,6 +45,14 @@ class RecommendationEventServiceTest {
         @Test
         void 이벤트_로깅_성공() {
             // given
+            User user = User.builder()
+                    .email("test@example.com")
+                    .username("testuser")
+                    .name("Test")
+                    .password("pw")
+                    .build();
+            ReflectionTestUtils.setField(user, "id", 1L);
+
             RecommendationEventCreateRequest request = new RecommendationEventCreateRequest(
                     1L,
                     "p123",
@@ -58,12 +72,39 @@ class RecommendationEventServiceTest {
             given(repository.save(any(RecommendationEvent.class))).willReturn(savedEvent);
 
             // when
-            RecommendationEventResponse response = service.logEvent(request);
+            RecommendationEventResponse response = service.logEvent(user, request);
 
             // then
             assertThat(response.id()).isEqualTo("evt-1");
             assertThat(response.userId()).isEqualTo(1L);
             then(repository).should().save(any(RecommendationEvent.class));
+        }
+
+        @Test
+        void 다른_사용자_이벤트_로깅_시_권한_예외_발생() {
+            // given
+            User user = User.builder()
+                    .email("test@example.com")
+                    .username("testuser")
+                    .name("Test")
+                    .password("pw")
+                    .build();
+            ReflectionTestUtils.setField(user, "id", 1L);
+
+            RecommendationEventCreateRequest request = new RecommendationEventCreateRequest(
+                    999L,
+                    "p123",
+                    "CLICK",
+                    "sess-1",
+                    Map.of("duration", 10)
+            );
+
+            // when & then
+            assertThatThrownBy(() -> service.logEvent(user, request))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+
+            then(repository).should(never()).save(any(RecommendationEvent.class));
         }
     }
 
@@ -79,11 +120,13 @@ class RecommendationEventServiceTest {
             given(repository.findBySessionId(any(), any(Pageable.class))).willReturn(page);
 
             // when
-            RecommendationEventListResponse response = service.getEventsBySession(sessionId, 1, 10);
+            PageResponse<RecommendationEventResponse> response = service.getEventsBySession(sessionId, 1, 10);
 
             // then
-            assertThat(response.items()).hasSize(1);
-            assertThat(response.total()).isEqualTo(1);
+            assertThat(response.content()).hasSize(1);
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.page()).isEqualTo(1);
         }
     }
 }
+

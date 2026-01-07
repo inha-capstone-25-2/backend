@@ -6,7 +6,6 @@ import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
 import com.inha.capstone.common.exception.CustomException;
-import com.inha.capstone.common.exception.DuplicateUserException;
 import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.user.domain.User;
 import com.inha.capstone.user.repository.UserRepository;
@@ -86,8 +85,8 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.register(request))
-                    .isInstanceOf(DuplicateUserException.class)
-                    .hasMessage(ErrorCode.DUPLICATE_EMAIL.getMessage());
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_EMAIL);
 
             then(userRepository).should().existsByUsername("newuser");
             then(userRepository).should().existsByEmail("existing@example.com");
@@ -105,8 +104,8 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.register(request))
-                    .isInstanceOf(DuplicateUserException.class)
-                    .hasMessage(ErrorCode.DUPLICATE_USERNAME.getMessage());
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_USERNAME);
 
             then(userRepository).should().existsByUsername("existinguser");
             then(userRepository).should(never()).existsByEmail(anyString());
@@ -130,8 +129,8 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.register(request))
-                    .isInstanceOf(DuplicateUserException.class)
-                    .hasMessage(ErrorCode.ALREADY_REGISTERED_USER.getMessage());
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ALREADY_REGISTERED_USER);
 
             then(userRepository).should().save(any(User.class));
         }
