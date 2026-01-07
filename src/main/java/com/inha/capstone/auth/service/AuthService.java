@@ -1,7 +1,7 @@
 package com.inha.capstone.auth.service;
 
 import com.inha.capstone.auth.dto.LoginRequest;
-import com.inha.capstone.auth.dto.TokenResponse;
+import com.inha.capstone.auth.dto.LoginResponse;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
@@ -49,7 +49,7 @@ public class AuthService {
         return UserResponse.from(user);
     }
 
-    public TokenResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_CREDENTIALS));
 
@@ -57,8 +57,10 @@ public class AuthService {
             throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUsername(), user.getTokenVersion());
-        return new TokenResponse(accessToken);
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUsername(), user.getId());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUsername(), user.getId());
+
+        return LoginResponse.of(accessToken, refreshToken, jwtTokenProvider.getAccessTokenExpirationSeconds());
     }
 
     public boolean checkUsernameExists(String username) {

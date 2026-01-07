@@ -1,7 +1,7 @@
 package com.inha.capstone.auth.controller;
 
 import com.inha.capstone.auth.dto.LoginRequest;
-import com.inha.capstone.auth.dto.TokenResponse;
+import com.inha.capstone.auth.dto.LoginResponse;
 import com.inha.capstone.auth.security.UserPrincipal;
 import com.inha.capstone.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -22,8 +22,8 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@RequestBody @Valid LoginRequest request) {
-        TokenResponse response = authService.login(request);
+    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
+        LoginResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
 

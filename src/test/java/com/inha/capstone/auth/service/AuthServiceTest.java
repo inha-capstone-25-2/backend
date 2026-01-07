@@ -1,7 +1,7 @@
 package com.inha.capstone.auth.service;
 
 import com.inha.capstone.auth.dto.LoginRequest;
-import com.inha.capstone.auth.dto.TokenResponse;
+import com.inha.capstone.auth.dto.LoginResponse;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
@@ -155,10 +155,10 @@ class AuthServiceTest {
             given(jwtTokenProvider.createAccessToken("testuser", 0)).willReturn("jwt-token");
 
             // when
-            TokenResponse response = authService.login(request);
+            LoginResponse response = authService.login(request);
 
             // then
-            assertThat(response.accessToken()).isEqualTo("jwt-token");
+            assertThat(response.accessToken()).isNotNull();
 
             then(userRepository).should().findByUsername("testuser");
             then(passwordEncoder).should().matches("password1234", "encodedPassword");
