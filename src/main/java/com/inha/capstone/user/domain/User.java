@@ -34,9 +34,6 @@ public class User extends BaseEntity {
     @Column(name = "hashed_password", nullable = false, length = 255)
     private String password;
 
-    @Column(name = "token_version", nullable = false)
-    private Integer tokenVersion;
-
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
@@ -46,11 +43,6 @@ public class User extends BaseEntity {
         this.username = username;
         this.name = name;
         this.password = password;
-        this.tokenVersion = 0;
         this.isActive = true;
-    }
-
-    public void increaseTokenVersion() {
-        this.tokenVersion++;
     }
 }
