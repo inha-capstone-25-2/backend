@@ -27,9 +27,6 @@ cloud:
       key: ${aws.s3.key}
 
 app:
-  jwt:
-    secret: ${jwt.secret}
-    expiration: ${jwt.expiration}
   cors:
     origins: ${cors.origins}
   gpu-server:
