@@ -2,9 +2,11 @@ package com.inha.capstone.auth.service;
 
 import com.inha.capstone.auth.dto.LoginRequest;
 import com.inha.capstone.auth.dto.LoginResponse;
+import com.inha.capstone.auth.dto.RefreshRequest;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
+import com.inha.capstone.auth.repository.TokenRepository;
 import com.inha.capstone.common.exception.CustomException;
 import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.user.domain.User;
@@ -23,6 +25,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenRepository tokenRepository;
 
     @Transactional
     public UserResponse register(UserCreateRequest request) {
@@ -60,18 +63,55 @@ public class AuthService {
         String accessToken = jwtTokenProvider.createAccessToken(user.getUsername(), user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getUsername(), user.getId());
 
+        tokenRepository.saveRefreshToken(
+                user.getId(),
+                refreshToken,
+                jwtTokenProvider.getRefreshTokenExpirationSeconds()
+        );
+
         return LoginResponse.of(accessToken, refreshToken, jwtTokenProvider.getAccessTokenExpirationSeconds());
+    }
+
+    public LoginResponse refresh(RefreshRequest request) {
+        String refreshToken = request.refreshToken();
+
+        if (!jwtTokenProvider.validateToken(refreshToken)) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        Long userId = jwtTokenProvider.getUserId(refreshToken);
+        String username = jwtTokenProvider.getUsername(refreshToken);
+
+        String storedToken = tokenRepository.findRefreshToken(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_TOKEN));
+
+        if (!storedToken.equals(refreshToken)) {
+            tokenRepository.deleteRefreshToken(userId);
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        String newAccessToken = jwtTokenProvider.createAccessToken(username, userId);
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(username, userId);
+
+        tokenRepository.saveRefreshToken(
+                userId,
+                newRefreshToken,
+                jwtTokenProvider.getRefreshTokenExpirationSeconds()
+        );
+
+        return LoginResponse.of(newAccessToken, newRefreshToken, jwtTokenProvider.getAccessTokenExpirationSeconds());
     }
 
     public boolean checkUsernameExists(String username) {
         return userRepository.existsByUsername(username);
     }
 
-    @Transactional
-    public void logout(Long userId) {
-        User persistentUser = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        persistentUser.increaseTokenVersion();
+    public void logout(Long userId, String accessToken) {
+        tokenRepository.deleteRefreshToken(userId);
+
+        String jti = jwtTokenProvider.getJti(accessToken);
+        long remainingSeconds = jwtTokenProvider.getRemainingSeconds(accessToken);
+        tokenRepository.addToBlacklist(jti, remainingSeconds);
     }
 
     @Transactional
