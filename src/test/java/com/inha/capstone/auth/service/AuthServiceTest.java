@@ -2,9 +2,11 @@ package com.inha.capstone.auth.service;
 
 import com.inha.capstone.auth.dto.LoginRequest;
 import com.inha.capstone.auth.dto.LoginResponse;
+import com.inha.capstone.auth.dto.RefreshRequest;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
+import com.inha.capstone.auth.repository.TokenRepository;
 import com.inha.capstone.common.exception.CustomException;
 import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.user.domain.User;
@@ -16,7 +18,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
@@ -24,7 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -41,6 +42,9 @@ class AuthServiceTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private TokenRepository tokenRepository;
 
     @InjectMocks
     private AuthService authService;
@@ -152,17 +156,22 @@ class AuthServiceTest {
 
             given(userRepository.findByUsername("testuser")).willReturn(Optional.of(user));
             given(passwordEncoder.matches("password1234", "encodedPassword")).willReturn(true);
-            given(jwtTokenProvider.createAccessToken("testuser", 0)).willReturn("jwt-token");
+            given(jwtTokenProvider.createAccessToken(anyString(), any())).willReturn("access-token");
+            given(jwtTokenProvider.createRefreshToken(anyString(), any())).willReturn("refresh-token");
+            given(jwtTokenProvider.getRefreshTokenExpirationSeconds()).willReturn(604800L);
+            given(jwtTokenProvider.getAccessTokenExpirationSeconds()).willReturn(900L);
 
             // when
             LoginResponse response = authService.login(request);
 
             // then
-            assertThat(response.accessToken()).isNotNull();
+            assertThat(response.accessToken()).isEqualTo("access-token");
+            assertThat(response.refreshToken()).isEqualTo("refresh-token");
+            assertThat(response.expiresIn()).isEqualTo(900L);
 
             then(userRepository).should().findByUsername("testuser");
             then(passwordEncoder).should().matches("password1234", "encodedPassword");
-            then(jwtTokenProvider).should().createAccessToken("testuser", 0);
+            then(tokenRepository).should().saveRefreshToken(any(), anyString(), anyLong());
         }
 
         @Test
@@ -174,12 +183,12 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.login(request))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("잘못된 아이디 또는 비밀번호입니다.");
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_CREDENTIALS);
 
             then(userRepository).should().findByUsername("unknown");
             then(passwordEncoder).should(never()).matches(anyString(), anyString());
-            then(jwtTokenProvider).should(never()).createAccessToken(anyString(), anyInt());
+            then(jwtTokenProvider).should(never()).createAccessToken(anyString(), anyLong());
         }
 
         @Test
@@ -198,12 +207,12 @@ class AuthServiceTest {
 
             // when & then
             assertThatThrownBy(() -> authService.login(request))
-                    .isInstanceOf(BadCredentialsException.class)
-                    .hasMessage("잘못된 아이디 또는 비밀번호입니다.");
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_CREDENTIALS);
 
             then(userRepository).should().findByUsername("testuser");
             then(passwordEncoder).should().matches("wrongpassword", "encodedPassword");
-            then(jwtTokenProvider).should(never()).createAccessToken(anyString(), anyInt());
+            then(jwtTokenProvider).should(never()).createAccessToken(anyString(), anyLong());
         }
     }
 
@@ -238,42 +247,107 @@ class AuthServiceTest {
     }
 
     @Nested
+    class Refresh {
+
+        @Test
+        void 토큰_갱신_성공() {
+            // given
+            String refreshToken = "valid-refresh-token";
+            RefreshRequest request = new RefreshRequest(refreshToken);
+            Long userId = 1L;
+            String username = "testuser";
+
+            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(true);
+            given(jwtTokenProvider.getUserId(refreshToken)).willReturn(userId);
+            given(jwtTokenProvider.getUsername(refreshToken)).willReturn(username);
+            given(tokenRepository.findRefreshToken(userId)).willReturn(Optional.of(refreshToken));
+            given(jwtTokenProvider.createAccessToken(username, userId)).willReturn("new-access-token");
+            given(jwtTokenProvider.createRefreshToken(username, userId)).willReturn("new-refresh-token");
+            given(jwtTokenProvider.getRefreshTokenExpirationSeconds()).willReturn(604800L);
+            given(jwtTokenProvider.getAccessTokenExpirationSeconds()).willReturn(900L);
+
+            // when
+            LoginResponse response = authService.refresh(request);
+
+            // then
+            assertThat(response.accessToken()).isEqualTo("new-access-token");
+            assertThat(response.refreshToken()).isEqualTo("new-refresh-token");
+
+            then(tokenRepository).should().saveRefreshToken(userId, "new-refresh-token", 604800L);
+        }
+
+        @Test
+        void 유효하지_않은_토큰으로_갱신_실패() {
+            // given
+            String invalidToken = "invalid-token";
+            RefreshRequest request = new RefreshRequest(invalidToken);
+
+            given(jwtTokenProvider.validateToken(invalidToken)).willReturn(false);
+
+            // when & then
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_TOKEN);
+        }
+
+        @Test
+        void Redis에_저장된_토큰과_불일치시_실패() {
+            // given
+            String refreshToken = "stolen-token";
+            RefreshRequest request = new RefreshRequest(refreshToken);
+            Long userId = 1L;
+
+            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(true);
+            given(jwtTokenProvider.getUserId(refreshToken)).willReturn(userId);
+            given(jwtTokenProvider.getUsername(refreshToken)).willReturn("testuser");
+            given(tokenRepository.findRefreshToken(userId)).willReturn(Optional.of("different-token"));
+
+            // when & then
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_TOKEN);
+
+            then(tokenRepository).should().deleteRefreshToken(userId);
+        }
+
+        @Test
+        void Redis에_토큰이_없으면_실패() {
+            // given
+            String refreshToken = "expired-token";
+            RefreshRequest request = new RefreshRequest(refreshToken);
+            Long userId = 1L;
+
+            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(true);
+            given(jwtTokenProvider.getUserId(refreshToken)).willReturn(userId);
+            given(jwtTokenProvider.getUsername(refreshToken)).willReturn("testuser");
+            given(tokenRepository.findRefreshToken(userId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_TOKEN);
+        }
+    }
+
+    @Nested
     class Logout {
 
         @Test
         void 로그아웃_성공() {
             // given
             Long userId = 1L;
-            User persistentUser = User.builder()
-                    .email("test@example.com")
-                    .username("testuser")
-                    .name("Test")
-                    .password("pw")
-                    .build();
-            // tokenVersion은 기본값(0)일 것임
+            String accessToken = "access-token";
+            String jti = "token-jti";
 
-            given(userRepository.findById(userId)).willReturn(Optional.of(persistentUser));
+            given(jwtTokenProvider.getJti(accessToken)).willReturn(jti);
+            given(jwtTokenProvider.getRemainingSeconds(accessToken)).willReturn(300L);
 
             // when
-            authService.logout(userId);
+            authService.logout(userId, accessToken);
 
             // then
-            assertThat(persistentUser.getTokenVersion()).isEqualTo(1);
-            then(userRepository).should().findById(userId);
-        }
-
-        @Test
-        void 존재하지_않는_사용자_로그아웃_실패() {
-            // given
-            Long userId = 999L;
-            given(userRepository.findById(userId)).willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> authService.logout(userId))
-                    .isInstanceOf(CustomException.class)
-                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
-
-            then(userRepository).should().findById(userId);
+            then(tokenRepository).should().deleteRefreshToken(userId);
+            then(tokenRepository).should().addToBlacklist(jti, 300L);
         }
     }
 
