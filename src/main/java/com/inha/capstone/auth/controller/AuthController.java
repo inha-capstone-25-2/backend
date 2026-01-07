@@ -2,7 +2,8 @@ package com.inha.capstone.auth.controller;
 
 import com.inha.capstone.auth.dto.LoginRequest;
 import com.inha.capstone.auth.dto.LoginResponse;
-import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.auth.dto.RefreshRequest;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,9 +29,19 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(@RequestBody @Valid RefreshRequest request) {
+        LoginResponse response = authService.refresh(request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal userPrincipal) {
-        authService.logout(userPrincipal.getUser().getId());
+    public ResponseEntity<Void> logout(
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
+            @RequestHeader("Authorization") String authorizationHeader
+    ) {
+        String accessToken = authorizationHeader.substring(7);
+        authService.logout(authentication.getUserId(), accessToken);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
