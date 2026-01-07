@@ -1,28 +1,27 @@
 package com.inha.capstone.auth.jwt;
 
-import com.inha.capstone.auth.security.UserPrincipal;
-import com.inha.capstone.auth.security.CustomUserDetailsService;
+import com.inha.capstone.auth.repository.TokenRepository;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtTokenProvider tokenProvider;
-    private final CustomUserDetailsService customUserDetailsService;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final TokenRepository tokenRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -30,21 +29,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = getJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                String username = tokenProvider.getUsername(jwt);
-                Integer tokenVersion = tokenProvider.getTokenVersion(jwt);
+            if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
+                String jti = jwtTokenProvider.getJti(jwt);
 
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
-                
-                if (userDetails instanceof UserPrincipal principal) {
-                     if (!principal.getUser().getTokenVersion().equals(tokenVersion)) {
-                         throw new SecurityException("Token version mismatch");
-                     }
+                if (tokenRepository.isBlacklisted(jti)) {
+                    filterChain.doFilter(request, response);
+                    return;
                 }
 
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                Long userId = jwtTokenProvider.getUserId(jwt);
+                String username = jwtTokenProvider.getUsername(jwt);
+
+                JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+                        userId,
+                        username,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
