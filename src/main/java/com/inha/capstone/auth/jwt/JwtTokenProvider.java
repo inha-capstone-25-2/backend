@@ -11,15 +11,21 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtTokenProvider {
 
-    @Value("${app.jwt.secret}")
+    private static final String CLAIM_USER_ID = "uid";
+
+    @Value("${jwt.secret}")
     private String secretKey;
 
-    @Value("${app.jwt.expiration}")
+    @Value("${jwt.access-expiration}")
     private long accessTokenExpirationMinutes;
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshTokenExpirationDays;
 
     private SecretKey key;
 
@@ -29,13 +35,24 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String createAccessToken(String username, Integer tokenVersion) {
+    public String createAccessToken(String username, Long userId) {
+        long expirationMillis = accessTokenExpirationMinutes * 60 * 1000;
+        return createToken(username, userId, expirationMillis);
+    }
+
+    public String createRefreshToken(String username, Long userId) {
+        long expirationMillis = refreshTokenExpirationDays * 24 * 60 * 60 * 1000;
+        return createToken(username, userId, expirationMillis);
+    }
+
+    private String createToken(String username, Long userId, long expirationMillis) {
         Date now = new Date();
-        Date validity = new Date(now.getTime() + (accessTokenExpirationMinutes * 60 * 1000));
+        Date validity = new Date(now.getTime() + expirationMillis);
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(username)
-                .claim("ver", tokenVersion)
+                .claim(CLAIM_USER_ID, userId)
                 .issuedAt(now)
                 .expiration(validity)
                 .signWith(key)
@@ -47,7 +64,6 @@ public class JwtTokenProvider {
             Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
-            // Logs removed as per requirement
         }
         return false;
     }
@@ -64,7 +80,19 @@ public class JwtTokenProvider {
         return getClaims(token).getSubject();
     }
 
-    public Integer getTokenVersion(String token) {
-        return getClaims(token).get("ver", Integer.class);
+    public String getJti(String token) {
+        return getClaims(token).getId();
+    }
+
+    public Long getUserId(String token) {
+        return getClaims(token).get(CLAIM_USER_ID, Long.class);
+    }
+
+    public long getAccessTokenExpirationSeconds() {
+        return accessTokenExpirationMinutes * 60;
+    }
+
+    public long getRefreshTokenExpirationSeconds() {
+        return refreshTokenExpirationDays * 24 * 60 * 60;
     }
 }
