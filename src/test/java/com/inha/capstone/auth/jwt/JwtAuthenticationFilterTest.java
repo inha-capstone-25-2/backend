@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -119,7 +120,7 @@ class JwtAuthenticationFilterTest {
 
             // then
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-            then(tokenRepository).should(never()).isBlacklisted(token);
+            then(tokenRepository).should(never()).isBlacklisted(anyString());
             then(filterChain).should().doFilter(request, response);
         }
 
