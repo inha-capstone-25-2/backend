@@ -30,13 +30,14 @@ Controller → Service → Repository → Entity
 - Wildcard import 금지
 - `private` 메서드는 가장 마지막으로 사용하는 `public` 메서드의 하단에 배치
 - 모든 파일의 마지막에는 개행 추가
-- 클래스 정의 전에 개행 추가
+- 클래스 정의 직후 개행 추가
 - non-null은 primitive, nullable은 Wrapper
 
 ### Entity
 
 - 무분별한 Getter/Setter/Builder/Data/NoArgsConstructor/AllArgsConstructor 지양
 - Entity 속성에 따라 유연하게 `BaseEntity` 상속
+- @Column의 name 옵션 반드시 사용(필드명은 camelCase, name 옵션은 kebab-case)
 
 ### DTO
 
