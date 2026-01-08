@@ -1,6 +1,7 @@
 package com.inha.capstone.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.inha.capstone.common.exception.ErrorCode;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -9,8 +10,7 @@ import java.time.format.DateTimeFormatter;
 public record ApiResponse<T>(
         boolean success,
         T data,
-        String error,
-        String message,
+        ErrorResponse error,
         String timestamp
 ) {
 
@@ -21,7 +21,6 @@ public record ApiResponse<T>(
                 true,
                 data,
                 null,
-                null,
                 LocalDateTime.now().format(ISO_FORMATTER)
         );
     }
@@ -31,17 +30,24 @@ public record ApiResponse<T>(
                 true,
                 null,
                 null,
-                null,
                 LocalDateTime.now().format(ISO_FORMATTER)
         );
     }
 
-    public static ApiResponse<Void> error(String error, String message) {
+    public static ApiResponse<Void> error(ErrorResponse error) {
         return new ApiResponse<>(
                 false,
                 null,
                 error,
-                message,
+                LocalDateTime.now().format(ISO_FORMATTER)
+        );
+    }
+
+    public static ApiResponse<Void> error(ErrorCode errorCode) {
+        return new ApiResponse<>(
+                false,
+                null,
+                ErrorResponse.of(errorCode),
                 LocalDateTime.now().format(ISO_FORMATTER)
         );
     }
