@@ -16,11 +16,25 @@ spring:
         format_sql: true
 
 app:
-  jwt:
-    secret: testSecretKeyForIntegrationTesting1234567890
-    expiration: 60
   cors:
     origins: "*"
   gpu-server:
     url: http://localhost:8000
+
+jwt:
+  secret: testSecretKeyForIntegrationTesting1234567890
+  access-expiration: 15
+  refresh-expiration: 7
+
+cors:
+  origins: "*"
+
+gpu-server:
+  url: http://localhost:8000
+
+aws:
+  region: us-east-1
+  s3:
+    bucket: test-bucket
+    key: test-key
 
