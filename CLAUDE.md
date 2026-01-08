@@ -37,7 +37,7 @@ Controller → Service → Repository → Entity
 
 - 무분별한 Getter/Setter/Builder/Data/NoArgsConstructor/AllArgsConstructor 지양
 - Entity 속성에 따라 유연하게 `BaseEntity` 상속
-- @Column의 name 옵션 반드시 사용(필드명은 camelCase, name 옵션은 kebab-case)
+- @Column의 name 옵션 반드시 사용(필드명은 camelCase, name 옵션은 snake_case)
 
 ### DTO
 
