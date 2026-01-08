@@ -21,7 +21,7 @@ public class CustomExceptionHandler {
         log.error("비즈니스 로직 예외 발생: {}", ex.getMessage());
         ErrorCode errorCode = ex.getErrorCode();
         return ResponseEntity.status(errorCode.getStatus())
-                .body(ApiResponse.error(errorCode));
+                .body(ApiResponse.error(ErrorResponse.of(errorCode)));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -60,7 +60,7 @@ public class CustomExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleBadCredentialsException(BadCredentialsException ex) {
         log.error("인증 실패 예외 발생: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(ErrorCode.INVALID_CREDENTIALS));
+                .body(ApiResponse.error(ErrorResponse.of(ErrorCode.INVALID_CREDENTIALS)));
     }
 }
 
