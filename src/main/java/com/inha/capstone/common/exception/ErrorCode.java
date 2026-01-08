@@ -23,7 +23,10 @@ public enum ErrorCode {
 
     // Authorization
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "A001", "로그인이 필요합니다."),
-    FORBIDDEN(HttpStatus.FORBIDDEN, "A002", "접근 권한이 없습니다.");
+    FORBIDDEN(HttpStatus.FORBIDDEN, "A002", "접근 권한이 없습니다."),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A003", "잘못된 아이디 또는 비밀번호입니다."),
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "A004", "유효하지 않은 토큰입니다."),
+    EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "A005", "만료된 토큰입니다.");
 
     private final HttpStatus status;
     private final String code;
