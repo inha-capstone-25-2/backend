@@ -14,7 +14,7 @@ import java.util.List;
 
 @Slf4j
 @RestControllerAdvice
-public class CustomExceptionHandler {
+public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException ex) {
@@ -63,5 +63,3 @@ public class CustomExceptionHandler {
                 .body(ApiResponse.error(ErrorResponse.of(ErrorCode.INVALID_CREDENTIALS)));
     }
 }
-
-
