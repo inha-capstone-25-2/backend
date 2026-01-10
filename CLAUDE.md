@@ -58,6 +58,7 @@ Controller → Service → Repository → Entity
 
 - 예외는 CustomException으로 처리
 - 조회 관련 메서드는 `readOnly = true`
+- `@Transactional`은 클래스가 아니라 메서드에 선언
 
 ### Repository
 
