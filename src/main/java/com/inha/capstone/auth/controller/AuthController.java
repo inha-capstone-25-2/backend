@@ -3,6 +3,7 @@ package com.inha.capstone.auth.controller;
 import com.inha.capstone.auth.dto.LoginRequest;
 import com.inha.capstone.auth.dto.LoginResponse;
 import com.inha.capstone.auth.dto.RefreshRequest;
+import com.inha.capstone.auth.jwt.JwtTokenProvider;
 import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
@@ -40,7 +42,7 @@ public class AuthController {
             @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestHeader("Authorization") String authorizationHeader
     ) {
-        String accessToken = authorizationHeader.substring(7);
+        String accessToken = jwtTokenProvider.extractBearerToken(authorizationHeader);
         authService.logout(authentication.getUserId(), accessToken);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
