@@ -4,8 +4,6 @@ import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.service.PaperService;
-import com.inha.capstone.user.domain.User;
-import com.inha.capstone.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,7 +21,6 @@ import java.util.List;
 public class PaperController {
 
     private final PaperService paperService;
-    private final UserRepository userRepository;
 
     @GetMapping
     public ResponseEntity<PaperSearchResponse> searchPapers(
@@ -33,8 +30,8 @@ public class PaperController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "relevance") String sort
     ) {
-        User user = findUserIfAuthenticated(authentication);
-        return ResponseEntity.ok(paperService.searchPapers(user, q, categories, page, sort));
+        Long userId = authentication != null ? authentication.getUserId() : null;
+        return ResponseEntity.ok(paperService.searchPapers(userId, q, categories, page, sort));
     }
 
     @GetMapping("/{paperId}")
@@ -42,14 +39,7 @@ public class PaperController {
             @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @PathVariable String paperId
     ) {
-        User user = findUserIfAuthenticated(authentication);
-        return ResponseEntity.ok(paperService.getPaperDetail(user, paperId));
-    }
-
-    private User findUserIfAuthenticated(JwtAuthenticationToken authentication) {
-        if (authentication == null) {
-            return null;
-        }
-        return userRepository.findById(authentication.getUserId()).orElse(null);
+        Long userId = authentication != null ? authentication.getUserId() : null;
+        return ResponseEntity.ok(paperService.getPaperDetail(userId, paperId));
     }
 }

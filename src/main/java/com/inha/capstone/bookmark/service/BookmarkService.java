@@ -8,7 +8,6 @@ import com.inha.capstone.common.exception.CustomException;
 import com.inha.capstone.common.exception.ErrorCode;
 import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.repository.PaperRepository;
-import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,16 +21,16 @@ public class BookmarkService {
     private final BookmarkRepository bookmarkRepository;
     private final PaperRepository paperRepository;
 
-    public BookmarkResponse createBookmark(User user, BookmarkCreateRequest request) {
+    public BookmarkResponse createBookmark(Long userId, BookmarkCreateRequest request) {
         Paper paper = paperRepository.findById(request.doi())
                 .orElseThrow(() -> new CustomException(ErrorCode.PAPER_NOT_FOUND));
 
-        if (bookmarkRepository.findByUserIdAndDoi(user.getId(), request.doi()).isPresent()) {
+        if (bookmarkRepository.findByUserIdAndDoi(userId, request.doi()).isPresent()) {
             throw new CustomException(ErrorCode.BOOKMARK_ALREADY_EXISTS);
         }
 
         Bookmark bookmark = Bookmark.builder()
-                .userId(user.getId())
+                .userId(userId)
                 .doi(request.doi())
                 .notes(request.notes())
                 .bookmarkedAt(LocalDateTime.now())
@@ -39,13 +38,11 @@ public class BookmarkService {
 
         Bookmark saved = bookmarkRepository.save(bookmark);
 
-        // TODO: Log activity (bookmark)
-
         return BookmarkResponse.of(saved, paper);
     }
 
-    public List<BookmarkResponse> getBookmarks(User user) {
-        List<Bookmark> bookmarks = bookmarkRepository.findByUserIdOrderByBookmarkedAtDesc(user.getId());
+    public List<BookmarkResponse> getBookmarks(Long userId) {
+        List<Bookmark> bookmarks = bookmarkRepository.findByUserIdOrderByBookmarkedAtDesc(userId);
 
         return bookmarks.stream()
                 .map(bookmark -> {
@@ -55,15 +52,14 @@ public class BookmarkService {
                 .toList();
     }
 
-    public void deleteBookmark(User user, String bookmarkId) {
+    public void deleteBookmark(Long userId, String bookmarkId) {
         Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
                 .orElseThrow(() -> new CustomException(ErrorCode.BOOKMARK_NOT_FOUND));
 
-        if (!bookmark.getUserId().equals(user.getId())) {
+        if (!bookmark.getUserId().equals(userId)) {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
         bookmarkRepository.delete(bookmark);
-        // TODO: Log activity (unbookmark)
     }
 }

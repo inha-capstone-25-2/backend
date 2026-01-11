@@ -4,10 +4,6 @@ import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.dto.UsernameExistsResponse;
 import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.auth.service.AuthService;
-import com.inha.capstone.common.exception.CustomException;
-import com.inha.capstone.common.exception.ErrorCode;
-import com.inha.capstone.user.domain.User;
-import com.inha.capstone.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final AuthService authService;
-    private final UserRepository userRepository;
 
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(@AuthenticationPrincipal JwtAuthenticationToken authentication) {
-        User user = findUserById(authentication.getUserId());
-        return ResponseEntity.ok(UserResponse.from(user));
+        return ResponseEntity.ok(authService.getUserById(authentication.getUserId()));
     }
 
     @DeleteMapping("/me")
@@ -42,10 +36,5 @@ public class UserController {
     public ResponseEntity<UsernameExistsResponse> checkUsernameExists(@RequestParam String username) {
         boolean exists = authService.checkUsernameExists(username);
         return ResponseEntity.ok(new UsernameExistsResponse(exists));
-    }
-
-    private User findUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 }

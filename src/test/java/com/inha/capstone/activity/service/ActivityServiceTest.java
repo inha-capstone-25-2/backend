@@ -3,8 +3,6 @@ package com.inha.capstone.activity.service;
 import com.inha.capstone.activity.dto.UserActivityResponse;
 import com.inha.capstone.activity.model.UserActivity;
 import com.inha.capstone.activity.repository.ActivityRepository;
-import com.inha.capstone.user.domain.User;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,14 +37,13 @@ class ActivityServiceTest {
         @Test
         void 활동_로그_저장_성공() {
             // given
-            User user = User.builder().build();
-            org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 1L);
+            Long userId = 1L;
             String doi = "10.1234/5678";
             String activityType = "view";
             Map<String, Object> metadata = Map.of("source", "search");
 
             // when
-            activityService.logActivity(user, doi, activityType, metadata);
+            activityService.logActivity(userId, doi, activityType, metadata);
 
             // then
             then(activityRepository).should().save(any(UserActivity.class));
@@ -59,8 +56,7 @@ class ActivityServiceTest {
         @Test
         void 최근_활동_조회_성공() {
             // given
-            User user = User.builder().build();
-            org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 1L);
+            Long userId = 1L;
             int limit = 10;
 
             UserActivity activity = UserActivity.builder()
@@ -76,7 +72,7 @@ class ActivityServiceTest {
                     .willReturn(Collections.singletonList(activity));
 
             // when
-            List<UserActivityResponse> result = activityService.getRecentActivities(user, limit);
+            List<UserActivityResponse> result = activityService.getRecentActivities(userId, limit);
 
             // then
             assertThat(result).hasSize(1);
@@ -90,8 +86,7 @@ class ActivityServiceTest {
         @Test
         void 유효하지_않은_개수_요청시_기본값으로_보정된다() {
             // given
-            User user = User.builder().build();
-            org.springframework.test.util.ReflectionTestUtils.setField(user, "id", 1L);
+            Long userId = 1L;
             int invalidLimit = 0;
 
             UserActivity activity = UserActivity.builder()
@@ -107,12 +102,12 @@ class ActivityServiceTest {
                     .willReturn(Collections.singletonList(activity));
 
             // when
-            List<UserActivityResponse> result = activityService.getRecentActivities(user, invalidLimit);
+            List<UserActivityResponse> result = activityService.getRecentActivities(userId, invalidLimit);
 
             // then
             assertThat(result).hasSize(1);
-            
-            // Verify that PageRequest was created with default limit checking requires capturing arguments 
+
+            // Verify that PageRequest was created with default limit checking requires capturing arguments
             // or simply relying on the fact that no exception was thrown and method proceeded.
             then(activityRepository).should().findRecentViewsByUserId(eq(1L), any(Pageable.class));
         }

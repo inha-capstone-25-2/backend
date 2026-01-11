@@ -4,7 +4,6 @@ import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.repository.PaperRepository;
-import com.inha.capstone.user.domain.User;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
-import com.inha.capstone.paper.dto.PaperListItem; // Add import for check
 
 import java.util.Collections;
 
@@ -40,7 +38,7 @@ class PaperServiceTest {
         @Test
         void 키워드_검색_성공() {
             // given
-            User user = User.builder().build();
+            Long userId = 1L;
             String query = "AI";
 
             Paper paper = Paper.builder()
@@ -52,7 +50,7 @@ class PaperServiceTest {
             given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
 
             // when
-            PaperSearchResponse response = paperService.searchPapers(user, query, null, 1, "relevance");
+            PaperSearchResponse response = paperService.searchPapers(userId, query, null, 1, "relevance");
 
             // then
             assertThat(response).isNotNull();
@@ -64,7 +62,7 @@ class PaperServiceTest {
         @Test
         void 유효하지_않은_페이지_번호는_1페이지로_보정된다() {
             // given
-            User user = User.builder().build();
+            Long userId = 1L;
             String query = "AI";
             int invalidPage = 0;
 
@@ -77,7 +75,7 @@ class PaperServiceTest {
             given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
 
             // when
-            PaperSearchResponse response = paperService.searchPapers(user, query, null, invalidPage, "relevance");
+            PaperSearchResponse response = paperService.searchPapers(userId, query, null, invalidPage, "relevance");
 
             // then
             assertThat(response).isNotNull();
@@ -86,7 +84,7 @@ class PaperServiceTest {
         @Test
         void 텍스트_검색_결과가_10000건_이상일_때_isApproximate_True() {
             // given
-            User user = User.builder().build();
+            Long userId = 1L;
             String query = "Big Data";
             long largeTotal = 15000L;
 
@@ -99,7 +97,7 @@ class PaperServiceTest {
             given(mongoTemplate.find(any(Query.class), eq(Paper.class))).willReturn(Collections.singletonList(paper));
 
             // when
-            PaperSearchResponse response = paperService.searchPapers(user, query, null, 1, "relevance");
+            PaperSearchResponse response = paperService.searchPapers(userId, query, null, 1, "relevance");
 
             // then
             assertThat(response).isNotNull();
@@ -114,7 +112,7 @@ class PaperServiceTest {
         @Test
         void 논문_상세_조회_및_조회수_증가_성공() {
             // given
-            User user = User.builder().build();
+            Long userId = 1L;
             String paperId = "1";
 
             Paper paper = Paper.builder()
@@ -131,7 +129,7 @@ class PaperServiceTest {
             )).willReturn(paper);
 
             // when
-            PaperDetailResponse result = paperService.getPaperDetail(user, paperId);
+            PaperDetailResponse result = paperService.getPaperDetail(userId, paperId);
 
             // then
             assertThat(result).isNotNull();

@@ -3,7 +3,6 @@ package com.inha.capstone.activity.service;
 import com.inha.capstone.activity.dto.UserActivityResponse;
 import com.inha.capstone.activity.model.UserActivity;
 import com.inha.capstone.activity.repository.ActivityRepository;
-import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -19,9 +18,9 @@ public class ActivityService {
 
     private final ActivityRepository activityRepository;
 
-    public void logActivity(User user, String doi, String activityType, Map<String, Object> metadata) {
+    public void logActivity(Long userId, String doi, String activityType, Map<String, Object> metadata) {
         UserActivity activity = UserActivity.builder()
-                .userId(user.getId())
+                .userId(userId)
                 .doi(doi)
                 .activityType(activityType)
                 .metadata(metadata)
@@ -31,12 +30,12 @@ public class ActivityService {
         activityRepository.save(activity);
     }
 
-    public List<UserActivityResponse> getRecentActivities(User user, int limit) {
+    public List<UserActivityResponse> getRecentActivities(Long userId, int limit) {
         if (limit < 1) {
             limit = 10;
         }
         List<UserActivity> activities = activityRepository.findRecentViewsByUserId(
-                user.getId(),
+                userId,
                 PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "timestamp"))
         );
 

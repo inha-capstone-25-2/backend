@@ -32,6 +32,7 @@ Controller → Service → Repository → Entity
 - 모든 파일의 마지막에는 개행 추가
 - 클래스 정의 직후 개행 추가
 - non-null은 primitive, nullable은 Wrapper
+- 클래스명은 필요한 경우가 아니면 FQN 대신 simple name을 사용한다.
 
 ### Entity
 

@@ -111,6 +111,12 @@ public class AuthService {
         return userRepository.existsByUsername(username);
     }
 
+    public UserResponse getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return UserResponse.from(user);
+    }
+
     public void logout(Long userId, String accessToken) {
         tokenRepository.deleteRefreshToken(userId);
 
