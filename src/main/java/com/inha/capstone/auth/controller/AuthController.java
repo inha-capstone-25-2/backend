@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -52,6 +53,12 @@ public class AuthController {
     ) {
         String accessToken = jwtTokenProvider.extractBearerToken(authorizationHeader);
         authService.logout(authentication.getUserId(), accessToken);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @DeleteMapping("/quit")
+    public ResponseEntity<Void> quit(@AuthenticationPrincipal JwtAuthenticationToken authentication) {
+        authService.deleteAccount(authentication.getUserId());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
