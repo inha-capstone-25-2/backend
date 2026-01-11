@@ -3,6 +3,8 @@ package com.inha.capstone.auth.controller;
 import com.inha.capstone.auth.dto.LoginRequest;
 import com.inha.capstone.auth.dto.LoginResponse;
 import com.inha.capstone.auth.dto.RefreshRequest;
+import com.inha.capstone.auth.dto.UserCreateRequest;
+import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
 import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.auth.service.AuthService;
@@ -24,6 +26,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
+
+    @PostMapping("/register")
+    public ResponseEntity<UserResponse> register(@RequestBody @Valid UserCreateRequest request) {
+        UserResponse response = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
