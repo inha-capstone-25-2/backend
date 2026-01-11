@@ -6,14 +6,12 @@ import com.inha.capstone.bookmark.model.Bookmark;
 import com.inha.capstone.bookmark.repository.BookmarkRepository;
 import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.paper.repository.PaperRepository;
-import com.inha.capstone.user.domain.User;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -40,8 +38,7 @@ class BookmarkServiceTest {
         @Test
         void 북마크_생성_성공() {
             // given
-            User user = User.builder().build();
-            ReflectionTestUtils.setField(user, "id", 1L);
+            Long userId = 1L;
             BookmarkCreateRequest request = new BookmarkCreateRequest("10.1234/5678", null);
 
             Paper paper = Paper.builder()
@@ -53,11 +50,11 @@ class BookmarkServiceTest {
             given(bookmarkRepository.save(any(Bookmark.class))).willAnswer(i -> i.getArguments()[0]);
 
             // when
-            BookmarkResponse result = bookmarkService.createBookmark(user, request);
+            BookmarkResponse result = bookmarkService.createBookmark(userId, request);
 
             // then
             assertThat(result).isNotNull();
-            
+
             then(paperRepository).should().findById("10.1234/5678");
             then(bookmarkRepository).should().save(any(Bookmark.class));
         }

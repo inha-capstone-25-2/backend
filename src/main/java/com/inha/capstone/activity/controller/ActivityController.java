@@ -2,7 +2,7 @@ package com.inha.capstone.activity.controller;
 
 import com.inha.capstone.activity.dto.UserActivityResponse;
 import com.inha.capstone.activity.service.ActivityService;
-import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,10 +22,9 @@ public class ActivityController {
 
     @GetMapping("/recent")
     public ResponseEntity<List<UserActivityResponse>> getRecentActivities(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        return ResponseEntity.ok(activityService.getRecentActivities(userPrincipal.getUser(), limit));
+        return ResponseEntity.ok(activityService.getRecentActivities(authentication.getUserId(), limit));
     }
 }
-

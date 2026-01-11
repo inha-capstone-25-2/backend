@@ -6,6 +6,7 @@ import com.inha.capstone.auth.dto.RefreshRequest;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
+import com.inha.capstone.auth.jwt.TokenValidationResult;
 import com.inha.capstone.auth.repository.TokenRepository;
 import com.inha.capstone.common.exception.CustomException;
 import com.inha.capstone.common.exception.ErrorCode;
@@ -257,7 +258,7 @@ class AuthServiceTest {
             Long userId = 1L;
             String username = "testuser";
 
-            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(true);
+            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(TokenValidationResult.VALID);
             given(jwtTokenProvider.getUserId(refreshToken)).willReturn(userId);
             given(jwtTokenProvider.getUsername(refreshToken)).willReturn(username);
             given(tokenRepository.findRefreshToken(userId)).willReturn(Optional.of(refreshToken));
@@ -277,12 +278,26 @@ class AuthServiceTest {
         }
 
         @Test
+        void 만료된_토큰으로_갱신_실패() {
+            // given
+            String expiredToken = "expired-token";
+            RefreshRequest request = new RefreshRequest(expiredToken);
+
+            given(jwtTokenProvider.validateToken(expiredToken)).willReturn(TokenValidationResult.EXPIRED);
+
+            // when & then
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EXPIRED_TOKEN);
+        }
+
+        @Test
         void 유효하지_않은_토큰으로_갱신_실패() {
             // given
             String invalidToken = "invalid-token";
             RefreshRequest request = new RefreshRequest(invalidToken);
 
-            given(jwtTokenProvider.validateToken(invalidToken)).willReturn(false);
+            given(jwtTokenProvider.validateToken(invalidToken)).willReturn(TokenValidationResult.INVALID_SIGNATURE);
 
             // when & then
             assertThatThrownBy(() -> authService.refresh(request))
@@ -297,7 +312,7 @@ class AuthServiceTest {
             RefreshRequest request = new RefreshRequest(refreshToken);
             Long userId = 1L;
 
-            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(true);
+            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(TokenValidationResult.VALID);
             given(jwtTokenProvider.getUserId(refreshToken)).willReturn(userId);
             given(jwtTokenProvider.getUsername(refreshToken)).willReturn("testuser");
             given(tokenRepository.findRefreshToken(userId)).willReturn(Optional.of("different-token"));
@@ -313,11 +328,11 @@ class AuthServiceTest {
         @Test
         void Redis에_토큰이_없으면_실패() {
             // given
-            String refreshToken = "expired-token";
+            String refreshToken = "some-token";
             RefreshRequest request = new RefreshRequest(refreshToken);
             Long userId = 1L;
 
-            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(true);
+            given(jwtTokenProvider.validateToken(refreshToken)).willReturn(TokenValidationResult.VALID);
             given(jwtTokenProvider.getUserId(refreshToken)).willReturn(userId);
             given(jwtTokenProvider.getUsername(refreshToken)).willReturn("testuser");
             given(tokenRepository.findRefreshToken(userId)).willReturn(Optional.empty());

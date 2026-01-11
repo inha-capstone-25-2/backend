@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -54,13 +55,15 @@ class JwtAuthenticationFilterTest {
         void 유효한_토큰으로_인증_성공() throws ServletException, IOException {
             // given
             String token = "valid-token";
+            String authorizationHeader = "Bearer " + token;
             String jti = "token-jti";
             Long userId = 1L;
             String username = "testuser";
 
-            request.addHeader("Authorization", "Bearer " + token);
+            request.addHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
 
-            given(jwtTokenProvider.validateToken(token)).willReturn(true);
+            given(jwtTokenProvider.extractBearerToken(authorizationHeader)).willReturn(token);
+            given(jwtTokenProvider.validateToken(token)).willReturn(TokenValidationResult.VALID);
             given(jwtTokenProvider.getJti(token)).willReturn(jti);
             given(tokenRepository.isBlacklisted(jti)).willReturn(false);
             given(jwtTokenProvider.getUserId(token)).willReturn(userId);
@@ -89,11 +92,13 @@ class JwtAuthenticationFilterTest {
         void 블랙리스트에_등록된_토큰은_인증_실패() throws ServletException, IOException {
             // given
             String token = "blacklisted-token";
+            String authorizationHeader = "Bearer " + token;
             String jti = "blacklisted-jti";
 
-            request.addHeader("Authorization", "Bearer " + token);
+            request.addHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
 
-            given(jwtTokenProvider.validateToken(token)).willReturn(true);
+            given(jwtTokenProvider.extractBearerToken(authorizationHeader)).willReturn(token);
+            given(jwtTokenProvider.validateToken(token)).willReturn(TokenValidationResult.VALID);
             given(jwtTokenProvider.getJti(token)).willReturn(jti);
             given(tokenRepository.isBlacklisted(jti)).willReturn(true);
 
@@ -110,10 +115,32 @@ class JwtAuthenticationFilterTest {
         void 유효하지_않은_토큰은_인증_실패() throws ServletException, IOException {
             // given
             String token = "invalid-token";
+            String authorizationHeader = "Bearer " + token;
 
-            request.addHeader("Authorization", "Bearer " + token);
+            request.addHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
 
-            given(jwtTokenProvider.validateToken(token)).willReturn(false);
+            given(jwtTokenProvider.extractBearerToken(authorizationHeader)).willReturn(token);
+            given(jwtTokenProvider.validateToken(token)).willReturn(TokenValidationResult.INVALID_SIGNATURE);
+
+            // when
+            jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+            // then
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            then(tokenRepository).should(never()).isBlacklisted(anyString());
+            then(filterChain).should().doFilter(request, response);
+        }
+
+        @Test
+        void 만료된_토큰은_인증_실패() throws ServletException, IOException {
+            // given
+            String token = "expired-token";
+            String authorizationHeader = "Bearer " + token;
+
+            request.addHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
+
+            given(jwtTokenProvider.extractBearerToken(authorizationHeader)).willReturn(token);
+            given(jwtTokenProvider.validateToken(token)).willReturn(TokenValidationResult.EXPIRED);
 
             // when
             jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -126,27 +153,32 @@ class JwtAuthenticationFilterTest {
 
         @Test
         void Authorization_헤더가_없으면_인증_건너뜀() throws ServletException, IOException {
-            // given - no Authorization header
+            // given
+            given(jwtTokenProvider.extractBearerToken(null)).willReturn(null);
 
             // when
             jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
             // then
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-            then(jwtTokenProvider).should(never()).validateToken(null);
+            then(jwtTokenProvider).should(never()).validateToken(anyString());
             then(filterChain).should().doFilter(request, response);
         }
 
         @Test
         void Bearer_형식이_아니면_인증_건너뜀() throws ServletException, IOException {
             // given
-            request.addHeader("Authorization", "Basic some-token");
+            String authorizationHeader = "Basic some-token";
+            request.addHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
+
+            given(jwtTokenProvider.extractBearerToken(authorizationHeader)).willReturn(null);
 
             // when
             jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
             // then
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            then(jwtTokenProvider).should(never()).validateToken(anyString());
             then(filterChain).should().doFilter(request, response);
         }
     }

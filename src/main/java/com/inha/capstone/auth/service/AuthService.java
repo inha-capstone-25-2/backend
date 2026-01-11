@@ -6,6 +6,7 @@ import com.inha.capstone.auth.dto.RefreshRequest;
 import com.inha.capstone.auth.dto.UserCreateRequest;
 import com.inha.capstone.auth.dto.UserResponse;
 import com.inha.capstone.auth.jwt.JwtTokenProvider;
+import com.inha.capstone.auth.jwt.TokenValidationResult;
 import com.inha.capstone.auth.repository.TokenRepository;
 import com.inha.capstone.common.exception.CustomException;
 import com.inha.capstone.common.exception.ErrorCode;
@@ -75,7 +76,11 @@ public class AuthService {
     public LoginResponse refresh(RefreshRequest request) {
         String refreshToken = request.refreshToken();
 
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
+        TokenValidationResult validationResult = jwtTokenProvider.validateToken(refreshToken);
+        if (validationResult != TokenValidationResult.VALID) {
+            if (validationResult == TokenValidationResult.EXPIRED) {
+                throw new CustomException(ErrorCode.EXPIRED_TOKEN);
+            }
             throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
 
@@ -104,6 +109,12 @@ public class AuthService {
 
     public boolean checkUsernameExists(String username) {
         return userRepository.existsByUsername(username);
+    }
+
+    public UserResponse getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return UserResponse.from(user);
     }
 
     public void logout(Long userId, String accessToken) {

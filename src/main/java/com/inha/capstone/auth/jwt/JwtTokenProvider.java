@@ -1,20 +1,28 @@
 package com.inha.capstone.auth.jwt;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class JwtTokenProvider {
+
+    private static final String BEARER_PREFIX = "Bearer ";
 
     private static final String CLAIM_USER_ID = "uid";
 
@@ -59,13 +67,30 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public boolean validateToken(String token) {
+    public String extractBearerToken(String authorizationHeader) {
+        if (StringUtils.hasText(authorizationHeader) && authorizationHeader.startsWith(BEARER_PREFIX)) {
+            return authorizationHeader.substring(BEARER_PREFIX.length());
+        }
+        return null;
+    }
+
+    public TokenValidationResult validateToken(String token) {
         try {
             Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
+            return TokenValidationResult.VALID;
+        } catch (ExpiredJwtException e) {
+            log.warn("만료된 토큰입니다.");
+            return TokenValidationResult.EXPIRED;
+        } catch (SignatureException e) {
+            log.warn("토큰 서명이 유효하지 않습니다.");
+            return TokenValidationResult.INVALID_SIGNATURE;
+        } catch (MalformedJwtException | IllegalArgumentException e) {
+            log.warn("토큰 형식이 올바르지 않습니다.");
+            return TokenValidationResult.MALFORMED;
+        } catch (UnsupportedJwtException e) {
+            log.warn("지원하지 않는 토큰 형식입니다.");
+            return TokenValidationResult.UNSUPPORTED;
         }
-        return false;
     }
 
     public Claims getClaims(String token) {

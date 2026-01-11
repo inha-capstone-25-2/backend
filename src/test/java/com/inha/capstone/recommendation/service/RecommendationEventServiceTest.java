@@ -7,7 +7,6 @@ import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
-import com.inha.capstone.user.domain.User;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +17,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -45,13 +43,7 @@ class RecommendationEventServiceTest {
         @Test
         void 이벤트_로깅_성공() {
             // given
-            User user = User.builder()
-                    .email("test@example.com")
-                    .username("testuser")
-                    .name("Test")
-                    .password("pw")
-                    .build();
-            ReflectionTestUtils.setField(user, "id", 1L);
+            Long userId = 1L;
 
             RecommendationEventCreateRequest request = new RecommendationEventCreateRequest(
                     1L,
@@ -72,7 +64,7 @@ class RecommendationEventServiceTest {
             given(repository.save(any(RecommendationEvent.class))).willReturn(savedEvent);
 
             // when
-            RecommendationEventResponse response = service.logEvent(user, request);
+            RecommendationEventResponse response = service.logEvent(userId, request);
 
             // then
             assertThat(response.id()).isEqualTo("evt-1");
@@ -83,13 +75,7 @@ class RecommendationEventServiceTest {
         @Test
         void 다른_사용자_이벤트_로깅_시_권한_예외_발생() {
             // given
-            User user = User.builder()
-                    .email("test@example.com")
-                    .username("testuser")
-                    .name("Test")
-                    .password("pw")
-                    .build();
-            ReflectionTestUtils.setField(user, "id", 1L);
+            Long userId = 1L;
 
             RecommendationEventCreateRequest request = new RecommendationEventCreateRequest(
                     999L,
@@ -100,7 +86,7 @@ class RecommendationEventServiceTest {
             );
 
             // when & then
-            assertThatThrownBy(() -> service.logEvent(user, request))
+            assertThatThrownBy(() -> service.logEvent(userId, request))
                     .isInstanceOf(CustomException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
 

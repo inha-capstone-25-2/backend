@@ -3,6 +3,9 @@ package com.inha.capstone.auth.controller;
 import com.inha.capstone.auth.dto.LoginRequest;
 import com.inha.capstone.auth.dto.LoginResponse;
 import com.inha.capstone.auth.dto.RefreshRequest;
+import com.inha.capstone.auth.dto.UserCreateRequest;
+import com.inha.capstone.auth.dto.UserResponse;
+import com.inha.capstone.auth.jwt.JwtTokenProvider;
 import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -10,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -22,6 +26,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtTokenProvider jwtTokenProvider;
+
+    @PostMapping("/register")
+    public ResponseEntity<UserResponse> register(@RequestBody @Valid UserCreateRequest request) {
+        UserResponse response = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
@@ -40,8 +51,14 @@ public class AuthController {
             @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestHeader("Authorization") String authorizationHeader
     ) {
-        String accessToken = authorizationHeader.substring(7);
+        String accessToken = jwtTokenProvider.extractBearerToken(authorizationHeader);
         authService.logout(authentication.getUserId(), accessToken);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @DeleteMapping("/quit")
+    public ResponseEntity<Void> quit(@AuthenticationPrincipal JwtAuthenticationToken authentication) {
+        authService.deleteAccount(authentication.getUserId());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

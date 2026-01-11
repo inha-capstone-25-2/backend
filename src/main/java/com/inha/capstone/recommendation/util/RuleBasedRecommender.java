@@ -4,7 +4,6 @@ import com.inha.capstone.activity.model.UserActivity;
 import com.inha.capstone.activity.repository.ActivityRepository;
 import com.inha.capstone.paper.model.Paper;
 import com.inha.capstone.recommendation.dto.RecommendationItem;
-import com.inha.capstone.user.domain.User;
 import com.inha.capstone.user.repository.UserInterestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +15,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,12 +32,12 @@ public class RuleBasedRecommender {
     private static final double WEIGHT_RECENCY = 0.1;
     private static final double WEIGHT_PERSONALIZATION = 0.3;
 
-    public List<RecommendationItem> recommend(User user, int topK, int candidateLimit) {
+    public List<RecommendationItem> recommend(Long userId, int topK, int candidateLimit) {
         // 1. Get User Interests
-        List<String> userInterests = userInterestRepository.findCategoryCodesByUserId(user.getId());
-        
+        List<String> userInterests = userInterestRepository.findCategoryCodesByUserId(userId);
+
         // 2. Get User Activity
-        List<UserActivity> activities = activityRepository.findRecentViewsByUserId(user.getId(), PageRequest.of(0, 50));
+        List<UserActivity> activities = activityRepository.findRecentViewsByUserId(userId, PageRequest.of(0, 50));
         List<String> viewedPaperIds = activities.stream().map(UserActivity::getDoi).collect(Collectors.toList());
         List<String> activityCategories = activities.stream()
                 .filter(a -> a.getMetadata() != null && a.getMetadata().containsKey("categories"))
@@ -54,9 +51,9 @@ public class RuleBasedRecommender {
         }
         query.with(Sort.by(Sort.Direction.DESC, "viewCount")); // Simplified sort
         query.limit(candidateLimit);
-        
+
         List<Paper> candidates = mongoTemplate.find(query, Paper.class);
-        
+
         // Fallback if no specific interest papers found
         if (candidates.isEmpty()) {
             query = new Query();
@@ -67,12 +64,12 @@ public class RuleBasedRecommender {
 
         // 4. Score Candidates
         List<RecommendationItem> recommendations = new ArrayList<>();
-        
+
         for (Paper paper : candidates) {
             double interestScore = scorer.calculateInterestScore(userInterests, paper);
             double popularityScore = scorer.calculatePopularityScore(paper);
             double recencyScore = scorer.calculateRecencyScore(paper);
-            double personalizationScore = scorer.calculatePersonalizationScore(user.getId(), paper, viewedPaperIds, activityCategories);
+            double personalizationScore = scorer.calculatePersonalizationScore(userId, paper, viewedPaperIds, activityCategories);
             
             double totalScore = (interestScore * WEIGHT_INTEREST) +
                                 (popularityScore * WEIGHT_POPULARITY) +

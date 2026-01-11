@@ -32,6 +32,7 @@ Controller → Service → Repository → Entity
 - 모든 파일의 마지막에는 개행 추가
 - 클래스 정의 직후 개행 추가
 - non-null은 primitive, nullable은 Wrapper
+- 클래스명은 필요한 경우가 아니면 FQN 대신 simple name을 사용한다.
 
 ### Entity
 
@@ -58,6 +59,7 @@ Controller → Service → Repository → Entity
 
 - 예외는 CustomException으로 처리
 - 조회 관련 메서드는 `readOnly = true`
+- `@Transactional`은 클래스가 아니라 메서드에 선언
 
 ### Repository
 

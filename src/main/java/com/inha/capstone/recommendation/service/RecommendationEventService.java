@@ -7,7 +7,6 @@ import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
 import com.inha.capstone.recommendation.model.RecommendationEvent;
 import com.inha.capstone.recommendation.repository.RecommendationEventRepository;
-import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,8 +21,8 @@ public class RecommendationEventService {
 
     private final RecommendationEventRepository repository;
 
-    public RecommendationEventResponse logEvent(User user, RecommendationEventCreateRequest request) {
-        if (!user.getId().equals(request.userId())) {
+    public RecommendationEventResponse logEvent(Long userId, RecommendationEventCreateRequest request) {
+        if (!userId.equals(request.userId())) {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
@@ -52,4 +51,3 @@ public class RecommendationEventService {
         return PageResponse.of(eventPage, RecommendationEventResponse::from);
     }
 }
-

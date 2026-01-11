@@ -1,6 +1,6 @@
 package com.inha.capstone.recommendation.controller;
 
-import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.recommendation.dto.RecommendationResponse;
 import com.inha.capstone.recommendation.service.RecommendationService;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +20,9 @@ public class RecommendationController {
 
     @GetMapping
     public ResponseEntity<RecommendationResponse> getRecommendations(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestParam(defaultValue = "10") int topK
     ) {
-        return ResponseEntity.ok(recommendationService.getRecommendations(userPrincipal.getUser(), topK));
+        return ResponseEntity.ok(recommendationService.getRecommendations(authentication.getUserId(), topK));
     }
 }
-

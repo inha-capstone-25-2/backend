@@ -1,6 +1,6 @@
 package com.inha.capstone.recommendation.controller;
 
-import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.common.dto.PageResponse;
 import com.inha.capstone.recommendation.dto.RecommendationEventCreateRequest;
 import com.inha.capstone.recommendation.dto.RecommendationEventResponse;
@@ -26,16 +26,16 @@ public class RecommendationEventController {
 
     @PostMapping
     public ResponseEntity<RecommendationEventResponse> logEvent(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestBody RecommendationEventCreateRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.logEvent(userPrincipal.getUser(), request));
+                .body(service.logEvent(authentication.getUserId(), request));
     }
 
     @GetMapping("/session/{sessionId}")
     public ResponseEntity<PageResponse<RecommendationEventResponse>> getSessionEvents(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @PathVariable String sessionId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int pageSize
@@ -45,7 +45,7 @@ public class RecommendationEventController {
 
     @GetMapping("/users/{userId}")
     public ResponseEntity<PageResponse<RecommendationEventResponse>> getUserEvents(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @PathVariable Long userId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int pageSize
@@ -53,5 +53,3 @@ public class RecommendationEventController {
         return ResponseEntity.ok(service.getEventsByUser(userId, page, pageSize));
     }
 }
-
-

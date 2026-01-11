@@ -1,10 +1,9 @@
 package com.inha.capstone.paper.controller;
 
-import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.service.PaperService;
-import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,25 +24,22 @@ public class PaperController {
 
     @GetMapping
     public ResponseEntity<PaperSearchResponse> searchPapers(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) List<String> categories,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "relevance") String sort
     ) {
-        User user = userPrincipal != null ? userPrincipal.getUser() : null;
-        
-        return ResponseEntity.ok(paperService.searchPapers(user, q, categories, page, sort));
+        Long userId = authentication != null ? authentication.getUserId() : null;
+        return ResponseEntity.ok(paperService.searchPapers(userId, q, categories, page, sort));
     }
 
     @GetMapping("/{paperId}")
     public ResponseEntity<PaperDetailResponse> getPaperDetail(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @PathVariable String paperId
     ) {
-        User user = userPrincipal != null ? userPrincipal.getUser() : null;
-
-
-        return ResponseEntity.ok(paperService.getPaperDetail(user, paperId));
+        Long userId = authentication != null ? authentication.getUserId() : null;
+        return ResponseEntity.ok(paperService.getPaperDetail(userId, paperId));
     }
 }

@@ -1,6 +1,6 @@
 package com.inha.capstone.user.controller;
 
-import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.user.dto.UserInterestAddRequest;
 import com.inha.capstone.user.dto.UserInterestListResponse;
 import com.inha.capstone.user.dto.UserInterestRemovalResponse;
@@ -28,26 +28,25 @@ public class UserInterestController {
 
     @PostMapping
     public ResponseEntity<List<String>> addInterests(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestBody UserInterestAddRequest request
     ) {
-        List<String> result = userInterestService.addInterests(userPrincipal.getUser(), request.categoryCodes());
+        List<String> result = userInterestService.addInterests(authentication.getUserId(), request.categoryCodes());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     @GetMapping
     public ResponseEntity<UserInterestListResponse> listInterests(
-            @AuthenticationPrincipal UserPrincipal userPrincipal
+            @AuthenticationPrincipal JwtAuthenticationToken authentication
     ) {
-        return ResponseEntity.ok(userInterestService.listInterests(userPrincipal.getUser()));
+        return ResponseEntity.ok(userInterestService.listInterests(authentication.getUserId()));
     }
 
     @DeleteMapping
     public ResponseEntity<UserInterestRemovalResponse> removeInterests(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestParam(name = "codes") List<String> codes
     ) {
-        return ResponseEntity.ok(userInterestService.removeInterests(userPrincipal.getUser(), codes));
+        return ResponseEntity.ok(userInterestService.removeInterests(authentication.getUserId(), codes));
     }
 }
-
