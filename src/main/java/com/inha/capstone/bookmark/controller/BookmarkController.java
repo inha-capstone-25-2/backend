@@ -1,9 +1,13 @@
 package com.inha.capstone.bookmark.controller;
 
-import com.inha.capstone.auth.security.UserPrincipal;
+import com.inha.capstone.auth.security.JwtAuthenticationToken;
 import com.inha.capstone.bookmark.dto.BookmarkCreateRequest;
 import com.inha.capstone.bookmark.dto.BookmarkResponse;
 import com.inha.capstone.bookmark.service.BookmarkService;
+import com.inha.capstone.common.exception.CustomException;
+import com.inha.capstone.common.exception.ErrorCode;
+import com.inha.capstone.user.domain.User;
+import com.inha.capstone.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,29 +27,37 @@ import java.util.List;
 public class BookmarkController {
 
     private final BookmarkService bookmarkService;
+    private final UserRepository userRepository;
 
     @PostMapping
     public ResponseEntity<BookmarkResponse> createBookmark(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @RequestBody BookmarkCreateRequest request
     ) {
-        return ResponseEntity.ok(bookmarkService.createBookmark(userPrincipal.getUser(), request));
+        User user = findUserById(authentication.getUserId());
+        return ResponseEntity.ok(bookmarkService.createBookmark(user, request));
     }
 
     @GetMapping
     public ResponseEntity<List<BookmarkResponse>> getBookmarks(
-            @AuthenticationPrincipal UserPrincipal userPrincipal
+            @AuthenticationPrincipal JwtAuthenticationToken authentication
     ) {
-        return ResponseEntity.ok(bookmarkService.getBookmarks(userPrincipal.getUser()));
+        User user = findUserById(authentication.getUserId());
+        return ResponseEntity.ok(bookmarkService.getBookmarks(user));
     }
 
     @DeleteMapping("/{bookmarkId}")
     public ResponseEntity<Void> deleteBookmark(
-            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @AuthenticationPrincipal JwtAuthenticationToken authentication,
             @PathVariable String bookmarkId
     ) {
-        bookmarkService.deleteBookmark(userPrincipal.getUser(), bookmarkId);
+        User user = findUserById(authentication.getUserId());
+        bookmarkService.deleteBookmark(user, bookmarkId);
         return ResponseEntity.ok().build();
     }
-}
 
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+}
