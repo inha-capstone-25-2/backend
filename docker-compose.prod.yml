@@ -9,6 +9,10 @@ services:
     environment:
       APP_ENV: prod
       REDIS_HOST: redis
+      PAPER_INGESTION_SOURCE: "${PAPER_INGESTION_SOURCE:-}"
+      PAPER_INGESTION_CRON: "${PAPER_INGESTION_CRON:--}"
+      PAPER_REQUIRE_CS_SUMMARY: "${PAPER_REQUIRE_CS_SUMMARY:-false}"
+      PAPER_NLP_URL: "${PAPER_NLP_URL:-}"
     ports:
       - "80:8080"
     extra_hosts:

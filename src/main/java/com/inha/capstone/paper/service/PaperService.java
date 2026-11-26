@@ -6,11 +6,11 @@ import com.inha.capstone.paper.dto.PaperDetailResponse;
 import com.inha.capstone.paper.dto.PaperListItem;
 import com.inha.capstone.paper.dto.PaperSearchResponse;
 import com.inha.capstone.paper.model.Paper;
+import com.inha.capstone.paper.model.PaperPublicationPolicy;
 import com.inha.capstone.paper.repository.PaperRepository;
 import com.inha.capstone.user.domain.User;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -22,17 +22,18 @@ import org.springframework.data.mongodb.core.query.TextQuery;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PaperService {
+
     private final PaperRepository paperRepository;
     private final MongoTemplate mongoTemplate;
 
+    @Value("${app.papers.require-cs-summary:false}")
+    private boolean requireCsSummary;
 
     public PaperSearchResponse searchPapers(User user, String query, List<String> categories, int page, String sortBy) {
         int pageSize = 10;
@@ -41,40 +42,18 @@ public class PaperService {
             page = 1;
         }
         Pageable pageable = PageRequest.of(page - 1, pageSize, getSort(sortBy));
-        
-        long total;
-        List<Paper> papers;
-        boolean isApproximate = false;
 
-        if (query != null && !query.isEmpty()) {
-            // Text Search
-            TextCriteria criteria = TextCriteria.forDefaultLanguage().matching(query);
-            Query textQuery = TextQuery.queryText(criteria).sortByScore();
-            
-            if (categories != null && !categories.isEmpty()) {
-                textQuery.addCriteria(Criteria.where("categories").in(categories));
-            }
-            
-            total = mongoTemplate.count(textQuery, Paper.class);
-            textQuery.with(pageable);
-            papers = mongoTemplate.find(textQuery, Paper.class);
-            
-        } else {
-            // Category Filter or All
-            Query simpleQuery = new Query();
-            if (categories != null && !categories.isEmpty()) {
-                simpleQuery.addCriteria(Criteria.where("categories").in(categories));
-            }
-            
-            total = mongoTemplate.count(simpleQuery, Paper.class);
-            simpleQuery.with(pageable);
-            papers = mongoTemplate.find(simpleQuery, Paper.class);
-            
+        Query searchQuery = query != null && !query.isEmpty()
+                ? TextQuery.queryText(TextCriteria.forDefaultLanguage().matching(query)).sortByScore()
+                : new Query();
+        if (categories != null && !categories.isEmpty()) {
+            searchQuery.addCriteria(Criteria.where("categories").in(categories));
         }
+        applyVisibility(searchQuery);
 
-        if (total >= 10000) {
-            isApproximate = true;
-        }
+        long total = mongoTemplate.count(searchQuery, Paper.class);
+        List<Paper> papers = mongoTemplate.find(searchQuery.with(pageable), Paper.class);
+        boolean isApproximate = total >= 10000;
 
         List<PaperListItem> items = papers.stream()
                 .map(PaperListItem::from)
@@ -97,8 +76,8 @@ public class PaperService {
     public PaperDetailResponse getPaperDetail(User user, String paperId) {
         // Atomic increment using MongoTemplate
         Query query = new Query(Criteria.where("id").is(paperId));
+        applyVisibility(query);
         Update update = new Update().inc("viewCount", 1);
-
 
         Paper paper = mongoTemplate.findAndModify(
             query,
@@ -114,6 +93,12 @@ public class PaperService {
         // TODO: Log activity (view)
 
         return PaperDetailResponse.from(paper);
+    }
+
+    private void applyVisibility(Query query) {
+        if (requireCsSummary) {
+            query.addCriteria(PaperPublicationPolicy.visibilityCriteria());
+        }
     }
 
     private Sort getSort(String sortBy) {

@@ -31,6 +31,12 @@ app:
     origins: ${cors.origins}
   gpu-server:
     url: ${gpu-server.url}
+  papers:
+    require-cs-summary: ${PAPER_REQUIRE_CS_SUMMARY:false}
+    ingestion:
+      source: ${PAPER_INGESTION_SOURCE:}
+      nlp-url: ${PAPER_NLP_URL:}
+      cron: "${PAPER_INGESTION_CRON:-}"
 
 management:
   endpoints:
